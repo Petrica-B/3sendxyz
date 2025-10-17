@@ -1,0 +1,324 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #ffffff;
+  --panel: #f9fafb;
+  --muted: #6b7280;
+  --text: #111827;
+  --accent: #f7931a; /* bitcoin orange */
+  --border: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Enforce font in wallet UI */
+[class^="rk-"],
+[class*=" rk-"],
+[class^="rainbowkit-"],
+[class*=" rainbowkit-"] {
+  font-family: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.accentLink {
+  color: var(--accent);
+  text-decoration: none;
+}
+.accentLink:hover {
+  text-decoration: underline;
+}
+
+.mono {
+  font-family: inherit;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.navbarInner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  /* Keep horizontal padding; this element also has .container */
+  padding: 14px 24px;
+}
+/* Minimal connect button is our own .button, no override needed */
+.navlinks {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-self: center;
+}
+.navbarBrand {
+  justify-self: start;
+}
+.navbarWallet {
+  justify-self: end;
+}
+.brand {
+  font-weight: 800;
+  font-size: 18px;
+}
+.gradientText {
+  color: var(--text);
+}
+.brandLogo {
+  height: 22px;
+  display: block;
+  margin-left: -8px;
+  margin-right: -8px;
+}
+@media (max-width: 767px) {
+  .navbar .navlinks {
+    display: none;
+  }
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.muted {
+  color: var(--muted);
+}
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.button:hover {
+  background: #f3f4f6;
+}
+
+.button.secondary {
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.dropzone {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  background: var(--panel);
+}
+
+.transfers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.transferItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+.status {
+  font-weight: 600;
+}
+
+.details {
+  margin-top: 8px;
+}
+.pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+}
+
+.hero {
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.headline {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+.subhead {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.footer {
+  margin-top: 40px;
+  border-top: 1px solid var(--border);
+  padding: 18px 0 40px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+}
+
+/* (Reverted) ServedBy footer wrapper styles removed */
+/* ServedBy footer styling wrapper (design only; no logic changes) */
+.servedBy {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.servedBy .label {
+  color: var(--muted);
+}
+.servedBy a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.servedBy a:hover {
+  text-decoration: underline;
+}
+.servedBy .pill {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #fff;
+}
+.servedBy .nodeName,
+.servedBy .unknown {
+  color: var(--accent);
+  font-weight: 400;
+}
+.servedBy .sep {
+  color: var(--muted);
+  margin: 0 4px;
+}
+.kbd {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+/* Mobile bottom tab bar */
+.mobileTabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 19;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.mobileTabbarInner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 6px 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.mobileTabItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.mobileTabItem svg {
+  width: 22px;
+  height: 22px;
+}
+.mobileTabItem.active {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Reserve space for the tabbar on small screens */
+@media (max-width: 767px) {
+  body {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+  /* Ensure spacing between brand and wallet button on mobile */
+  .navbarInner {
+    gap: 12px;
+  }
+  /* Add side padding on mobile so content doesn't touch edges */
+  .navbarInner {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+@media (min-width: 768px) {
+  .mobileTabbar {
+    display: none;
+  }
+}

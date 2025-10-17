@@ -18,11 +18,11 @@ export function Footer() {
         </div>
         <div className="row" style={{ gap: 12 }}>
           <a
-            href="https://docs.base.org/get-started/build-app"
+            href="https://github.com/Petrica-B/3sendxyz"
             target="_blank"
             rel="noreferrer"
           >
-            3send Git Repo
+            3sendxyz Git Repo
           </a>
         </div>
       </div>

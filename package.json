@@ -19,6 +19,7 @@
     "wagmi": "^2.13.3"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.14",
     "@types/node": "^20.14.2",
     "@types/react": "^18.2.79",
     "autoprefixer": "^10.4.21",

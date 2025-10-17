@@ -38,7 +38,9 @@ function b64(bytes: ArrayBuffer | Uint8Array): string {
 }
 
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
-  const d = await crypto.subtle.digest('SHA-256', data);
+  const ab = new ArrayBuffer(data.byteLength);
+  new Uint8Array(ab).set(data);
+  const d = await crypto.subtle.digest('SHA-256', ab);
   return new Uint8Array(d);
 }
 
@@ -60,7 +62,8 @@ export async function createRatio1Session(args: {
     )
   );
   const keyMaterial = seed.slice(0, 32);
-  const key = await crypto.subtle.importKey('raw', keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const kmBuf = new ArrayBuffer(keyMaterial.byteLength); new Uint8Array(kmBuf).set(keyMaterial);
+  const key = await crypto.subtle.importKey('raw', kmBuf, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   return {
     id: toHex(seed.slice(0, 16)),
     initiator: args.initiator,
@@ -83,7 +86,11 @@ export async function encryptFileToPacket(args: {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const data = new Uint8Array(await file.arrayBuffer());
   const aad = strToBytes(`ratio1|${session.id}|${session.initiator}|${session.recipient}`);
-  const ctBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, session.key, data);
+  // Ensure WebCrypto receives ArrayBuffer (not ArrayBufferLike) for all BufferSources
+  const ivBuf = new ArrayBuffer(iv.byteLength); new Uint8Array(ivBuf).set(iv);
+  const aadBuf = new ArrayBuffer(aad.byteLength); new Uint8Array(aadBuf).set(aad);
+  const dataBuf = new ArrayBuffer(data.byteLength); new Uint8Array(dataBuf).set(data);
+  const ctBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: ivBuf, additionalData: aadBuf }, session.key, dataBuf);
   // mock tx hash derived from iv + first chunk of ciphertext + session id
   const txHashBytes = await sha256(concatBytes(iv, new Uint8Array(ctBuf).slice(0, 64), strToBytes(session.id)));
   const sendTxHash = '0x' + toHex(txHashBytes);
@@ -109,11 +116,16 @@ export async function encryptFileToPacket(args: {
 export async function decryptPacketToBlob(packet: Ratio1Packet): Promise<Blob> {
   if (!packet.keyMaterialB64) throw new Error('Missing key material (mock).');
   const keyMaterial = fromB64(packet.keyMaterialB64);
-  const key = await crypto.subtle.importKey('raw', keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const kmBuf = new ArrayBuffer(keyMaterial.byteLength); new Uint8Array(kmBuf).set(keyMaterial);
+  const key = await crypto.subtle.importKey('raw', kmBuf, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
   const iv = fromB64(packet.iv);
   const aad = strToBytes(`ratio1|${packet.sessionId}|${packet.sender}|${packet.recipient}`);
   const ciphertext = fromB64(packet.ciphertext);
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: aad }, key, ciphertext);
+  // Convert to ArrayBuffer for WebCrypto
+  const ivBuf = new ArrayBuffer(iv.byteLength); new Uint8Array(ivBuf).set(iv);
+  const aadBuf = new ArrayBuffer(aad.byteLength); new Uint8Array(aadBuf).set(aad);
+  const ctBuf = new ArrayBuffer(ciphertext.byteLength); new Uint8Array(ctBuf).set(ciphertext);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBuf, additionalData: aadBuf }, key, ctBuf);
   return new Blob([plain], { type: 'application/octet-stream' });
 }
 

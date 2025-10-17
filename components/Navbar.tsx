@@ -3,7 +3,6 @@
 import { MinimalConnect } from "@/components/MinimalConnect";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { useAccount } from "wagmi";
 
 function NavItem({ href, label }: { href: string; label: string }) {
@@ -40,14 +39,7 @@ export function Navbar() {
               alignItems: "center",
             }}
           >
-            <Image
-              src="/3sendlogo.svg"
-              alt="3send"
-              width={100}
-              height={50}
-              priority
-              className="brandLogo"
-            />
+            3send
           </Link>
         </div>
         <nav className="navlinks">

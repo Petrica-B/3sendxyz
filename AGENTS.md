@@ -11,7 +11,7 @@ Use this guide for day-to-day development and refresh it when workflows change.
 - Root configs (`tailwind.config.cjs`, `postcss.config.cjs`, `tsconfig.json`) define build and lint behavior; avoid per-feature overrides.
 
 - Smart contract implementation lives at: https://github.com/aledefra/3sendxyz-sc
-- Front-end ABI copy is available in `lib/SmartContract.ts`.
+- Front-end ABI copy is available in `lib/SmartContracts.ts`.
 
 ## Build, Test, and Development Commands
 

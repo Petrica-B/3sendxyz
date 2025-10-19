@@ -9,12 +9,16 @@ function parseRecord(raw: string): StoredUploadRecord | null {
   try {
     const parsed = JSON.parse(raw) as StoredUploadRecord;
     if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.cid !== 'string') return null;
     if (typeof parsed.filename !== 'string') return null;
     if (typeof parsed.recipient !== 'string') return null;
     if (typeof parsed.initiator !== 'string') return null;
     if (typeof parsed.txHash !== 'string') return null;
     if (typeof parsed.filesize !== 'number') return null;
     if (typeof parsed.sentAt !== 'number') return null;
+    if (typeof parsed.tierId !== 'number') return null;
+    if (typeof parsed.usdcAmount !== 'string') return null;
+    if (typeof parsed.r1Amount !== 'string') return null;
     return parsed;
   } catch {
     return null;

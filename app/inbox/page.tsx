@@ -2,9 +2,11 @@
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
+import { getTierById } from '@/lib/constants';
 import type { StoredUploadRecord } from '@/lib/types';
 import { useCallback, useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
+import { formatUnits } from 'viem';
 
 type ReceivedItem = StoredUploadRecord & { id: string };
 
@@ -73,49 +75,46 @@ export default function InboxPage() {
     });
   }, [records]);
 
-  const onDownload = useCallback(
-    async (item: ReceivedItem) => {
-      try {
-        setDownloadingId(item.id);
-        const response = await fetch('/api/inbox/download', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            cid: item.cid,
-            recipient: item.recipient,
-            filename: item.filename,
-          }),
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.success || !payload?.file?.base64) {
-          throw new Error(payload?.error || 'Download failed');
-        }
-        const rawBase64 = payload.file.base64;
-        const downloadUrl =
-          typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
-            ? rawBase64
-            : `data:application/octet-stream;base64,${rawBase64 ?? ''}`;
-        const fileName =
-          payload.file.filename && typeof payload.file.filename === 'string'
-            ? payload.file.filename
-            : item.filename;
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        alert(message);
-      } finally {
-        setDownloadingId((current) => (current === item.id ? null : current));
+  const onDownload = useCallback(async (item: ReceivedItem) => {
+    try {
+      setDownloadingId(item.id);
+      const response = await fetch('/api/inbox/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cid: item.cid,
+          recipient: item.recipient,
+          filename: item.filename,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success || !payload?.file?.base64) {
+        throw new Error(payload?.error || 'Download failed');
       }
-    },
-    []
-  );
+      const rawBase64 = payload.file.base64;
+      const downloadUrl =
+        typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
+          ? rawBase64
+          : `data:application/octet-stream;base64,${rawBase64 ?? ''}`;
+      const fileName =
+        payload.file.filename && typeof payload.file.filename === 'string'
+          ? payload.file.filename
+          : item.filename;
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      alert(message);
+    } finally {
+      setDownloadingId((current) => (current === item.id ? null : current));
+    }
+  }, []);
 
   if (!isConnected || !address) {
     return (
@@ -141,58 +140,73 @@ export default function InboxPage() {
             Loading inbox…
           </div>
         )}
-        {error && (
-          <div style={{ color: '#f87171', fontSize: 12 }}>
-            {error}
-          </div>
-        )}
+        {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
         {!loading && !error && records.length === 0 ? (
           <div className="muted" style={{ fontSize: 12 }}>
             No files in your inbox yet.
           </div>
         ) : (
           <div className="col" style={{ gap: 10 }}>
-            {records.map((item) => (
-              <div key={item.id} className="transferItem">
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700 }} className="mono">
-                    {item.filename}
-                  </div>
-                  <div className="muted mono" style={{ fontSize: 12 }}>
-                    {formatBytes(item.filesize)} · received {formatDate(item.sentAt)}
-                  </div>
-                  {expanded[item.id] && (
-                    <div className="details mono" style={{ fontSize: 12 }}>
-                      <div>
-                        from: <AddressLink address={item.initiator} size={5} />
-                      </div>
-                      <div>
-                        tx: <TxLink tx={item.txHash} size={5} />
-                      </div>
-                      <div>note: {item.note ?? '—'}</div>
-                      <div>received: {formatDateShort(item.sentAt)}</div>
+            {records.map((item) => {
+              const tier = getTierById(item.tierId);
+              let r1Burn: string | null = null;
+              let usdBurn: string | null = null;
+              try {
+                r1Burn = formatUnits(BigInt(item.r1Amount), 18);
+              } catch {}
+              try {
+                usdBurn = formatUnits(BigInt(item.usdcAmount), 6);
+              } catch {}
+              const r1Display = r1Burn ? Number.parseFloat(r1Burn).toFixed(6) : null;
+              const usdDisplay = usdBurn ? Number.parseFloat(usdBurn).toFixed(2) : null;
+              return (
+                <div key={item.id} className="transferItem">
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700 }} className="mono">
+                      {item.filename}
                     </div>
-                  )}
-                </div>
-                <div className="col" style={{ gap: 8, alignItems: 'flex-end' }}>
-                  <div className="row" style={{ gap: 8 }}>
-                    <button
-                      className="button"
-                      onClick={() => onDownload(item)}
-                      disabled={downloadingId === item.id}
-                    >
-                      {downloadingId === item.id ? 'Downloading…' : 'Download'}
-                    </button>
-                    <button
-                      className="button secondary"
-                      onClick={() => setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
-                    >
-                      {expanded[item.id] ? 'Hide Details' : 'Details'}
-                    </button>
+                    <div className="muted mono" style={{ fontSize: 12 }}>
+                      {formatBytes(item.filesize)} · received {formatDate(item.sentAt)}
+                    </div>
+                    {expanded[item.id] && (
+                      <div className="details mono" style={{ fontSize: 12 }}>
+                        <div>
+                          from: <AddressLink address={item.initiator} size={5} />
+                        </div>
+                        <div>
+                          tx: <TxLink tx={item.txHash} size={5} />
+                        </div>
+                        <div>tier: {tier ? tier.label : `Tier ${item.tierId}`}</div>
+                        <div>
+                          burned: {r1Display ?? '—'} R1 {usdDisplay ? `(≈ ${usdDisplay} USDC)` : ''}
+                        </div>
+                        <div>note: {item.note ?? '—'}</div>
+                        <div>received: {formatDateShort(item.sentAt)}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="col" style={{ gap: 8, alignItems: 'flex-end' }}>
+                    <div className="row" style={{ gap: 8 }}>
+                      <button
+                        className="button"
+                        onClick={() => onDownload(item)}
+                        disabled={downloadingId === item.id}
+                      >
+                        {downloadingId === item.id ? 'Downloading…' : 'Download'}
+                      </button>
+                      <button
+                        className="button secondary"
+                        onClick={() =>
+                          setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                        }
+                      >
+                        {expanded[item.id] ? 'Hide Details' : 'Details'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

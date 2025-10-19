@@ -3,9 +3,11 @@
 import { AddressLink, TxLink } from '@/components/Links';
 import { SendFileCard } from '@/components/SendFileCard';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
+import { getTierById } from '@/lib/constants';
 import type { StoredUploadRecord } from '@/lib/types';
 import { useCallback, useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
+import { formatUnits } from 'viem';
 
 type SentItem = StoredUploadRecord & { id: string };
 
@@ -97,11 +99,7 @@ export default function OutboxPage() {
             Loading sent files…
           </div>
         )}
-        {error && (
-          <div style={{ color: '#f87171', fontSize: 12 }}>
-            {error}
-          </div>
-        )}
+        {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
         {!loading && !error && records.length === 0 ? (
           <div className="muted" style={{ fontSize: 12 }}>
             No sent files yet.
@@ -109,47 +107,59 @@ export default function OutboxPage() {
         ) : null}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
-            {records.map((item) => (
-              <div key={item.id} className="transferItem">
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700 }} className="mono">
-                    {item.filename}
-                  </div>
-                  <div className="muted mono" style={{ fontSize: 12 }}>
-                    {formatBytes(item.filesize)} · sent {formatDate(item.sentAt)}
-                  </div>
-                  {expanded[item.id] && (
-                    <div className="details mono" style={{ fontSize: 12 }}>
-                      <div>
-                        to: <AddressLink address={item.recipient} size={5} />
-                      </div>
-                      <div>
-                        from: <AddressLink address={item.initiator} size={5} />
-                      </div>
-                      <div>
-                        tx: <TxLink tx={item.txHash} size={5} />
-                      </div>
-                      <div>
-                        note: {item.note ? item.note : '—'}
-                      </div>
-                      <div>
-                        sent at: {formatDateShort(item.sentAt)}
-                      </div>
+            {records.map((item) => {
+              const tier = getTierById(item.tierId);
+              let r1Burn: string | null = null;
+              let usdBurn: string | null = null;
+              try {
+                r1Burn = formatUnits(BigInt(item.r1Amount), 18);
+              } catch {}
+              try {
+                usdBurn = formatUnits(BigInt(item.usdcAmount), 6);
+              } catch {}
+              const r1Display = r1Burn ? Number.parseFloat(r1Burn).toFixed(6) : null;
+              const usdDisplay = usdBurn ? Number.parseFloat(usdBurn).toFixed(2) : null;
+              return (
+                <div key={item.id} className="transferItem">
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700 }} className="mono">
+                      {item.filename}
                     </div>
-                  )}
+                    <div className="muted mono" style={{ fontSize: 12 }}>
+                      {formatBytes(item.filesize)} · sent {formatDate(item.sentAt)}
+                    </div>
+                    {expanded[item.id] && (
+                      <div className="details mono" style={{ fontSize: 12 }}>
+                        <div>
+                          to: <AddressLink address={item.recipient} size={5} />
+                        </div>
+                        <div>
+                          from: <AddressLink address={item.initiator} size={5} />
+                        </div>
+                        <div>
+                          tx: <TxLink tx={item.txHash} size={5} />
+                        </div>
+                        <div>tier: {tier ? tier.label : `Tier ${item.tierId}`}</div>
+                        <div>
+                          burned: {r1Display ?? '—'} R1{' '}
+                          {usdDisplay ? `(≈ ${usdDisplay} USDC)` : ''}
+                        </div>
+                        <div>note: {item.note ? item.note : '—'}</div>
+                        <div>sent at: {formatDateShort(item.sentAt)}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="col" style={{ alignItems: 'flex-end', gap: 8 }}>
+                    <button
+                      className="button secondary"
+                      onClick={() => setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                    >
+                      {expanded[item.id] ? 'Hide Details' : 'Details'}
+                    </button>
+                  </div>
                 </div>
-                <div className="col" style={{ alignItems: 'flex-end', gap: 8 }}>
-                  <button
-                    className="button secondary"
-                    onClick={() =>
-                      setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
-                    }
-                  >
-                    {expanded[item.id] ? 'Hide Details' : 'Details'}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

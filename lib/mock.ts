@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { addInbox, addOutbox } from '@/lib/store';
 
@@ -27,9 +27,18 @@ export async function seedMockForAddress(address: string) {
   } catch {}
 
   // Add 4 dummy outbox items with full details
-  function randHex(len: number) { const chars = '0123456789abcdef'; let s = ''; for (let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)]; return s; }
-  function randomAddress() { return `0x${randHex(40)}`; }
-  function randomTx() { return `0x${randHex(64)}`; }
+  function randHex(len: number) {
+    const chars = '0123456789abcdef';
+    let s = '';
+    for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+  function randomAddress() {
+    return `0x${randHex(40)}`;
+  }
+  function randomTx() {
+    return `0x${randHex(64)}`;
+  }
   function randomMsg() {
     const msgs = [
       'your seed phrase',
@@ -39,18 +48,13 @@ export async function seedMockForAddress(address: string) {
       'api token',
       'otp backup',
     ];
-    return msgs[Math.floor(Math.random()*msgs.length)];
+    return msgs[Math.floor(Math.random() * msgs.length)];
   }
   const now = Date.now();
-  const outFiles = [
-    'proposal-v3.pdf',
-    'wireframe.png',
-    'backup.key',
-    'photos.tar.gz',
-  ];
+  const outFiles = ['proposal-v3.pdf', 'wireframe.png', 'backup.key', 'photos.tar.gz'];
   for (let i = 0; i < 4; i++) {
     const createdAt = now - Math.floor(Math.random() * (1000 * 60 * 60 * 24 * 5));
-    const expiresAt = now + (1000 * 60 * 60 * 24 * (7 + Math.floor(Math.random() * 21)));
+    const expiresAt = now + 1000 * 60 * 60 * 24 * (7 + Math.floor(Math.random() * 21));
     addOutbox(address, {
       id: `dummy-out-${Date.now()}-${i}`,
       to: randomAddress(),
@@ -73,15 +77,10 @@ export async function seedMockForAddress(address: string) {
   }
 
   // Add 4 dummy inbox items with full details
-  const files = [
-    'statement-aug.csv',
-    'sprints-roadmap.pdf',
-    'screens-v2.zip',
-    'nda-signed.docx',
-  ];
+  const files = ['statement-aug.csv', 'sprints-roadmap.pdf', 'screens-v2.zip', 'nda-signed.docx'];
   for (let i = 0; i < 4; i++) {
     const createdAt = now - Math.floor(Math.random() * (1000 * 60 * 60 * 24 * 5));
-    const expiresAt = now + (1000 * 60 * 60 * 24 * (7 + Math.floor(Math.random() * 21))); // 7-28 days
+    const expiresAt = now + 1000 * 60 * 60 * 24 * (7 + Math.floor(Math.random() * 21)); // 7-28 days
     addInbox(address, {
       id: `dummy-${Date.now()}-${i}`,
       from: randomAddress(),

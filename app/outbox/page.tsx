@@ -1,19 +1,12 @@
-"use client";
+'use client';
 
-import { useAccount } from "wagmi";
-import { useEffect, useState } from "react";
-import { SendFileCard } from "@/components/SendFileCard";
-import { getPacket, listOutbox, OutboxItem, subscribe } from "@/lib/store";
-import {
-  shortAddress,
-  shortHex,
-  formatBytes,
-  formatDate,
-  formatDateShort,
-  daysLeft,
-} from "@/lib/format";
-import { AddressLink, TxLink, NodeLinks } from "@/components/Links";
-import { seedMockForAddress } from "@/lib/mock";
+import { AddressLink, NodeLinks, TxLink } from '@/components/Links';
+import { SendFileCard } from '@/components/SendFileCard';
+import { daysLeft, formatBytes, formatDate, formatDateShort } from '@/lib/format';
+import { seedMockForAddress } from '@/lib/mock';
+import { getPacket, listOutbox, OutboxItem, subscribe } from '@/lib/store';
+import { useEffect, useState } from 'react';
+import { useAccount } from 'wagmi';
 
 export default function OutboxPage() {
   const { address, isConnected } = useAccount();
@@ -79,7 +72,7 @@ export default function OutboxPage() {
                     {t.name}
                   </div>
                   <div className="muted mono" style={{ fontSize: 12 }}>
-                    {" "}
+                    {' '}
                     {formatBytes(t.size)} · {formatDate(t.createdAt)}
                   </div>
                   {!t.isMock && t.viaNodes && t.viaNodes.length > 0 && (
@@ -92,49 +85,35 @@ export default function OutboxPage() {
                       {t.isMock ? (
                         <>
                           <div>
-                            to:{" "}
-                            <AddressLink
-                              address={t.details?.peer || t.to}
-                              size={5}
-                            />
+                            to: <AddressLink address={t.details?.peer || t.to} size={5} />
                           </div>
                           <div>
-                            tx: <TxLink tx={t.details?.tx || ""} size={5} />
+                            tx: <TxLink tx={t.details?.tx || ''} size={5} />
                           </div>
                           <div>
-                            via:{" "}
-                            <NodeLinks
-                              aliases={
-                                t.details?.via || ["draco", "lyra", "aether"]
-                              }
-                            />
+                            via:{' '}
+                            <NodeLinks aliases={t.details?.via || ['draco', 'lyra', 'aether']} />
+                          </div>
+                          <div>encrypted message: {t.details?.encMsg || 'message'} (0 bytes)</div>
+                          <div>
+                            received:{' '}
+                            {t.details?.received ? formatDateShort(t.details.received) : '—'}
                           </div>
                           <div>
-                            encrypted message: {t.details?.encMsg || "message"}{" "}
-                            (0 bytes)
-                          </div>
-                          <div>
-                            received:{" "}
-                            {t.details?.received
-                              ? formatDateShort(t.details.received)
-                              : "—"}
-                          </div>
-                          <div>
-                            expiring:{" "}
+                            expiring:{' '}
                             {t.details?.expiring
                               ? `${formatDateShort(
                                   t.details.expiring
                                 )} (${daysLeft(t.details.expiring)})`
-                              : "—"}
+                              : '—'}
                           </div>
                         </>
                       ) : (
                         (() => {
                           const p = getPacket(t.packetId);
-                          const cipherPreview =
-                            p?.ciphertext?.slice(0, 24) || "";
+                          const cipherPreview = p?.ciphertext?.slice(0, 24) || '';
                           const clen = p?.ciphertext
-                            ? typeof atob !== "undefined"
+                            ? typeof atob !== 'undefined'
                               ? atob(p.ciphertext).length
                               : p.ciphertext.length
                             : 0;
@@ -144,26 +123,18 @@ export default function OutboxPage() {
                                 to: <AddressLink address={t.to} size={5} />
                               </div>
                               <div>
-                                tx:{" "}
-                                {p?.sendTxHash ? (
-                                  <TxLink tx={p.sendTxHash} size={5} />
-                                ) : (
-                                  "—"
-                                )}
+                                tx: {p?.sendTxHash ? <TxLink tx={p.sendTxHash} size={5} /> : '—'}
                               </div>
                               <div>
-                                via:{" "}
+                                via:{' '}
                                 <NodeLinks
                                   aliases={
-                                    t.viaNodes && t.viaNodes.length
-                                      ? t.viaNodes
-                                      : p?.viaNodes || []
+                                    t.viaNodes && t.viaNodes.length ? t.viaNodes : p?.viaNodes || []
                                   }
                                 />
                               </div>
                               <div>
-                                encrypted message: {cipherPreview}… ({clen}{" "}
-                                bytes)
+                                encrypted message: {cipherPreview}… ({clen} bytes)
                               </div>
                               <div>received: —</div>
                               <div>expiring: —</div>
@@ -174,14 +145,12 @@ export default function OutboxPage() {
                     </div>
                   )}
                 </div>
-                <div className="col" style={{ alignItems: "flex-end", gap: 8 }}>
+                <div className="col" style={{ alignItems: 'flex-end', gap: 8 }}>
                   <button
                     className="button secondary"
-                    onClick={() =>
-                      setExpanded((e) => ({ ...e, [t.id]: !e[t.id] }))
-                    }
+                    onClick={() => setExpanded((e) => ({ ...e, [t.id]: !e[t.id] }))}
                   >
-                    {expanded[t.id] ? "Hide Details" : "Details"}
+                    {expanded[t.id] ? 'Hide Details' : 'Details'}
                   </button>
                 </div>
               </div>

@@ -62,8 +62,12 @@ export async function createRatio1Session(args: {
     )
   );
   const keyMaterial = seed.slice(0, 32);
-  const kmBuf = new ArrayBuffer(keyMaterial.byteLength); new Uint8Array(kmBuf).set(keyMaterial);
-  const key = await crypto.subtle.importKey('raw', kmBuf, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const kmBuf = new ArrayBuffer(keyMaterial.byteLength);
+  new Uint8Array(kmBuf).set(keyMaterial);
+  const key = await crypto.subtle.importKey('raw', kmBuf, { name: 'AES-GCM', length: 256 }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
   return {
     id: toHex(seed.slice(0, 16)),
     initiator: args.initiator,
@@ -87,12 +91,21 @@ export async function encryptFileToPacket(args: {
   const data = new Uint8Array(await file.arrayBuffer());
   const aad = strToBytes(`ratio1|${session.id}|${session.initiator}|${session.recipient}`);
   // Ensure WebCrypto receives ArrayBuffer (not ArrayBufferLike) for all BufferSources
-  const ivBuf = new ArrayBuffer(iv.byteLength); new Uint8Array(ivBuf).set(iv);
-  const aadBuf = new ArrayBuffer(aad.byteLength); new Uint8Array(aadBuf).set(aad);
-  const dataBuf = new ArrayBuffer(data.byteLength); new Uint8Array(dataBuf).set(data);
-  const ctBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: ivBuf, additionalData: aadBuf }, session.key, dataBuf);
+  const ivBuf = new ArrayBuffer(iv.byteLength);
+  new Uint8Array(ivBuf).set(iv);
+  const aadBuf = new ArrayBuffer(aad.byteLength);
+  new Uint8Array(aadBuf).set(aad);
+  const dataBuf = new ArrayBuffer(data.byteLength);
+  new Uint8Array(dataBuf).set(data);
+  const ctBuf = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: ivBuf, additionalData: aadBuf },
+    session.key,
+    dataBuf
+  );
   // mock tx hash derived from iv + first chunk of ciphertext + session id
-  const txHashBytes = await sha256(concatBytes(iv, new Uint8Array(ctBuf).slice(0, 64), strToBytes(session.id)));
+  const txHashBytes = await sha256(
+    concatBytes(iv, new Uint8Array(ctBuf).slice(0, 64), strToBytes(session.id))
+  );
   const sendTxHash = '0x' + toHex(txHashBytes);
   return {
     id: crypto.randomUUID(),
@@ -116,16 +129,26 @@ export async function encryptFileToPacket(args: {
 export async function decryptPacketToBlob(packet: Ratio1Packet): Promise<Blob> {
   if (!packet.keyMaterialB64) throw new Error('Missing key material (mock).');
   const keyMaterial = fromB64(packet.keyMaterialB64);
-  const kmBuf = new ArrayBuffer(keyMaterial.byteLength); new Uint8Array(kmBuf).set(keyMaterial);
-  const key = await crypto.subtle.importKey('raw', kmBuf, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const kmBuf = new ArrayBuffer(keyMaterial.byteLength);
+  new Uint8Array(kmBuf).set(keyMaterial);
+  const key = await crypto.subtle.importKey('raw', kmBuf, { name: 'AES-GCM', length: 256 }, false, [
+    'decrypt',
+  ]);
   const iv = fromB64(packet.iv);
   const aad = strToBytes(`ratio1|${packet.sessionId}|${packet.sender}|${packet.recipient}`);
   const ciphertext = fromB64(packet.ciphertext);
   // Convert to ArrayBuffer for WebCrypto
-  const ivBuf = new ArrayBuffer(iv.byteLength); new Uint8Array(ivBuf).set(iv);
-  const aadBuf = new ArrayBuffer(aad.byteLength); new Uint8Array(aadBuf).set(aad);
-  const ctBuf = new ArrayBuffer(ciphertext.byteLength); new Uint8Array(ctBuf).set(ciphertext);
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBuf, additionalData: aadBuf }, key, ctBuf);
+  const ivBuf = new ArrayBuffer(iv.byteLength);
+  new Uint8Array(ivBuf).set(iv);
+  const aadBuf = new ArrayBuffer(aad.byteLength);
+  new Uint8Array(aadBuf).set(aad);
+  const ctBuf = new ArrayBuffer(ciphertext.byteLength);
+  new Uint8Array(ctBuf).set(ciphertext);
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: ivBuf, additionalData: aadBuf },
+    key,
+    ctBuf
+  );
   return new Blob([plain], { type: 'application/octet-stream' });
 }
 
@@ -138,12 +161,17 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
   const len = parts.reduce((a, b) => a + b.length, 0);
   const out = new Uint8Array(len);
   let off = 0;
-  for (const p of parts) { out.set(p, off); off += p.length; }
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
   return out;
 }
 
 function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function fromB64(s: string): Uint8Array {
@@ -154,7 +182,50 @@ function fromB64(s: string): Uint8Array {
 }
 
 const NODE_ALIASES = [
-  'atlas','borealis','ceres','draco','elysium','flux','gaia','helios','io','janus','kronos','lyra','mercury','nexus','orion','phoenix','quanta','rhea','sol','tauri','umbra','vulcan','warp','xenon','yotta','zephyr','aether','blazar','cygnus','dorado','equuleus','fornax','gemini','horologium','indus','lacerta','monoceros','norma','ophiuchus','pyxis','reticulum','scutum','telescopium','volans'
+  'atlas',
+  'borealis',
+  'ceres',
+  'draco',
+  'elysium',
+  'flux',
+  'gaia',
+  'helios',
+  'io',
+  'janus',
+  'kronos',
+  'lyra',
+  'mercury',
+  'nexus',
+  'orion',
+  'phoenix',
+  'quanta',
+  'rhea',
+  'sol',
+  'tauri',
+  'umbra',
+  'vulcan',
+  'warp',
+  'xenon',
+  'yotta',
+  'zephyr',
+  'aether',
+  'blazar',
+  'cygnus',
+  'dorado',
+  'equuleus',
+  'fornax',
+  'gemini',
+  'horologium',
+  'indus',
+  'lacerta',
+  'monoceros',
+  'norma',
+  'ophiuchus',
+  'pyxis',
+  'reticulum',
+  'scutum',
+  'telescopium',
+  'volans',
 ];
 
 function generateNodeAliases(count = 3): string[] {

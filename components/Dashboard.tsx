@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from 'react';
 import { formatBytes } from '@/lib/format';
+import { useEffect, useState } from 'react';
 
 type Stats = {
   totalSentFiles: number;
@@ -79,7 +79,9 @@ export default function Dashboard() {
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ fontWeight: 700 }}>Dashboard</div>
-      <div className="muted" style={{ fontSize: 12 }}>Aggregated from local app history.</div>
+      <div className="muted" style={{ fontSize: 12 }}>
+        Aggregated from local app history.
+      </div>
       <div
         style={{
           display: 'grid',
@@ -91,7 +93,11 @@ export default function Dashboard() {
         <StatCard label="Total files sent" value={String(stats.totalSentFiles)} />
         <StatCard label="Unique senders" value={String(stats.uniqueSenders)} />
         <StatCard label="Unique receivers" value={String(stats.uniqueReceivers)} />
-        <StatCard label="GB sent" value={`${gb.toFixed(2)} GB`} hint={formatBytes(stats.totalBytesSent)} />
+        <StatCard
+          label="GB sent"
+          value={`${gb.toFixed(2)} GB`}
+          hint={formatBytes(stats.totalBytesSent)}
+        />
       </div>
     </div>
   );
@@ -100,9 +106,15 @@ export default function Dashboard() {
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div className="muted" style={{ fontSize: 12 }}>{label}</div>
+      <div className="muted" style={{ fontSize: 12 }}>
+        {label}
+      </div>
       <div style={{ fontWeight: 800, fontSize: 22 }}>{value}</div>
-      {hint ? <div className="muted" style={{ fontSize: 12 }}>{hint}</div> : null}
+      {hint ? (
+        <div className="muted" style={{ fontSize: 12 }}>
+          {hint}
+        </div>
+      ) : null}
     </div>
   );
 }

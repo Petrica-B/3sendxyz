@@ -22,17 +22,19 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family:
+    'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
 }
 
 /* Enforce font in wallet UI */
-[class^="rk-"],
-[class*=" rk-"],
-[class^="rainbowkit-"],
-[class*=" rainbowkit-"] {
-  font-family: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, "Liberation Mono", "Courier New", monospace !important;
+[class^='rk-'],
+[class*=' rk-'],
+[class^='rainbowkit-'],
+[class*=' rainbowkit-'] {
+  font-family:
+    'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace !important;
 }
 
 a {

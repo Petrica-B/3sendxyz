@@ -1,11 +1,11 @@
-import { headers } from "next/headers";
+import { headers } from 'next/headers';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export default function ServedBy() {
   const h = headers();
-  const hostId = h.get("x-vercel-id") ?? process.env.EE_HOST_ID ?? "unknown";
-  const isUnknown = hostId.toLowerCase() === "unknown";
+  const hostId = h.get('x-vercel-id') ?? process.env.EE_HOST_ID ?? 'unknown';
+  const isUnknown = hostId.toLowerCase() === 'unknown';
 
   return (
     <div className="servedBy">
@@ -19,7 +19,7 @@ export default function ServedBy() {
         Ratio1
       </a>
       <span className="label">Edge node proudly serving this site:</span>
-      <span className={isUnknown ? "unknown" : "nodeName"}>{hostId}</span>
+      <span className={isUnknown ? 'unknown' : 'nodeName'}>{hostId}</span>
     </div>
   );
 }

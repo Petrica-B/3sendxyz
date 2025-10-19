@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React from 'react';
 import { explorerAddressUrl, explorerTxUrl, shortAddress, shortHex } from '@/lib/format';
+import React from 'react';
 
 export function AddressLink({ address, size = 5 }: { address: string; size?: number }) {
   if (!address) return null;
@@ -41,10 +41,10 @@ export function NodeLinks({ aliases }: { aliases: string[] }) {
     <>
       {aliases.map((a, i) => (
         <React.Fragment key={`${a}-${i}`}>
-          <NodeLink alias={a} />{i < aliases.length - 1 ? ', ' : ''}
+          <NodeLink alias={a} />
+          {i < aliases.length - 1 ? ', ' : ''}
         </React.Fragment>
       ))}
     </>
   );
 }
-

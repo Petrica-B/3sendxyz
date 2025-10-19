@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import '@rainbow-me/rainbowkit/styles.css';
 import { RainbowKitProvider, getDefaultConfig, lightTheme } from '@rainbow-me/rainbowkit';
-import { WagmiProvider } from 'wagmi';
-import { base, baseSepolia } from 'wagmi/chains';
+import '@rainbow-me/rainbowkit/styles.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useState } from 'react';
+import { WagmiProvider } from 'wagmi';
+import { base, baseSepolia } from 'wagmi/chains';
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
@@ -21,7 +21,13 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={lightTheme({ borderRadius: 'small', accentColor: '#F7931A', accentColorForeground: '#ffffff' })}>
+        <RainbowKitProvider
+          theme={lightTheme({
+            borderRadius: 'small',
+            accentColor: '#F7931A',
+            accentColorForeground: '#ffffff',
+          })}
+        >
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

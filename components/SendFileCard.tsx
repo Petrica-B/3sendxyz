@@ -1,10 +1,16 @@
-"use client";
+'use client';
 
-import { useAccount, useSignMessage } from 'wagmi';
+import { createRatio1Session, encryptFileToPacket } from '@/lib/ratio1';
+import {
+  addInbox,
+  addOutbox,
+  deliverPacket,
+  setOutboxPacket,
+  updateOutboxStatus,
+} from '@/lib/store';
 import { useMemo, useState } from 'react';
 import { isAddress } from 'viem';
-import { createRatio1Session, encryptFileToPacket } from '@/lib/ratio1';
-import { addInbox, addOutbox, deliverPacket, setOutboxPacket, updateOutboxStatus } from '@/lib/store';
+import { useAccount, useSignMessage } from 'wagmi';
 
 export function SendFileCard() {
   const { address, isConnected } = useAccount();
@@ -61,7 +67,7 @@ export function SendFileCard() {
       // Find and update most recent outbox entry for this file
       setOutboxPacket(address, tempId, packet.id, packet.viaNodes);
       updateOutboxStatus(address, tempId, 'sent');
-      
+
       // Inbox item for the recipient (mock)
       addInbox(recipient, {
         id: packet.id,
@@ -89,11 +95,15 @@ export function SendFileCard() {
     <div className="card col" style={{ gap: 16 }}>
       <div>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send a file</div>
-        <div className="muted" style={{ fontSize: 12 }}>P2P mock using ratio1 stubs</div>
+        <div className="muted" style={{ fontSize: 12 }}>
+          P2P mock using ratio1 stubs
+        </div>
       </div>
 
       <label className="col">
-        <span className="muted mono" style={{ fontSize: 12 }}>Recipient wallet address</span>
+        <span className="muted mono" style={{ fontSize: 12 }}>
+          Recipient wallet address
+        </span>
         <input
           className="input"
           placeholder="0x… or ENS (mock)"
@@ -101,14 +111,18 @@ export function SendFileCard() {
           onChange={(e) => setRecipient(e.target.value.trim())}
         />
         {!recipient ? null : isAddress(recipient) ? (
-          <span className="muted" style={{ fontSize: 12 }}>Address looks valid</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            Address looks valid
+          </span>
         ) : (
           <span style={{ color: '#f87171', fontSize: 12 }}>Invalid address format</span>
         )}
       </label>
 
       <div className="col">
-        <span className="muted mono" style={{ fontSize: 12 }}>Select file</span>
+        <span className="muted mono" style={{ fontSize: 12 }}>
+          Select file
+        </span>
         <div className="dropzone">
           <input
             type="file"
@@ -120,15 +134,21 @@ export function SendFileCard() {
           </div>
           {file && (
             <div style={{ marginTop: 8 }}>
-              <div><strong>{file.name}</strong></div>
-              <div className="muted" style={{ fontSize: 12 }}>{(file.size / (1024*1024)).toFixed(2)} MB</div>
+              <div>
+                <strong>{file.name}</strong>
+              </div>
+              <div className="muted" style={{ fontSize: 12 }}>
+                {(file.size / (1024 * 1024)).toFixed(2)} MB
+              </div>
             </div>
           )}
         </div>
       </div>
 
       <label className="col">
-        <span className="muted mono" style={{ fontSize: 12 }}>Optional note</span>
+        <span className="muted mono" style={{ fontSize: 12 }}>
+          Optional note
+        </span>
         <input
           className="input"
           placeholder="Say hi to the recipient (encrypted)"
@@ -138,11 +158,11 @@ export function SendFileCard() {
       </label>
 
       {!isConnected && (
-        <div className="muted" style={{ fontSize: 12 }}>Connect your wallet to continue.</div>
+        <div className="muted" style={{ fontSize: 12 }}>
+          Connect your wallet to continue.
+        </div>
       )}
-      {error && (
-        <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>
-      )}
+      {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
 
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button className="button" onClick={onSend} disabled={disabled}>

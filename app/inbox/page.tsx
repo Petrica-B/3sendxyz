@@ -1,30 +1,16 @@
-"use client";
+'use client';
 
-import { useAccount } from "wagmi";
-import { useEffect, useState } from "react";
-import {
-  InboxItem,
-  listInbox,
-  subscribe,
-  getPacket,
-  markInboxDownloaded,
-} from "@/lib/store";
-import { decryptPacketToBlob } from "@/lib/ratio1";
-import {
-  shortAddress,
-  shortHex,
-  formatBytes,
-  formatDate,
-  formatExpiry,
-  formatDateShort,
-  daysLeft,
-} from "@/lib/format";
-import { AddressLink, TxLink, NodeLinks } from "@/components/Links";
-import { seedMockForAddress } from "@/lib/mock";
+import { AddressLink, NodeLinks, TxLink } from '@/components/Links';
+import { daysLeft, formatBytes, formatDate, formatDateShort, formatExpiry } from '@/lib/format';
+import { seedMockForAddress } from '@/lib/mock';
+import { decryptPacketToBlob } from '@/lib/ratio1';
+import { getPacket, InboxItem, listInbox, markInboxDownloaded, subscribe } from '@/lib/store';
+import { useEffect, useState } from 'react';
+import { useAccount } from 'wagmi';
 
 async function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
@@ -70,7 +56,7 @@ export default function InboxPage() {
       if (!packet) {
         // Fallback: download placeholder to demo flow
         const placeholder = new Blob([`Mock download for ${item.name}`], {
-          type: "text/plain",
+          type: 'text/plain',
         });
         await downloadBlob(placeholder, `${item.name}.txt`);
         return;
@@ -80,7 +66,7 @@ export default function InboxPage() {
       if (address) markInboxDownloaded(address, item.id);
     } catch (e) {
       console.error(e);
-      alert("Failed to download (mock).");
+      alert('Failed to download (mock).');
     } finally {
       setDownloadingId(null);
     }
@@ -91,9 +77,7 @@ export default function InboxPage() {
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">Inbox</div>
-          <div className="subhead">
-            Connect your wallet to see incoming files.
-          </div>
+          <div className="subhead">Connect your wallet to see incoming files.</div>
         </div>
       </main>
     );
@@ -120,9 +104,9 @@ export default function InboxPage() {
                     {t.name}
                   </div>
                   <div className="muted mono" style={{ fontSize: 12 }}>
-                    {" "}
-                    {formatBytes(t.size)} · received {formatDate(t.createdAt)} ·
-                    expires {formatExpiry(t.expiresAt)}
+                    {' '}
+                    {formatBytes(t.size)} · received {formatDate(t.createdAt)} · expires{' '}
+                    {formatExpiry(t.expiresAt)}
                   </div>
                   {!t.isMock && t.viaNodes && t.viaNodes.length > 0 && (
                     <div className="muted mono" style={{ fontSize: 12 }}>
@@ -134,48 +118,28 @@ export default function InboxPage() {
                       {t.isMock ? (
                         <>
                           <div>
-                            from:{" "}
-                            <AddressLink
-                              address={t.details?.peer || t.from}
-                              size={5}
-                            />
+                            from: <AddressLink address={t.details?.peer || t.from} size={5} />
                           </div>
                           <div>
-                            tx: <TxLink tx={t.details?.tx || ""} size={5} />
+                            tx: <TxLink tx={t.details?.tx || ''} size={5} />
                           </div>
                           <div>
-                            via:{" "}
-                            <NodeLinks
-                              aliases={
-                                t.details?.via || ["draco", "lyra", "aether"]
-                              }
-                            />
+                            via:{' '}
+                            <NodeLinks aliases={t.details?.via || ['draco', 'lyra', 'aether']} />
                           </div>
+                          <div>encrypted message: {t.details?.encMsg || 'message'} (0 bytes)</div>
+                          <div>received: {formatDateShort(t.details?.received || t.createdAt)}</div>
                           <div>
-                            encrypted message: {t.details?.encMsg || "message"}{" "}
-                            (0 bytes)
-                          </div>
-                          <div>
-                            received:{" "}
-                            {formatDateShort(
-                              t.details?.received || t.createdAt
-                            )}
-                          </div>
-                          <div>
-                            expiring:{" "}
-                            {formatDateShort(
-                              t.details?.expiring || t.expiresAt
-                            )}{" "}
-                            ({daysLeft(t.details?.expiring || t.expiresAt)})
+                            expiring: {formatDateShort(t.details?.expiring || t.expiresAt)} (
+                            {daysLeft(t.details?.expiring || t.expiresAt)})
                           </div>
                         </>
                       ) : (
                         (() => {
                           const p = getPacket(t.packetId);
-                          const cipherPreview =
-                            p?.ciphertext?.slice(0, 24) || "";
+                          const cipherPreview = p?.ciphertext?.slice(0, 24) || '';
                           const clen = p?.ciphertext
-                            ? typeof atob !== "undefined"
+                            ? typeof atob !== 'undefined'
                               ? atob(p.ciphertext).length
                               : p.ciphertext.length
                             : 0;
@@ -185,33 +149,22 @@ export default function InboxPage() {
                                 from: <AddressLink address={t.from} size={5} />
                               </div>
                               <div>
-                                tx:{" "}
-                                {p?.sendTxHash ? (
-                                  <TxLink tx={p.sendTxHash} size={5} />
-                                ) : (
-                                  "—"
-                                )}
+                                tx: {p?.sendTxHash ? <TxLink tx={p.sendTxHash} size={5} /> : '—'}
                               </div>
                               <div>
-                                via:{" "}
+                                via:{' '}
                                 <NodeLinks
                                   aliases={
-                                    t.viaNodes && t.viaNodes.length
-                                      ? t.viaNodes
-                                      : p?.viaNodes || []
+                                    t.viaNodes && t.viaNodes.length ? t.viaNodes : p?.viaNodes || []
                                   }
                                 />
                               </div>
                               <div>
-                                encrypted message: {cipherPreview}… ({clen}{" "}
-                                bytes)
+                                encrypted message: {cipherPreview}… ({clen} bytes)
                               </div>
+                              <div>received: {formatDateShort(t.createdAt)}</div>
                               <div>
-                                received: {formatDateShort(t.createdAt)}
-                              </div>
-                              <div>
-                                expiring: {formatDateShort(t.expiresAt)} (
-                                {daysLeft(t.expiresAt)})
+                                expiring: {formatDateShort(t.expiresAt)} ({daysLeft(t.expiresAt)})
                               </div>
                             </>
                           );
@@ -220,24 +173,20 @@ export default function InboxPage() {
                     </div>
                   )}
                 </div>
-                <div className="col" style={{ gap: 8, alignItems: "flex-end" }}>
+                <div className="col" style={{ gap: 8, alignItems: 'flex-end' }}>
                   <div className="row" style={{ gap: 8 }}>
                     <button
                       className="button"
                       onClick={() => onDownload(t)}
-                      disabled={
-                        t.status !== "available" || downloadingId === t.id
-                      }
+                      disabled={t.status !== 'available' || downloadingId === t.id}
                     >
-                      {downloadingId === t.id ? "Downloading…" : "Download"}
+                      {downloadingId === t.id ? 'Downloading…' : 'Download'}
                     </button>
                     <button
                       className="button secondary"
-                      onClick={() =>
-                        setExpanded((e) => ({ ...e, [t.id]: !e[t.id] }))
-                      }
+                      onClick={() => setExpanded((e) => ({ ...e, [t.id]: !e[t.id] }))}
                     >
-                      {expanded[t.id] ? "Hide Details" : "Details"}
+                      {expanded[t.id] ? 'Hide Details' : 'Details'}
                     </button>
                   </div>
                 </div>

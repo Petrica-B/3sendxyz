@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import Dashboard from '@/components/Dashboard';
+import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -13,12 +13,19 @@ export default function Home() {
         <div className="subhead">End-to-end, p2p-inspired flow using a ratio1 mock.</div>
       </section>
 
-      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div
+        className="card"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+      >
         <div>
           <div style={{ fontWeight: 700 }}>Get started</div>
-          <div className="muted" style={{ fontSize: 12 }}>Connect your wallet, then use Outbox to send and Inbox to receive.</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Connect your wallet, then use Outbox to send and Inbox to receive.
+          </div>
         </div>
-        <Link href="/outbox" className="button" style={{ textDecoration: 'none' }}>Open Outbox</Link>
+        <Link href="/outbox" className="button" style={{ textDecoration: 'none' }}>
+          Open Outbox
+        </Link>
       </div>
 
       <Dashboard />

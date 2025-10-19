@@ -56,13 +56,17 @@ function notify() {
   for (const l of listeners) l();
 }
 
-function keyOutbox(addr: string) { return `outbox:${addr.toLowerCase()}`; }
-function keyInbox(addr: string) { return `inbox:${addr.toLowerCase()}`; }
+function keyOutbox(addr: string) {
+  return `outbox:${addr.toLowerCase()}`;
+}
+function keyInbox(addr: string) {
+  return `inbox:${addr.toLowerCase()}`;
+}
 
 function read<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) as T : fallback;
+    return raw ? (JSON.parse(raw) as T) : fallback;
   } catch {
     return fallback;
   }
@@ -75,7 +79,9 @@ function write<T>(key: string, value: T) {
 
 export function deliverPacket(packet: Ratio1Packet) {
   memoryPackets.set(packet.id, packet);
-  try { localStorage.setItem(`packet:${packet.id}`, JSON.stringify(packet)); } catch {}
+  try {
+    localStorage.setItem(`packet:${packet.id}`, JSON.stringify(packet));
+  } catch {}
 }
 
 export function getPacket(packetId: string): Ratio1Packet | undefined {
@@ -93,7 +99,7 @@ export function getPacket(packetId: string): Ratio1Packet | undefined {
 }
 
 export function listOutbox(address: string): OutboxItem[] {
-  return read<OutboxItem[]>(keyOutbox(address), []).sort((a,b) => b.createdAt - a.createdAt);
+  return read<OutboxItem[]>(keyOutbox(address), []).sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export function addOutbox(address: string, item: OutboxItem) {
@@ -113,7 +119,12 @@ export function updateOutboxStatus(address: string, id: string, status: OutboxSt
   }
 }
 
-export function setOutboxPacket(address: string, id: string, packetId: string, viaNodes?: string[]) {
+export function setOutboxPacket(
+  address: string,
+  id: string,
+  packetId: string,
+  viaNodes?: string[]
+) {
   const key = keyOutbox(address);
   const list = read<OutboxItem[]>(key, []);
   const idx = list.findIndex((i) => i.id === id);
@@ -129,7 +140,7 @@ export function listInbox(address: string): InboxItem[] {
   // filter out expired and ongoing items (no ongoing section)
   const filtered = items.filter((it) => now <= it.expiresAt && it.status !== 'ongoing');
   if (filtered.length !== items.length) write(keyInbox(address), filtered);
-  return filtered.sort((a,b) => b.createdAt - a.createdAt);
+  return filtered.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export function addInbox(address: string, item: InboxItem) {

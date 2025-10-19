@@ -12,4 +12,3 @@ function simplePretty() {
 }
 
 module.exports.prettyFactory = simplePretty;
-

@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { MinimalConnect } from "@/components/MinimalConnect";
-import { usePathname } from "next/navigation";
-import Link from "next/link";
-import { useAccount } from "wagmi";
+import { MinimalConnect } from '@/components/MinimalConnect';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useAccount } from 'wagmi';
 
 function NavItem({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -13,10 +13,10 @@ function NavItem({ href, label }: { href: string; label: string }) {
       href={href}
       className="muted"
       style={{
-        textDecoration: "none",
+        textDecoration: 'none',
         fontWeight: active ? 700 : 500,
         // Ensure active link remains visible against light background
-        color: active ? "var(--text)" : undefined,
+        color: active ? 'var(--text)' : undefined,
       }}
     >
       {label}
@@ -34,9 +34,9 @@ export function Navbar() {
             href="/"
             className="brand"
             style={{
-              textDecoration: "none",
-              display: "flex",
-              alignItems: "center",
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
             }}
           >
             3send

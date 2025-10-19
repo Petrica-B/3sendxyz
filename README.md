@@ -22,7 +22,7 @@
 - Handshake mock: requests a message signature from the sender to derive a symmetric AES-GCM key (in-browser only)
 - Client-side encryption of the selected file into a mock packet and a fake "send" step
 - Recent transfers list shows status updates (pending → encrypting → sent)
- - Auto-seeded demo items: The first time you open Outbox/Inbox when connected, mock entries are created for easy testing
+- Auto-seeded demo items: The first time you open Outbox/Inbox when connected, mock entries are created for easy testing
 
 **What’s Not Implemented (yet)**
 
@@ -35,10 +35,10 @@
 - `app/` — Next.js App Router pages
 - `components/` — UI components (Providers, WalletBar, SendFileCard)
 - `lib/ratio1.ts` — mock protocol stubs (session key derivation, AES-GCM encryption)
- - `lib/store.ts` — client-side store for Outbox/Inbox (localStorage + in-memory packets)
- - `lib/mock.ts` — seeding helper to create demo Inbox/Outbox entries
- - `app/outbox/page.tsx` — send files and see sent list
- - `app/inbox/page.tsx` — see incoming files, expiration, and download
+- `lib/store.ts` — client-side store for Outbox/Inbox (localStorage + in-memory packets)
+- `lib/mock.ts` — seeding helper to create demo Inbox/Outbox entries
+- `app/outbox/page.tsx` — send files and see sent list
+- `app/inbox/page.tsx` — see incoming files, expiration, and download
 
 **Notes on ratio1**
 

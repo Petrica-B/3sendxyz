@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
+import { shortAddress } from '@/lib/format';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
-import { shortAddress } from '@/lib/format';
 
 export function MinimalConnect() {
   const { address, isConnected } = useAccount();

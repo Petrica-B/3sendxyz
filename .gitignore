@@ -21,3 +21,5 @@ yarn-error.log*
 pnpm-debug.log*
 
 tsconfig.tsbuildinfo
+
+.DS_Store

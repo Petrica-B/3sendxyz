@@ -1,76 +1,121 @@
 'use client';
 
-import { AddressLink, NodeLinks, TxLink } from '@/components/Links';
-import { daysLeft, formatBytes, formatDate, formatDateShort, formatExpiry } from '@/lib/format';
-import { seedMockForAddress } from '@/lib/mock';
-import { decryptPacketToBlob } from '@/lib/ratio1';
-import { getPacket, InboxItem, listInbox, markInboxDownloaded, subscribe } from '@/lib/store';
-import { useEffect, useState } from 'react';
+import { AddressLink, TxLink } from '@/components/Links';
+import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
+import type { StoredUploadRecord } from '@/lib/types';
+import { useCallback, useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
 
-async function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+type ReceivedItem = StoredUploadRecord & { id: string };
+
+const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.initiator}`;
 
 export default function InboxPage() {
   const { address, isConnected } = useAccount();
-  const [items, setItems] = useState<InboxItem[]>([]);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [records, setRecords] = useState<ReceivedItem[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!address) return;
-    const load = () => setItems(listInbox(address));
-    load();
-    if (listInbox(address).length === 0) {
-      seedMockForAddress(address)
-        .then(load)
-        .catch(() => {});
+  const fetchInbox = useCallback(async () => {
+    if (!address) {
+      setRecords([]);
+      setExpanded({});
+      setLoading(false);
+      setError(null);
+      return;
     }
-    return subscribe(load);
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ recipient: address });
+      const res = await fetch(`/api/inbox?${params.toString()}`);
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to fetch inbox');
+      }
+      const nextRecords: ReceivedItem[] = Array.isArray(payload.records)
+        ? payload.records
+            .filter((record: StoredUploadRecord | null) => record && typeof record === 'object')
+            .map((record: StoredUploadRecord) => ({ ...record, id: makeRecordId(record) }))
+        : [];
+      setRecords(nextRecords);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }, [address]);
 
-  // Auto-expand mock items
   useEffect(() => {
-    if (items.length === 0) return;
+    fetchInbox();
+  }, [fetchInbox]);
+
+  useEffect(() => {
+    const handler = () => {
+      fetchInbox().catch(() => {});
+    };
+    window.addEventListener('ratio1:upload-completed', handler);
+    return () => {
+      window.removeEventListener('ratio1:upload-completed', handler);
+    };
+  }, [fetchInbox]);
+
+  useEffect(() => {
     setExpanded((prev) => {
-      const next = { ...prev };
-      for (const it of items) {
-        if (it.isMock && next[it.id] === undefined) next[it.id] = true;
+      const next: Record<string, boolean> = {};
+      for (const record of records) {
+        next[record.id] = prev[record.id] ?? false;
       }
       return next;
     });
-  }, [items]);
+  }, [records]);
 
-  async function onDownload(item: InboxItem) {
-    try {
-      setDownloadingId(item.id);
-      const packet = getPacket(item.packetId);
-      if (!packet) {
-        // Fallback: download placeholder to demo flow
-        const placeholder = new Blob([`Mock download for ${item.name}`], {
-          type: 'text/plain',
+  const onDownload = useCallback(
+    async (item: ReceivedItem) => {
+      try {
+        setDownloadingId(item.id);
+        const response = await fetch('/api/inbox/download', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            cid: item.cid,
+            recipient: item.recipient,
+            filename: item.filename,
+          }),
         });
-        await downloadBlob(placeholder, `${item.name}.txt`);
-        return;
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.success || !payload?.file?.base64) {
+          throw new Error(payload?.error || 'Download failed');
+        }
+        const rawBase64 = payload.file.base64;
+        const downloadUrl =
+          typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
+            ? rawBase64
+            : `data:application/octet-stream;base64,${rawBase64 ?? ''}`;
+        const fileName =
+          payload.file.filename && typeof payload.file.filename === 'string'
+            ? payload.file.filename
+            : item.filename;
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        alert(message);
+      } finally {
+        setDownloadingId((current) => (current === item.id ? null : current));
       }
-      const blob = await decryptPacketToBlob(packet);
-      await downloadBlob(blob, packet.filename);
-      if (address) markInboxDownloaded(address, item.id);
-    } catch (e) {
-      console.error(e);
-      alert('Failed to download (mock).');
-    } finally {
-      setDownloadingId(null);
-    }
-  }
+    },
+    []
+  );
 
   if (!isConnected || !address) {
     return (
@@ -91,85 +136,41 @@ export default function InboxPage() {
       </div>
 
       <section className="col" style={{ gap: 12 }}>
-        {items.length === 0 ? (
+        {loading && (
+          <div className="muted" style={{ fontSize: 12 }}>
+            Loading inbox…
+          </div>
+        )}
+        {error && (
+          <div style={{ color: '#f87171', fontSize: 12 }}>
+            {error}
+          </div>
+        )}
+        {!loading && !error && records.length === 0 ? (
           <div className="muted" style={{ fontSize: 12 }}>
             No files in your inbox yet.
           </div>
         ) : (
           <div className="col" style={{ gap: 10 }}>
-            {items.map((t) => (
-              <div key={t.id} className="transferItem">
+            {records.map((item) => (
+              <div key={item.id} className="transferItem">
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700 }} className="mono">
-                    {t.name}
+                    {item.filename}
                   </div>
                   <div className="muted mono" style={{ fontSize: 12 }}>
-                    {' '}
-                    {formatBytes(t.size)} · received {formatDate(t.createdAt)} · expires{' '}
-                    {formatExpiry(t.expiresAt)}
+                    {formatBytes(item.filesize)} · received {formatDate(item.sentAt)}
                   </div>
-                  {!t.isMock && t.viaNodes && t.viaNodes.length > 0 && (
-                    <div className="muted mono" style={{ fontSize: 12 }}>
-                      via <NodeLinks aliases={t.viaNodes} />
-                    </div>
-                  )}
-                  {expanded[t.id] && (
+                  {expanded[item.id] && (
                     <div className="details mono" style={{ fontSize: 12 }}>
-                      {t.isMock ? (
-                        <>
-                          <div>
-                            from: <AddressLink address={t.details?.peer || t.from} size={5} />
-                          </div>
-                          <div>
-                            tx: <TxLink tx={t.details?.tx || ''} size={5} />
-                          </div>
-                          <div>
-                            via:{' '}
-                            <NodeLinks aliases={t.details?.via || ['draco', 'lyra', 'aether']} />
-                          </div>
-                          <div>encrypted message: {t.details?.encMsg || 'message'} (0 bytes)</div>
-                          <div>received: {formatDateShort(t.details?.received || t.createdAt)}</div>
-                          <div>
-                            expiring: {formatDateShort(t.details?.expiring || t.expiresAt)} (
-                            {daysLeft(t.details?.expiring || t.expiresAt)})
-                          </div>
-                        </>
-                      ) : (
-                        (() => {
-                          const p = getPacket(t.packetId);
-                          const cipherPreview = p?.ciphertext?.slice(0, 24) || '';
-                          const clen = p?.ciphertext
-                            ? typeof atob !== 'undefined'
-                              ? atob(p.ciphertext).length
-                              : p.ciphertext.length
-                            : 0;
-                          return (
-                            <>
-                              <div>
-                                from: <AddressLink address={t.from} size={5} />
-                              </div>
-                              <div>
-                                tx: {p?.sendTxHash ? <TxLink tx={p.sendTxHash} size={5} /> : '—'}
-                              </div>
-                              <div>
-                                via:{' '}
-                                <NodeLinks
-                                  aliases={
-                                    t.viaNodes && t.viaNodes.length ? t.viaNodes : p?.viaNodes || []
-                                  }
-                                />
-                              </div>
-                              <div>
-                                encrypted message: {cipherPreview}… ({clen} bytes)
-                              </div>
-                              <div>received: {formatDateShort(t.createdAt)}</div>
-                              <div>
-                                expiring: {formatDateShort(t.expiresAt)} ({daysLeft(t.expiresAt)})
-                              </div>
-                            </>
-                          );
-                        })()
-                      )}
+                      <div>
+                        from: <AddressLink address={item.initiator} size={5} />
+                      </div>
+                      <div>
+                        tx: <TxLink tx={item.txHash} size={5} />
+                      </div>
+                      <div>note: {item.note ?? '—'}</div>
+                      <div>received: {formatDateShort(item.sentAt)}</div>
                     </div>
                   )}
                 </div>
@@ -177,16 +178,16 @@ export default function InboxPage() {
                   <div className="row" style={{ gap: 8 }}>
                     <button
                       className="button"
-                      onClick={() => onDownload(t)}
-                      disabled={t.status !== 'available' || downloadingId === t.id}
+                      onClick={() => onDownload(item)}
+                      disabled={downloadingId === item.id}
                     >
-                      {downloadingId === t.id ? 'Downloading…' : 'Download'}
+                      {downloadingId === item.id ? 'Downloading…' : 'Download'}
                     </button>
                     <button
                       className="button secondary"
-                      onClick={() => setExpanded((e) => ({ ...e, [t.id]: !e[t.id] }))}
+                      onClick={() => setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
                     >
-                      {expanded[t.id] ? 'Hide Details' : 'Details'}
+                      {expanded[item.id] ? 'Hide Details' : 'Details'}
                     </button>
                   </div>
                 </div>

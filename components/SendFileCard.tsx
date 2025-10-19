@@ -1,13 +1,5 @@
 'use client';
 
-import { createRatio1Session, encryptFileToPacket } from '@/lib/ratio1';
-import {
-  addInbox,
-  addOutbox,
-  deliverPacket,
-  setOutboxPacket,
-  updateOutboxStatus,
-} from '@/lib/store';
 import { useMemo, useState } from 'react';
 import { isAddress } from 'viem';
 import { useAccount, useSignMessage } from 'wagmi';
@@ -29,60 +21,34 @@ export function SendFileCard() {
     if (!address || !file) return;
     setError(null);
     setSending(true);
-    // Create an outbox entry early
     try {
-      const tempId = `temp:${Date.now()}`;
-      // 1) Mock handshake via signature to derive a session key
-      const handshakeMsg = `ratio1/handshake\nfrom:${address}\nto:${recipient}\ntimestamp:${Date.now()}`;
-      const sig = await signMessageAsync({ message: handshakeMsg });
-      const session = await createRatio1Session({
-        initiator: address,
-        recipient,
-        signature: sig,
-        context: '3send.xyz:mock',
-      });
-      // seed outbox record
-      addOutbox(address, {
-        id: tempId, // temporary before packet
-        to: recipient,
-        name: file.name,
-        size: file.size,
-        status: 'encrypting',
-        createdAt: Date.now(),
-        packetId: 'pending',
-      });
+      const startedAt = Date.now();
+      const handshakeMsg = `ratio1/handshake\nfrom:${address}\nto:${recipient}\ntimestamp:${startedAt}`;
+      const signature = await signMessageAsync({ message: handshakeMsg });
 
-      // 2) Encrypt file into a mock packet
-      const packet = await encryptFileToPacket({
-        file,
-        session,
-        note,
-        embedKeyMaterial: true,
-        viaNodes: undefined,
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('initiator', address);
+      formData.append('recipient', recipient);
+      if (note) formData.append('note', note);
+      formData.append('handshakeMessage', handshakeMsg);
+      formData.append('signature', signature);
+      formData.append('sentAt', String(startedAt));
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
       });
-
-      // 3) Deliver to mock transport + update outbox/inbox stores
-      deliverPacket(packet);
-
-      // Find and update most recent outbox entry for this file
-      setOutboxPacket(address, tempId, packet.id, packet.viaNodes);
-      updateOutboxStatus(address, tempId, 'sent');
-
-      // Inbox item for the recipient (mock)
-      addInbox(recipient, {
-        id: packet.id,
-        from: address,
-        name: file.name,
-        size: file.size,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 2, // 2 days
-        status: 'available',
-        packetId: packet.id,
-        viaNodes: packet.viaNodes,
-      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Upload failed');
+      }
 
       setFile(null);
       setNote('');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ratio1:upload-completed'));
+      }
     } catch (e: any) {
       console.error(e);
       setError(e?.message || 'Failed to send');
@@ -96,7 +62,7 @@ export function SendFileCard() {
       <div>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send a file</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          P2P mock using ratio1 stubs
+          Uploads go through the ratio1 server API
         </div>
       </div>
 
@@ -130,7 +96,7 @@ export function SendFileCard() {
             style={{ width: '100%' }}
           />
           <div className="muted mono" style={{ fontSize: 12, marginTop: 8 }}>
-            Max ~50MB recommended for demo. Encrypted locally in-browser.
+            Max ~50MB recommended for demo.
           </div>
           {file && (
             <div style={{ marginTop: 8 }}>
@@ -166,7 +132,7 @@ export function SendFileCard() {
 
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button className="button" onClick={onSend} disabled={disabled}>
-          {sending ? 'Encrypting…' : 'Encrypt & Send (Mock)'}
+          {sending ? 'Uploading...' : 'Upload & Send'}
         </button>
       </div>
 

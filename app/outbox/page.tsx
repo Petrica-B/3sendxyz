@@ -1,42 +1,75 @@
 'use client';
 
-import { AddressLink, NodeLinks, TxLink } from '@/components/Links';
+import { AddressLink, TxLink } from '@/components/Links';
 import { SendFileCard } from '@/components/SendFileCard';
-import { daysLeft, formatBytes, formatDate, formatDateShort } from '@/lib/format';
-import { seedMockForAddress } from '@/lib/mock';
-import { getPacket, listOutbox, OutboxItem, subscribe } from '@/lib/store';
-import { useEffect, useState } from 'react';
+import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
+import type { StoredUploadRecord } from '@/lib/types';
+import { useCallback, useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
+
+type SentItem = StoredUploadRecord & { id: string };
+
+const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.recipient}`;
 
 export default function OutboxPage() {
   const { address, isConnected } = useAccount();
-  const [items, setItems] = useState<OutboxItem[]>([]);
+  const [records, setRecords] = useState<SentItem[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!address) return;
-    const load = () => setItems(listOutbox(address));
-    load();
-    // Seed mock data on first visit if empty
-    if (listOutbox(address).length === 0) {
-      seedMockForAddress(address)
-        .then(load)
-        .catch(() => {});
+  const fetchSent = useCallback(async () => {
+    if (!address) {
+      setRecords([]);
+      setExpanded({});
+      return;
     }
-    return subscribe(load);
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ initiator: address });
+      const res = await fetch(`/api/sent?${params.toString()}`);
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to fetch sent files');
+      }
+      const nextRecords: SentItem[] = Array.isArray(payload.records)
+        ? payload.records
+            .filter((record: StoredUploadRecord | null) => record && typeof record === 'object')
+            .map((record: StoredUploadRecord) => ({ ...record, id: makeRecordId(record) }))
+        : [];
+      setRecords(nextRecords);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }, [address]);
 
-  // Auto-expand mock items so their dummy details are visible
   useEffect(() => {
-    if (items.length === 0) return;
+    fetchSent();
+  }, [fetchSent]);
+
+  useEffect(() => {
+    const handler = () => {
+      fetchSent().catch(() => {});
+    };
+    window.addEventListener('ratio1:upload-completed', handler);
+    return () => {
+      window.removeEventListener('ratio1:upload-completed', handler);
+    };
+  }, [fetchSent]);
+
+  useEffect(() => {
     setExpanded((prev) => {
-      const next = { ...prev };
-      for (const it of items) {
-        if (it.isMock && next[it.id] === undefined) next[it.id] = true;
+      const next: Record<string, boolean> = {};
+      for (const record of records) {
+        next[record.id] = prev[record.id] ?? false;
       }
       return next;
     });
-  }, [items]);
+  }, [records]);
 
   if (!isConnected || !address) {
     return (
@@ -59,98 +92,60 @@ export default function OutboxPage() {
 
       <section className="col" style={{ gap: 12 }}>
         <div style={{ fontWeight: 700 }}>Sent items</div>
-        {items.length === 0 ? (
+        {loading && (
+          <div className="muted" style={{ fontSize: 12 }}>
+            Loading sent files…
+          </div>
+        )}
+        {error && (
+          <div style={{ color: '#f87171', fontSize: 12 }}>
+            {error}
+          </div>
+        )}
+        {!loading && !error && records.length === 0 ? (
           <div className="muted" style={{ fontSize: 12 }}>
             No sent files yet.
           </div>
-        ) : (
+        ) : null}
+        {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
-            {items.map((t) => (
-              <div key={t.id} className="transferItem">
+            {records.map((item) => (
+              <div key={item.id} className="transferItem">
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700 }} className="mono">
-                    {t.name}
+                    {item.filename}
                   </div>
                   <div className="muted mono" style={{ fontSize: 12 }}>
-                    {' '}
-                    {formatBytes(t.size)} · {formatDate(t.createdAt)}
+                    {formatBytes(item.filesize)} · sent {formatDate(item.sentAt)}
                   </div>
-                  {!t.isMock && t.viaNodes && t.viaNodes.length > 0 && (
-                    <div className="muted mono" style={{ fontSize: 12 }}>
-                      via <NodeLinks aliases={t.viaNodes} />
-                    </div>
-                  )}
-                  {expanded[t.id] && (
+                  {expanded[item.id] && (
                     <div className="details mono" style={{ fontSize: 12 }}>
-                      {t.isMock ? (
-                        <>
-                          <div>
-                            to: <AddressLink address={t.details?.peer || t.to} size={5} />
-                          </div>
-                          <div>
-                            tx: <TxLink tx={t.details?.tx || ''} size={5} />
-                          </div>
-                          <div>
-                            via:{' '}
-                            <NodeLinks aliases={t.details?.via || ['draco', 'lyra', 'aether']} />
-                          </div>
-                          <div>encrypted message: {t.details?.encMsg || 'message'} (0 bytes)</div>
-                          <div>
-                            received:{' '}
-                            {t.details?.received ? formatDateShort(t.details.received) : '—'}
-                          </div>
-                          <div>
-                            expiring:{' '}
-                            {t.details?.expiring
-                              ? `${formatDateShort(
-                                  t.details.expiring
-                                )} (${daysLeft(t.details.expiring)})`
-                              : '—'}
-                          </div>
-                        </>
-                      ) : (
-                        (() => {
-                          const p = getPacket(t.packetId);
-                          const cipherPreview = p?.ciphertext?.slice(0, 24) || '';
-                          const clen = p?.ciphertext
-                            ? typeof atob !== 'undefined'
-                              ? atob(p.ciphertext).length
-                              : p.ciphertext.length
-                            : 0;
-                          return (
-                            <>
-                              <div>
-                                to: <AddressLink address={t.to} size={5} />
-                              </div>
-                              <div>
-                                tx: {p?.sendTxHash ? <TxLink tx={p.sendTxHash} size={5} /> : '—'}
-                              </div>
-                              <div>
-                                via:{' '}
-                                <NodeLinks
-                                  aliases={
-                                    t.viaNodes && t.viaNodes.length ? t.viaNodes : p?.viaNodes || []
-                                  }
-                                />
-                              </div>
-                              <div>
-                                encrypted message: {cipherPreview}… ({clen} bytes)
-                              </div>
-                              <div>received: —</div>
-                              <div>expiring: —</div>
-                            </>
-                          );
-                        })()
-                      )}
+                      <div>
+                        to: <AddressLink address={item.recipient} size={5} />
+                      </div>
+                      <div>
+                        from: <AddressLink address={item.initiator} size={5} />
+                      </div>
+                      <div>
+                        tx: <TxLink tx={item.txHash} size={5} />
+                      </div>
+                      <div>
+                        note: {item.note ? item.note : '—'}
+                      </div>
+                      <div>
+                        sent at: {formatDateShort(item.sentAt)}
+                      </div>
                     </div>
                   )}
                 </div>
                 <div className="col" style={{ alignItems: 'flex-end', gap: 8 }}>
                   <button
                     className="button secondary"
-                    onClick={() => setExpanded((e) => ({ ...e, [t.id]: !e[t.id] }))}
+                    onClick={() =>
+                      setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                    }
                   >
-                    {expanded[t.id] ? 'Hide Details' : 'Details'}
+                    {expanded[item.id] ? 'Hide Details' : 'Details'}
                   </button>
                 </div>
               </div>

@@ -1,8 +1,10 @@
 'use client';
 
+import { encodeBase64 } from '@/lib/encryption';
 import { shortAddress } from '@/lib/format';
 import { generateMnemonicKeyPair } from '@/lib/keys';
 import { buildPasskeyRegisterMessage } from '@/lib/passkeyAccess';
+import { derivePasskeyX25519KeyPair, randomPrfSalt } from '@/lib/passkeyClient';
 import type { PasskeyRecord, UserProfile } from '@/lib/types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
@@ -37,15 +39,6 @@ type AttestationResponseWithPublicKey = AuthenticatorAttestationResponse & {
 type PasskeyCredential = PublicKeyCredential & {
   response: AttestationResponseWithPublicKey;
 };
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
 
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
@@ -276,21 +269,18 @@ export default function ProfilePage() {
       }
 
       const attestationResponse = credential.response;
-      const publicKeyBuffer =
-        typeof attestationResponse.getPublicKey === 'function'
-          ? attestationResponse.getPublicKey()
-          : null;
-      if (!publicKeyBuffer) {
-        throw new Error('Authenticator did not return a public key.');
-      }
-
       const algorithm =
         typeof attestationResponse.getPublicKeyAlgorithm === 'function'
           ? attestationResponse.getPublicKeyAlgorithm()
           : undefined;
 
-      const credentialIdB64 = arrayBufferToBase64(credential.rawId);
-      const publicKeyB64 = arrayBufferToBase64(publicKeyBuffer);
+      const credentialIdB64 = encodeBase64(new Uint8Array(credential.rawId));
+      const prfSaltBytes = randomPrfSalt();
+      const { publicKey: x25519PublicKey } = await derivePasskeyX25519KeyPair({
+        credentialIdB64,
+        salt: prfSaltBytes,
+      });
+      const prfSaltB64 = encodeBase64(prfSaltBytes);
 
       const registerRes = await fetch('/api/passkeys/register', {
         method: 'POST',
@@ -300,8 +290,9 @@ export default function ProfilePage() {
           signature,
           message,
           credentialId: credentialIdB64,
-          publicKey: publicKeyB64,
+          passkeyPublicKey: x25519PublicKey,
           algorithm,
+          prfSalt: prfSaltB64,
         }),
       });
       const payload = await registerRes.json().catch(() => null);
@@ -310,6 +301,11 @@ export default function ProfilePage() {
       }
       setPasskeyRecord(payload.record ?? null);
       setPasskeyError(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ratio1:passkey-updated', { detail: { address } })
+        );
+      }
     } catch (err) {
       let message =
         err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
@@ -490,6 +486,12 @@ export default function ProfilePage() {
                 Credential ID: {passkeyCredentialPreview}
               </div>
             )}
+            <div className="muted mono" style={{ fontSize: 12 }}>
+              X25519 pubkey: {passkeyRecord.publicKey.slice(0, 12)}…
+            </div>
+            <div className="muted mono" style={{ fontSize: 12 }}>
+              PRF salt: {passkeyRecord.prfSalt.slice(0, 12)}…
+            </div>
             {typeof passkeyRecord.algorithm === 'number' && (
               <div className="muted mono" style={{ fontSize: 12 }}>
                 COSE algorithm: {passkeyRecord.algorithm}

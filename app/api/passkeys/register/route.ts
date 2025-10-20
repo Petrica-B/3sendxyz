@@ -15,8 +15,11 @@ type RegisterBody = {
   message?: string;
   credentialId?: string;
   publicKey?: string;
+  passkeyPublicKey?: string;
   algorithm?: number;
   label?: string;
+  prfSalt?: string;
+  x25519PublicKey?: string;
 };
 
 function isBase64(input: string): boolean {
@@ -31,7 +34,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { address, signature, message, credentialId, publicKey, algorithm, label } = body ?? {};
+  const {
+    address,
+    signature,
+    message,
+    credentialId,
+    publicKey,
+    passkeyPublicKey,
+    x25519PublicKey,
+    algorithm,
+    label,
+    prfSalt,
+  } = body ?? {};
   if (!address || typeof address !== 'string' || address.trim().length === 0) {
     return NextResponse.json({ success: false, error: 'Missing address' }, { status: 400 });
   }
@@ -44,8 +58,21 @@ export async function POST(request: Request) {
   if (!credentialId || typeof credentialId !== 'string' || credentialId.trim().length === 0) {
     return NextResponse.json({ success: false, error: 'Missing credentialId' }, { status: 400 });
   }
-  if (!publicKey || typeof publicKey !== 'string' || publicKey.trim().length === 0) {
-    return NextResponse.json({ success: false, error: 'Missing publicKey' }, { status: 400 });
+  const keyPublicBase64 =
+    typeof passkeyPublicKey === 'string' && passkeyPublicKey.trim().length > 0
+      ? passkeyPublicKey
+      : typeof x25519PublicKey === 'string' && x25519PublicKey.trim().length > 0
+        ? x25519PublicKey
+        : typeof publicKey === 'string' && publicKey.trim().length > 0
+          ? publicKey
+          : null;
+
+  if (!keyPublicBase64) {
+    return NextResponse.json({ success: false, error: 'Missing passkey public key' }, { status: 400 });
+  }
+
+  if (!prfSalt || typeof prfSalt !== 'string' || prfSalt.trim().length === 0) {
+    return NextResponse.json({ success: false, error: 'Missing prfSalt' }, { status: 400 });
   }
 
   let normalized: string;
@@ -76,15 +103,20 @@ export async function POST(request: Request) {
   if (!isBase64(credentialId)) {
     return NextResponse.json({ success: false, error: 'credentialId must be base64 encoded' }, { status: 400 });
   }
-  if (!isBase64(publicKey)) {
-    return NextResponse.json({ success: false, error: 'publicKey must be base64 encoded' }, { status: 400 });
+  if (!isBase64(keyPublicBase64)) {
+    return NextResponse.json({ success: false, error: 'passkey public key must be base64 encoded' }, { status: 400 });
+  }
+  if (!isBase64(prfSalt)) {
+    return NextResponse.json({ success: false, error: 'prfSalt must be base64 encoded' }, { status: 400 });
   }
 
   let credentialIdBuf: Buffer;
   let publicKeyBuf: Buffer;
+  let prfSaltBuf: Buffer;
   try {
     credentialIdBuf = Buffer.from(credentialId, 'base64');
-    publicKeyBuf = Buffer.from(publicKey, 'base64');
+    publicKeyBuf = Buffer.from(keyPublicBase64, 'base64');
+    prfSaltBuf = Buffer.from(prfSalt, 'base64');
   } catch {
     return NextResponse.json({ success: false, error: 'Failed to decode credential payload' }, { status: 400 });
   }
@@ -95,13 +127,17 @@ export async function POST(request: Request) {
   if (publicKeyBuf.length === 0) {
     return NextResponse.json({ success: false, error: 'publicKey is empty' }, { status: 400 });
   }
+  if (prfSaltBuf.length === 0) {
+    return NextResponse.json({ success: false, error: 'prfSalt is empty' }, { status: 400 });
+  }
 
   const record: PasskeyRecord = {
     credentialId,
-    publicKey,
+    publicKey: keyPublicBase64,
     algorithm: typeof algorithm === 'number' && Number.isInteger(algorithm) ? algorithm : undefined,
     createdAt: Date.now(),
     label: typeof label === 'string' && label.trim().length > 0 ? label.trim().slice(0, 30) : undefined,
+    prfSalt,
   };
 
   try {
@@ -128,8 +164,9 @@ export async function POST(request: Request) {
       if (parsedVault) {
         const nextVault = {
           ...parsedVault,
-          passkeyPublicKey: publicKey,
+          passkeyPublicKey: keyPublicBase64,
           passkeyCredentialId: credentialId,
+          passkeyPrfSalt: prfSalt,
         };
         await ratio1.cstore.hset({
           hkey: VAULT_CSTORE_HKEY,

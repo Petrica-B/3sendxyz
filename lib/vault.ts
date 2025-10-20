@@ -29,6 +29,12 @@ export function parseVaultRecord(raw: string | null | undefined): VaultKeyRecord
       publicKey: parsed.publicKey,
       privateKey: parsed.privateKey,
       createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : undefined,
+      passkeyPublicKey:
+        typeof parsed.passkeyPublicKey === 'string' ? parsed.passkeyPublicKey : undefined,
+      passkeyCredentialId:
+        typeof parsed.passkeyCredentialId === 'string' ? parsed.passkeyCredentialId : undefined,
+      passkeyPrfSalt:
+        typeof parsed.passkeyPrfSalt === 'string' ? parsed.passkeyPrfSalt : undefined,
     };
   } catch {
     return null;

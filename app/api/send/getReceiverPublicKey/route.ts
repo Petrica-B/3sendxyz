@@ -1,10 +1,34 @@
-import { VAULT_CSTORE_HKEY } from '@/lib/constants';
+import { PASSKEY_CSTORE_HKEY, VAULT_CSTORE_HKEY } from '@/lib/constants';
 import { createVaultRecord, getVaultPrivateKeySecret, parseVaultRecord } from '@/lib/vault';
-import type { VaultKeyRecord } from '@/lib/types';
+import type { PasskeyRecord, VaultKeyRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
+
+function parsePasskeyRecord(raw: string | null | undefined): PasskeyRecord | null {
+  if (!raw || typeof raw !== 'string') return null;
+  try {
+    const parsed = JSON.parse(raw) as PasskeyRecord;
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.credentialId !== 'string') return null;
+    if (typeof parsed.publicKey !== 'string') return null;
+    const prfSalt = typeof parsed.prfSalt === 'string' ? parsed.prfSalt : '';
+    return {
+      credentialId: parsed.credentialId,
+      publicKey: parsed.publicKey,
+      algorithm: typeof parsed.algorithm === 'number' ? parsed.algorithm : undefined,
+      createdAt:
+        typeof parsed.createdAt === 'number' && Number.isFinite(parsed.createdAt)
+          ? parsed.createdAt
+          : Date.now(),
+      label: typeof parsed.label === 'string' ? parsed.label : undefined,
+      prfSalt,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -17,6 +41,31 @@ export async function GET(request: Request) {
   try {
     const ratio1 = createEdgeSdk();
     const addressKey = address.toLowerCase();
+
+    let passkey: PasskeyRecord | null = null;
+    try {
+      const passkeyExisting = await ratio1.cstore.hget({
+        hkey: PASSKEY_CSTORE_HKEY,
+        key: addressKey,
+      });
+      const passkeyValue =
+        typeof passkeyExisting === 'string'
+          ? passkeyExisting
+          : passkeyExisting && typeof passkeyExisting === 'object' && 'result' in passkeyExisting
+            ? (passkeyExisting as { result?: unknown }).result
+            : null;
+      passkey = parsePasskeyRecord(typeof passkeyValue === 'string' ? passkeyValue : null);
+    } catch (error) {
+      console.warn('[passkey] hget failed', error);
+    }
+
+    if (passkey?.publicKey) {
+      return NextResponse.json({
+        success: true,
+        type: 'passkey',
+        publicKey: passkey.publicKey,
+      });
+    }
 
     let record: VaultKeyRecord | null = null;
 

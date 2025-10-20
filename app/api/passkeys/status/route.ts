@@ -13,6 +13,7 @@ function parsePasskeyRecord(raw: string | null | undefined): PasskeyRecord | nul
     if (!parsed || typeof parsed !== 'object') return null;
     if (typeof parsed.credentialId !== 'string') return null;
     if (typeof parsed.publicKey !== 'string') return null;
+    const prfSalt = typeof parsed.prfSalt === 'string' ? parsed.prfSalt : '';
     const normalized: PasskeyRecord = {
       credentialId: parsed.credentialId,
       publicKey: parsed.publicKey,
@@ -22,6 +23,7 @@ function parsePasskeyRecord(raw: string | null | undefined): PasskeyRecord | nul
           ? parsed.createdAt
           : Date.now(),
       label: typeof parsed.label === 'string' ? parsed.label : undefined,
+      prfSalt,
     };
     return normalized;
   } catch {

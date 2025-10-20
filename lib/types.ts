@@ -8,6 +8,7 @@ export type EncryptionMetadata = {
   plaintextLength?: number;
   ciphertextLength?: number;
   recipient?: string;
+  keySource?: 'vault' | 'passkey';
 };
 
 export type StoredUploadRecord = {
@@ -59,6 +60,7 @@ export type VaultKeyRecord = {
   createdAt?: number;
   passkeyPublicKey?: string;
   passkeyCredentialId?: string;
+  passkeyPrfSalt?: string;
 };
 
 export type PasskeyRecord = {
@@ -67,4 +69,5 @@ export type PasskeyRecord = {
   algorithm?: number;
   createdAt: number;
   label?: string;
+  prfSalt: string;
 };

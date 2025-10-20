@@ -2,9 +2,10 @@
 
 import { shortAddress } from '@/lib/format';
 import { generateMnemonicKeyPair } from '@/lib/keys';
-import type { UserProfile } from '@/lib/types';
+import { buildPasskeyRegisterMessage } from '@/lib/passkeyAccess';
+import type { PasskeyRecord, UserProfile } from '@/lib/types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useSignMessage } from 'wagmi';
 
 function loadProfile(addr: string): UserProfile {
   try {
@@ -28,13 +29,49 @@ function normalizeHandle(input: string): string {
   return withSuffix;
 }
 
+type AttestationResponseWithPublicKey = AuthenticatorAttestationResponse & {
+  getPublicKey?: () => ArrayBuffer | null;
+  getPublicKeyAlgorithm?: () => number | null;
+};
+
+type PasskeyCredential = PublicKeyCredential & {
+  response: AttestationResponseWithPublicKey;
+};
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const [profile, setProfile] = useState<UserProfile>({});
   const [handleInput, setHandleInput] = useState('');
   const [keyLabelInput, setKeyLabelInput] = useState('');
   const [privKeyOnce, setPrivKeyOnce] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [passkeyRecord, setPasskeyRecord] = useState<PasskeyRecord | null>(null);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+
+  const passkeyCredentialPreview = useMemo(() => {
+    if (!passkeyRecord?.credentialId) return null;
+    const id = passkeyRecord.credentialId;
+    if (id.length <= 16) return id;
+    return `${id.slice(0, 12)}…${id.slice(-4)}`;
+  }, [passkeyRecord]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setPasskeySupported('PublicKeyCredential' in window);
+  }, []);
 
   useEffect(() => {
     if (!address) return;
@@ -42,6 +79,44 @@ export default function ProfilePage() {
     setProfile(p);
     setHandleInput(p.handle ?? '');
     setKeyLabelInput(p.keyLabel ?? '');
+  }, [address]);
+
+  useEffect(() => {
+    if (!address) {
+      setPasskeyRecord(null);
+      setPasskeyLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      setPasskeyLoading(true);
+      setPasskeyError(null);
+      try {
+        const params = new URLSearchParams({ address });
+        const res = await fetch(`/api/passkeys/status?${params.toString()}`);
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.success) {
+          throw new Error(payload?.error || 'Failed to fetch passkey status');
+        }
+        if (!cancelled) {
+          setPasskeyRecord(payload.record ?? null);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        if (!cancelled) {
+          setPasskeyRecord(null);
+          setPasskeyError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setPasskeyLoading(false);
+        }
+      }
+    };
+    run().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [address]);
 
   const handleValid = useMemo(() => {
@@ -145,6 +220,115 @@ export default function ProfilePage() {
     }
   }, [privKeyOnce]);
 
+  const onRegisterPasskey = useCallback(async () => {
+    if (!address) return;
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      alert('Passkeys are not supported in this environment.');
+      return;
+    }
+    if (!window.PublicKeyCredential) {
+      alert('Passkeys are not supported by this browser.');
+      return;
+    }
+    if (!signMessageAsync) {
+      alert('Wallet signer not available. Connect your wallet to continue.');
+      return;
+    }
+
+    setPasskeyBusy(true);
+    setPasskeyError(null);
+    try {
+      const message = buildPasskeyRegisterMessage(address);
+      const signature = await signMessageAsync({ message });
+
+      const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+      const userId = new TextEncoder().encode(address.toLowerCase());
+
+      const creationOptions: PublicKeyCredentialCreationOptions = {
+        challenge,
+        rp: {
+          name: '3send',
+          id: window.location.hostname,
+        },
+        user: {
+          id: userId,
+          name: address,
+          displayName: `3send ${address}`,
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -8 },
+          { type: 'public-key', alg: -7 },
+        ],
+        timeout: 60_000,
+        attestation: 'direct',
+        authenticatorSelection: {
+          residentKey: 'preferred',
+          userVerification: 'preferred',
+        },
+      };
+
+      const credential = (await navigator.credentials.create({
+        publicKey: creationOptions,
+      })) as PasskeyCredential | null;
+
+      if (!credential) {
+        throw new Error('Passkey registration was cancelled.');
+      }
+
+      const attestationResponse = credential.response;
+      const publicKeyBuffer =
+        typeof attestationResponse.getPublicKey === 'function'
+          ? attestationResponse.getPublicKey()
+          : null;
+      if (!publicKeyBuffer) {
+        throw new Error('Authenticator did not return a public key.');
+      }
+
+      const algorithm =
+        typeof attestationResponse.getPublicKeyAlgorithm === 'function'
+          ? attestationResponse.getPublicKeyAlgorithm()
+          : undefined;
+
+      const credentialIdB64 = arrayBufferToBase64(credential.rawId);
+      const publicKeyB64 = arrayBufferToBase64(publicKeyBuffer);
+
+      const registerRes = await fetch('/api/passkeys/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address,
+          signature,
+          message,
+          credentialId: credentialIdB64,
+          publicKey: publicKeyB64,
+          algorithm,
+        }),
+      });
+      const payload = await registerRes.json().catch(() => null);
+      if (!registerRes.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to register passkey');
+      }
+      setPasskeyRecord(payload.record ?? null);
+      setPasskeyError(null);
+    } catch (err) {
+      let message =
+        err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
+      if (
+        err instanceof DOMException &&
+        (err.name === 'AbortError' || err.name === 'NotAllowedError')
+      ) {
+        message = 'Passkey registration was cancelled.';
+      }
+      setPasskeyError(message);
+      console.error('[passkeys] register failed', err);
+      if (message && !/cancel/i.test(message) && !/not allowed/i.test(message)) {
+        alert(message);
+      }
+    } finally {
+      setPasskeyBusy(false);
+    }
+  }, [address, signMessageAsync]);
+
   if (!isConnected || !address) {
     return (
       <main className="col" style={{ gap: 16 }}>
@@ -234,7 +418,6 @@ export default function ProfilePage() {
                 Regenerate Key Pair
               </button>
             </div>
-            
           </div>
         ) : (
           <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'stretch' }}>
@@ -274,6 +457,59 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+      </section>
+
+      <section className="card col" style={{ gap: 12 }}>
+        <div style={{ fontWeight: 700 }}>Passkey Encryption</div>
+        <div className="muted" style={{ fontSize: 12 }}>
+          Register a passkey so encrypted file delivery can rely on hardware-backed keys stored on
+          your device. Only the public key is shared with 3send; the private key remains protected
+          by your passkey provider.
+        </div>
+        {!passkeySupported && (
+          <div style={{ color: '#f87171', fontSize: 12 }}>
+            Passkeys are not supported in this browser. Try Safari, Chrome, or Edge on a device with
+            passkey support.
+          </div>
+        )}
+        {passkeyLoading && (
+          <div className="muted" style={{ fontSize: 12 }}>
+            Checking passkey status…
+          </div>
+        )}
+        {passkeyError && !passkeyLoading && (
+          <div style={{ color: '#f87171', fontSize: 12 }}>{passkeyError}</div>
+        )}
+        {!passkeyLoading && passkeyRecord && (
+          <div className="col" style={{ gap: 6 }}>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Passkey registered on {new Date(passkeyRecord.createdAt).toLocaleString()}.
+            </div>
+            {passkeyCredentialPreview && (
+              <div className="muted mono" style={{ fontSize: 12 }}>
+                Credential ID: {passkeyCredentialPreview}
+              </div>
+            )}
+            {typeof passkeyRecord.algorithm === 'number' && (
+              <div className="muted mono" style={{ fontSize: 12 }}>
+                COSE algorithm: {passkeyRecord.algorithm}
+              </div>
+            )}
+          </div>
+        )}
+        {!passkeyLoading && !passkeyRecord && passkeySupported && (
+          <div className="muted" style={{ fontSize: 12 }}>
+            No passkey registered yet. Use the button below to store a passkey public key for your
+            wallet address.
+          </div>
+        )}
+        <button
+          className="button"
+          onClick={onRegisterPasskey}
+          disabled={passkeyBusy || !passkeySupported}
+        >
+          {passkeyRecord ? 'Replace Passkey' : 'Register Passkey'}
+        </button>
       </section>
     </main>
   );

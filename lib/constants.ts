@@ -1,11 +1,13 @@
 import { TierConfig } from './types';
 
 export const VAULT_ACCESS_MESSAGE_PREFIX = '3send vault private key access for';
+export const PASSKEY_REGISTER_MESSAGE_PREFIX = '3send passkey register for';
 export const VAULT_PRIVATE_KEY_MIN_SECRET_LENGTH = 32;
 
 export const RECEIVED_FILES_CSTORE_HKEY = '3sendxyz_received_files';
 export const SENT_FILES_CSTORE_HKEY = '3sendxyz_sent_files';
 export const VAULT_CSTORE_HKEY = '3sendxyz_vault';
+export const PASSKEY_CSTORE_HKEY = '3sendxyz_passkeys';
 
 export const MANAGER_CONTRACT_ADDRESS =
   '0x3adD1000920ef08D902fCc9de8053fdcaF708c9E' as `0x${string}`;

@@ -57,4 +57,14 @@ export type VaultKeyRecord = {
   publicKey: string;
   privateKey: string;
   createdAt?: number;
+  passkeyPublicKey?: string;
+  passkeyCredentialId?: string;
+};
+
+export type PasskeyRecord = {
+  credentialId: string;
+  publicKey: string;
+  algorithm?: number;
+  createdAt: number;
+  label?: string;
 };

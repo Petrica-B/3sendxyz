@@ -1,3 +1,15 @@
+export type EncryptionMetadata = {
+  version: string;
+  algorithm: string;
+  keyDerivation?: string;
+  ephemeralPublicKey: string;
+  iv: string;
+  recipientPublicKey?: string;
+  plaintextLength?: number;
+  ciphertextLength?: number;
+  recipient?: string;
+};
+
 export type StoredUploadRecord = {
   cid: string;
   filename: string;
@@ -10,6 +22,11 @@ export type StoredUploadRecord = {
   tierId: number;
   usdcAmount: string;
   r1Amount: string;
+  originalFilename?: string;
+  originalMimeType?: string;
+  originalFilesize?: number;
+  encryptedFilesize?: number;
+  encryption?: EncryptionMetadata;
 };
 
 export type TierConfig = {

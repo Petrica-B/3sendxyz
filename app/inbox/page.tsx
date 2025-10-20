@@ -2,11 +2,13 @@
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { getTierById } from '@/lib/constants';
+import { decryptFileFromEnvelope, decodeBase64 } from '@/lib/encryption';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
+import { getVaultPrivateKey } from '@/lib/vaultClient';
 import { useCallback, useEffect, useState } from 'react';
 import { formatUnits } from 'viem';
-import { useAccount } from 'wagmi';
+import { useAccount, useSignMessage } from 'wagmi';
 
 type ReceivedItem = StoredUploadRecord & { id: string };
 
@@ -14,6 +16,7 @@ const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.
 
 export default function InboxPage() {
   const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const [records, setRecords] = useState<ReceivedItem[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
@@ -114,27 +117,77 @@ export default function InboxPage() {
         throw new Error(payload?.error || 'Download failed');
       }
       const rawBase64 = payload.file.base64;
-      const downloadUrl =
-        typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
-          ? rawBase64
-          : `data:application/octet-stream;base64,${rawBase64 ?? ''}`;
       const fileName =
-        payload.file.filename && typeof payload.file.filename === 'string'
+        (payload.file.filename && typeof payload.file.filename === 'string'
           ? payload.file.filename
-          : item.filename;
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+          : null) ?? item.originalFilename ?? item.filename;
+
+      const { encryption, originalMimeType } = item;
+      if (encryption) {
+        if (!address) {
+          throw new Error('Wallet address required to decrypt');
+        }
+        if (!signMessageAsync) {
+          throw new Error('Wallet signer not available');
+        }
+
+        let base64Data: string | null = null;
+        if (typeof rawBase64 === 'string') {
+          if (rawBase64.startsWith('data:')) {
+            const commaIndex = rawBase64.indexOf(',');
+            base64Data = commaIndex >= 0 ? rawBase64.slice(commaIndex + 1) : null;
+          } else {
+            base64Data = rawBase64;
+          }
+        }
+        if (!base64Data) {
+          throw new Error('Encrypted payload missing data');
+        }
+
+        const ciphertext = decodeBase64(base64Data);
+        const privateKey = await getVaultPrivateKey(address, signMessageAsync);
+        const plaintext = await decryptFileFromEnvelope({
+          ciphertext,
+          metadata: encryption,
+          recipientPrivateKey: privateKey,
+        });
+
+        const mimeType =
+          typeof originalMimeType === 'string' && originalMimeType.trim().length > 0
+            ? originalMimeType
+            : 'application/octet-stream';
+        const plainBuffer = plaintext.buffer.slice(
+          plaintext.byteOffset,
+          plaintext.byteOffset + plaintext.byteLength
+        ) as ArrayBuffer;
+        const blob = new Blob([plainBuffer], { type: mimeType });
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(downloadUrl);
+      } else {
+        const downloadUrl =
+          typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
+            ? rawBase64
+            : `data:application/octet-stream;base64,${rawBase64 ?? ''}`;
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       alert(message);
     } finally {
       setDownloadingId((current) => (current === item.id ? null : current));
     }
-  }, []);
+  }, [address, signMessageAsync]);
 
   if (!isConnected || !address) {
     return (

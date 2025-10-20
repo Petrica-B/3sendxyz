@@ -39,7 +39,5 @@ export type UserProfile = {
 export type VaultKeyRecord = {
   publicKey: string;
   privateKey: string;
-  algorithm?: string;
-  encoding?: 'base64' | 'hex';
   createdAt?: number;
 };

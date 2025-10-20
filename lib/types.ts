@@ -35,3 +35,11 @@ export type UserProfile = {
   keyCreatedAt?: number;
   keyLabel?: string; // user-defined label for the key pair
 };
+
+export type VaultKeyRecord = {
+  publicKey: string;
+  privateKey: string;
+  algorithm?: string;
+  encoding?: 'base64' | 'hex';
+  createdAt?: number;
+};

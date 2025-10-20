@@ -2,6 +2,8 @@ import { TierConfig } from './types';
 
 export const RECEIVED_FILES_CSTORE_HKEY = '3sendxyz_received_files';
 export const SENT_FILES_CSTORE_HKEY = '3sendxyz_sent_files';
+export const VAULT_CSTORE_HKEY = '3sendxyz_vault';
+
 export const MANAGER_CONTRACT_ADDRESS =
   '0x3adD1000920ef08D902fCc9de8053fdcaF708c9E' as `0x${string}`;
 export const R1_CONTRACT_ADDRESS = '0x277CbD0Cf25F4789Bc04035eCd03d811FAf73691' as `0x${string}`;

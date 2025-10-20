@@ -196,7 +196,7 @@ export function SendFileCard() {
       formData.append('chainId', String(chainId));
       formData.append('tierId', String(tierInfo.id));
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch('/api/send/upload', {
         method: 'POST',
         body: formData,
       });

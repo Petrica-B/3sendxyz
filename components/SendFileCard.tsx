@@ -1,102 +1,248 @@
 'use client';
 
-import { createRatio1Session, encryptFileToPacket } from '@/lib/ratio1';
 import {
-  addInbox,
-  addOutbox,
-  deliverPacket,
-  setOutboxPacket,
-  updateOutboxStatus,
-} from '@/lib/store';
-import { useMemo, useState } from 'react';
-import { isAddress } from 'viem';
-import { useAccount, useSignMessage } from 'wagmi';
+  MANAGER_CONTRACT_ADDRESS,
+  MAX_FILE_BYTES,
+  R1_CONTRACT_ADDRESS,
+  resolveTierBySize,
+} from '@/lib/constants';
+import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
+import { QuoteData } from '@/lib/types';
+import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo, useState } from 'react';
+import { formatUnits, isAddress } from 'viem';
+import { useAccount, useChainId, usePublicClient, useSignMessage, useWriteContract } from 'wagmi';
+
+const addTenPercentBuffer = (amount: bigint) => {
+  if (amount === 0n) return 0n;
+  return (amount * 110n + 99n) / 100n; // round up
+};
 
 export function SendFileCard() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const publicClient = usePublicClient();
+  const { writeContractAsync } = useWriteContract();
+  const { signMessageAsync } = useSignMessage();
+
   const [recipient, setRecipient] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { signMessageAsync } = useSignMessage();
+
+  const tierInfo = useMemo(() => {
+    if (!file) return null;
+    return resolveTierBySize(file.size);
+  }, [file]);
+
+  const sizeExceedsLimit = useMemo(() => {
+    if (!file) return false;
+    return file.size > MAX_FILE_BYTES;
+  }, [file]);
+
+  const {
+    data: quoteData,
+    isLoading: quoteLoading,
+    refetch: refetchQuote,
+    error: quoteError,
+  } = useQuery<QuoteData>({
+    queryKey: ['quote-payment', chainId, MANAGER_CONTRACT_ADDRESS, tierInfo?.id],
+    enabled: Boolean(publicClient && MANAGER_CONTRACT_ADDRESS && tierInfo),
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      if (!publicClient || !MANAGER_CONTRACT_ADDRESS || !tierInfo) {
+        throw new Error('Missing dependencies for payment quote.');
+      }
+      const [, usdcAmount, r1Amount] = (await publicClient.readContract({
+        address: MANAGER_CONTRACT_ADDRESS,
+        abi: Manager3sendAbi,
+        functionName: 'quotePayment',
+        args: [tierInfo.id],
+      })) as readonly [number, bigint, bigint];
+
+      const decimalsRaw = await publicClient.readContract({
+        address: R1_CONTRACT_ADDRESS,
+        abi: Erc20Abi,
+        functionName: 'decimals',
+        args: [],
+      });
+
+      const r1Decimals = typeof decimalsRaw === 'number' ? decimalsRaw : Number(decimalsRaw ?? 18);
+
+      return {
+        usdcAmount,
+        r1Amount,
+        r1Decimals,
+        maxR1WithSlippage: addTenPercentBuffer(r1Amount),
+      };
+    },
+  });
+
+  const usdcDisplay = useMemo(() => {
+    if (!quoteData) return null;
+    const formatted = formatUnits(quoteData.usdcAmount, 6);
+    return Number.parseFloat(formatted).toFixed(2);
+  }, [quoteData]);
+
+  const r1Display = useMemo(() => {
+    if (!quoteData) return null;
+    const formatted = formatUnits(quoteData.r1Amount, quoteData.r1Decimals);
+    return Number.parseFloat(formatted).toFixed(6);
+  }, [quoteData]);
+
+  const r1MaxDisplay = useMemo(() => {
+    if (!quoteData) return null;
+    const formatted = formatUnits(quoteData.maxR1WithSlippage, quoteData.r1Decimals);
+    return Number.parseFloat(formatted).toFixed(6);
+  }, [quoteData]);
 
   const disabled = useMemo(() => {
-    return !isConnected || !isAddress(recipient) || !file || sending;
-  }, [isConnected, recipient, file, sending]);
+    if (!isConnected) return true;
+    if (!isAddress(recipient)) return true;
+    if (!file) return true;
+    if (sending) return true;
+    if (!tierInfo) return true;
+    if (sizeExceedsLimit) return true;
+    if (!chainId) return true;
+    if (!MANAGER_CONTRACT_ADDRESS) return true;
+    if (quoteLoading) return true;
+    if (!quoteData) return true;
+    return false;
+  }, [
+    isConnected,
+    recipient,
+    file,
+    sending,
+    tierInfo,
+    sizeExceedsLimit,
+    chainId,
+    MANAGER_CONTRACT_ADDRESS,
+    quoteLoading,
+    quoteData,
+  ]);
 
-  async function onSend() {
+  const onSend = useCallback(async () => {
     if (!address || !file) return;
     setError(null);
     setSending(true);
-    // Create an outbox entry early
+    setStatus('Preparing payment…');
     try {
-      const tempId = `temp:${Date.now()}`;
-      // 1) Mock handshake via signature to derive a session key
-      const handshakeMsg = `ratio1/handshake\nfrom:${address}\nto:${recipient}\ntimestamp:${Date.now()}`;
-      const sig = await signMessageAsync({ message: handshakeMsg });
-      const session = await createRatio1Session({
-        initiator: address,
-        recipient,
-        signature: sig,
-        context: '3send.xyz:mock',
-      });
-      // seed outbox record
-      addOutbox(address, {
-        id: tempId, // temporary before packet
-        to: recipient,
-        name: file.name,
-        size: file.size,
-        status: 'encrypting',
-        createdAt: Date.now(),
-        packetId: 'pending',
-      });
+      if (!MANAGER_CONTRACT_ADDRESS) {
+        throw new Error('Manager contract address is not configured.');
+      }
+      if (!tierInfo) {
+        throw new Error('Selected file exceeds the 5 GB limit we support today.');
+      }
+      if (!publicClient) {
+        throw new Error('Unable to connect to the network client.');
+      }
+      if (!chainId) {
+        throw new Error('Wallet chain not detected.');
+      }
 
-      // 2) Encrypt file into a mock packet
-      const packet = await encryptFileToPacket({
-        file,
-        session,
-        note,
-        embedKeyMaterial: true,
-        viaNodes: undefined,
+      const currentQuote = quoteData ?? (await refetchQuote().then((res) => res.data ?? null));
+      if (!currentQuote) {
+        throw new Error('Could not fetch payment quote.');
+      }
+
+      const maxR1Amount = currentQuote.maxR1WithSlippage;
+
+      setStatus('Checking R1 allowance…');
+      const allowance = (await publicClient.readContract({
+        address: R1_CONTRACT_ADDRESS,
+        abi: Erc20Abi,
+        functionName: 'allowance',
+        args: [address, MANAGER_CONTRACT_ADDRESS],
+      })) as bigint;
+
+      if (allowance < maxR1Amount) {
+        setStatus('Approving R1 spend…');
+        const approveHash = await writeContractAsync({
+          address: R1_CONTRACT_ADDRESS,
+          abi: Erc20Abi,
+          functionName: 'approve',
+          args: [MANAGER_CONTRACT_ADDRESS, maxR1Amount],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      }
+
+      setStatus('Burning payment…');
+      const transferHash = await writeContractAsync({
+        address: MANAGER_CONTRACT_ADDRESS,
+        abi: Manager3sendAbi,
+        functionName: 'transferPayment',
+        args: [tierInfo.id, maxR1Amount],
       });
+      await publicClient.waitForTransactionReceipt({ hash: transferHash });
+      const paymentTxHash = transferHash;
 
-      // 3) Deliver to mock transport + update outbox/inbox stores
-      deliverPacket(packet);
+      const startedAt = Date.now();
+      setStatus('Signing upload…');
+      const handshakeMsg = `ratio1/handshake\nfrom:${address}\nto:${recipient}\ntimestamp:${startedAt}`;
+      const signature = await signMessageAsync({ message: handshakeMsg });
 
-      // Find and update most recent outbox entry for this file
-      setOutboxPacket(address, tempId, packet.id, packet.viaNodes);
-      updateOutboxStatus(address, tempId, 'sent');
+      setStatus('Uploading file…');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('initiator', address);
+      formData.append('recipient', recipient);
+      if (note) formData.append('note', note);
+      formData.append('handshakeMessage', handshakeMsg);
+      formData.append('signature', signature);
+      formData.append('sentAt', String(startedAt));
+      formData.append('paymentTxHash', paymentTxHash);
+      formData.append('chainId', String(chainId));
+      formData.append('tierId', String(tierInfo.id));
 
-      // Inbox item for the recipient (mock)
-      addInbox(recipient, {
-        id: packet.id,
-        from: address,
-        name: file.name,
-        size: file.size,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 2, // 2 days
-        status: 'available',
-        packetId: packet.id,
-        viaNodes: packet.viaNodes,
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
       });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Upload failed');
+      }
 
       setFile(null);
       setNote('');
-    } catch (e: any) {
-      console.error(e);
-      setError(e?.message || 'Failed to send');
+      setStatus(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ratio1:upload-completed'));
+      }
+    } catch (err) {
+      console.error(err);
+      const message =
+        err instanceof Error ? err.message : typeof err === 'string' ? err : 'Failed to send';
+      setError(message);
+      setStatus(null);
     } finally {
       setSending(false);
     }
-  }
+  }, [
+    address,
+    chainId,
+    file,
+    MANAGER_CONTRACT_ADDRESS,
+    note,
+    publicClient,
+    quoteData,
+    recipient,
+    refetchQuote,
+    signMessageAsync,
+    tierInfo,
+    writeContractAsync,
+  ]);
+
+  const buttonLabel = sending ? (status ?? 'Processing…') : 'Pay & Send';
 
   return (
     <div className="card col" style={{ gap: 16 }}>
       <div>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send a file</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          P2P mock using ratio1 stubs
+          Pay in R1, then upload securely through the ratio1 edge node.
         </div>
       </div>
 
@@ -126,11 +272,14 @@ export function SendFileCard() {
         <div className="dropzone">
           <input
             type="file"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            onChange={(e) => {
+              setFile(e.target.files?.[0] || null);
+              setError(null);
+            }}
             style={{ width: '100%' }}
           />
           <div className="muted mono" style={{ fontSize: 12, marginTop: 8 }}>
-            Max ~50MB recommended for demo. Encrypted locally in-browser.
+            Max file size 5 GB.
           </div>
           {file && (
             <div style={{ marginTop: 8 }}>
@@ -143,6 +292,36 @@ export function SendFileCard() {
             </div>
           )}
         </div>
+        {sizeExceedsLimit && (
+          <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>
+            Files above 5 GB are not supported yet.
+          </div>
+        )}
+        {tierInfo && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{tierInfo.label}</div>
+            <div className="muted" style={{ fontSize: 12 }}>
+              {tierInfo.description}
+            </div>
+            {quoteLoading && (
+              <div className="muted" style={{ fontSize: 12 }}>
+                Fetching payment quote…
+              </div>
+            )}
+            {quoteError && (
+              <div style={{ color: '#f87171', fontSize: 12 }}>
+                {(quoteError as Error).message || 'Failed to fetch payment quote.'}
+              </div>
+            )}
+            {!quoteLoading && quoteData && (
+              <div className="muted mono" style={{ fontSize: 12, marginTop: 4 }}>
+                Quote: {usdcDisplay ?? '—'} USDC → {r1Display ?? '—'} R1
+                {' · '}
+                Max burn (incl. 10% buffer): {r1MaxDisplay ?? '—'} R1
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <label className="col">
@@ -166,11 +345,9 @@ export function SendFileCard() {
 
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button className="button" onClick={onSend} disabled={disabled}>
-          {sending ? 'Encrypting…' : 'Encrypt & Send (Mock)'}
+          {buttonLabel}
         </button>
       </div>
-
-      {/* Outbox list moved to Outbox page */}
     </div>
   );
 }

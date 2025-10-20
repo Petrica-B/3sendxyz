@@ -1,12 +1,12 @@
 'use client';
 
 import { AddressLink, TxLink } from '@/components/Links';
-import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import { getTierById } from '@/lib/constants';
+import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
 import { useCallback, useEffect, useState } from 'react';
-import { useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
+import { useAccount } from 'wagmi';
 
 type ReceivedItem = StoredUploadRecord & { id: string };
 
@@ -19,6 +19,7 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
 
   const fetchInbox = useCallback(async () => {
     if (!address) {
@@ -75,6 +76,25 @@ export default function InboxPage() {
     });
   }, [records]);
 
+  // Check if user has generated a key pair (profile fingerprint)
+  useEffect(() => {
+    try {
+      if (!address) {
+        setHasKey(null);
+        return;
+      }
+      const raw = localStorage.getItem(`profile:${address.toLowerCase()}`);
+      if (!raw) {
+        setHasKey(false);
+        return;
+      }
+      const parsed = JSON.parse(raw) as { fingerprintHex?: string };
+      setHasKey(Boolean(parsed?.fingerprintHex));
+    } catch {
+      setHasKey(false);
+    }
+  }, [address]);
+
   const onDownload = useCallback(async (item: ReceivedItem) => {
     try {
       setDownloadingId(item.id);
@@ -127,6 +147,26 @@ export default function InboxPage() {
     );
   }
 
+  if (hasKey === false) {
+    return (
+      <main className="col" style={{ gap: 16 }}>
+        <div className="hero">
+          <div className="headline">Inbox</div>
+          <div className="subhead">Set up your encryption keys to receive and decrypt files.</div>
+        </div>
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 700 }}>Encryption required</div>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Generate your key pair so files can be delivered and decrypted.
+            </div>
+          </div>
+          <a href="/profile" className="button" style={{ textDecoration: 'none' }}>Go to Profile</a>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="col" style={{ gap: 24 }}>
       <div className="hero">
@@ -142,7 +182,7 @@ export default function InboxPage() {
         )}
         {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
         {!loading && !error && records.length === 0 ? (
-          <div className="muted" style={{ fontSize: 12 }}>
+          <div className="muted mb-[360px]" style={{ fontSize: 12 }}>
             No files in your inbox yet.
           </div>
         ) : (

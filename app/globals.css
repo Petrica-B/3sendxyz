@@ -211,6 +211,14 @@ a {
   font-size: 12px;
 }
 
+.footerInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .badge {
   font-size: 11px;
   padding: 2px 8px;
@@ -277,7 +285,7 @@ a {
   margin: 0 auto;
   padding: 6px 24px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 .mobileTabItem {
@@ -313,9 +321,55 @@ a {
     padding-left: 16px;
     padding-right: 16px;
   }
+  /* Add extra bottom padding to footer on mobile */
+  .footer {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+  /* Center footer content on mobile */
+  .footerInner {
+    justify-content: center;
+    text-align: center;
+  }
+  .footerInner .row {
+    justify-content: center;
+  }
+  .servedBy {
+    justify-content: center;
+  }
 }
 @media (min-width: 768px) {
   .mobileTabbar {
     display: none;
+  }
+}
+
+/* Pricing layout: compact cards on small screens */
+.pricingGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .pricingGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Home CTA actions: horizontal on desktop, full width on mobile */
+.homeCtaActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 767px) {
+  .homeCtaActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+  .homeCtaActions > a,
+  .homeCtaActions > button {
+    width: 100%;
+    justify-content: center;
   }
 }

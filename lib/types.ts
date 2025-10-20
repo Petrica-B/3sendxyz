@@ -27,3 +27,11 @@ export type QuoteData = {
   r1Decimals: number;
   maxR1WithSlippage: bigint;
 };
+
+export type UserProfile = {
+  handle?: string; // e.g., alice.3send
+  publicKeyPem?: string;
+  fingerprintHex?: string;
+  keyCreatedAt?: number;
+  keyLabel?: string; // user-defined label for the key pair
+};

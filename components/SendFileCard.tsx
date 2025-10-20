@@ -242,7 +242,8 @@ export function SendFileCard() {
       <div>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send a file</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          Pay in R1, then upload securely through the ratio1 edge node.
+          Pay in R1, ETH, or USC. Encrypt and send securely through the Ratio1 Edge Nodes network -
+          all with one click. All tokens are converted to R1 and burned.
         </div>
       </div>
 

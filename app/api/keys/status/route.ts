@@ -1,6 +1,6 @@
-import { PASSKEY_CSTORE_HKEY } from '@/lib/constants';
-import { parsePasskeyRecord } from '@/lib/passkey';
-import type { PasskeyRecord } from '@/lib/types';
+import { REGISTERED_KEYS_CSTORE_HKEY } from '@/lib/constants';
+import { parseRegisteredKeyRecord } from '@/lib/passkey';
+import type { RegisteredKeyRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 import { getAddress } from 'viem';
@@ -23,27 +23,28 @@ export async function GET(request: Request) {
 
   try {
     const ratio1 = createEdgeSdk();
-    const key = normalized.toLowerCase();
-    let record: PasskeyRecord | null = null;
+  	const key = normalized.toLowerCase();
+    let record: RegisteredKeyRecord | null = null;
     try {
       const value = await ratio1.cstore.hget({
-        hkey: PASSKEY_CSTORE_HKEY,
+        hkey: REGISTERED_KEYS_CSTORE_HKEY,
         key,
       });
-      record = parsePasskeyRecord(value);
+      record = parseRegisteredKeyRecord(value);
     } catch (error) {
-      console.warn('[passkeys] hget failed', error);
+      console.warn('[keys] hget failed', error);
     }
 
     return NextResponse.json({
       success: true,
       address: normalized,
       record,
-      hasPasskey: Boolean(record),
+      hasKey: Boolean(record),
+      keyType: record?.type ?? null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[passkeys] Failed to fetch status', error);
+    console.error('[keys] Failed to fetch status', error);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

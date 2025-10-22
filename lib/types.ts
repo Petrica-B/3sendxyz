@@ -8,7 +8,7 @@ export type EncryptionMetadata = {
   plaintextLength?: number;
   ciphertextLength?: number;
   recipient?: string;
-  keySource?: 'vault' | 'passkey';
+  keySource?: 'vault' | 'passkey' | 'seed';
 };
 
 export type StoredUploadRecord = {
@@ -63,11 +63,28 @@ export type VaultKeyRecord = {
   passkeyPrfSalt?: string;
 };
 
-export type PasskeyRecord = {
-  credentialId: string;
+export type RegisteredKeyType = 'passkey' | 'seed';
+
+type RegisteredKeyRecordBase = {
+  type: RegisteredKeyType;
   publicKey: string;
-  algorithm?: number;
   createdAt: number;
   label?: string;
-  prfSalt: string;
 };
+
+export type RegisteredPasskeyRecord = RegisteredKeyRecordBase & {
+  type: 'passkey';
+  credentialId: string;
+  prfSalt: string;
+  algorithm?: number;
+};
+
+export type RegisteredSeedRecord = RegisteredKeyRecordBase & {
+  type: 'seed';
+  fingerprint?: string;
+  derivationPath?: string;
+};
+
+export type RegisteredKeyRecord = RegisteredPasskeyRecord | RegisteredSeedRecord;
+
+export type PasskeyRecord = RegisteredPasskeyRecord;

@@ -1,6 +1,6 @@
-import { PASSKEY_CSTORE_HKEY, VAULT_CSTORE_HKEY } from '@/lib/constants';
-import { parsePasskeyRecord } from '@/lib/passkey';
-import type { PasskeyRecord, VaultKeyRecord } from '@/lib/types';
+import { REGISTERED_KEYS_CSTORE_HKEY, VAULT_CSTORE_HKEY } from '@/lib/constants';
+import { parseRegisteredKeyRecord } from '@/lib/passkey';
+import type { RegisteredKeyRecord, VaultKeyRecord } from '@/lib/types';
 import { createVaultRecord, getVaultPrivateKeySecret, parseVaultRecord } from '@/lib/vault';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
@@ -19,22 +19,22 @@ export async function GET(request: Request) {
     const ratio1 = createEdgeSdk();
     const addressKey = address.toLowerCase();
 
-    let passkey: PasskeyRecord | null = null;
+    let registeredKey: RegisteredKeyRecord | null = null;
     try {
-      const passkeyValue = await ratio1.cstore.hget({
-        hkey: PASSKEY_CSTORE_HKEY,
+      const storedValue = await ratio1.cstore.hget({
+        hkey: REGISTERED_KEYS_CSTORE_HKEY,
         key: addressKey,
       });
-      passkey = parsePasskeyRecord(passkeyValue);
+      registeredKey = parseRegisteredKeyRecord(storedValue);
     } catch (error) {
-      console.warn('[passkey] hget failed', error);
+      console.warn('[keys] hget failed', error);
     }
 
-    if (passkey?.publicKey) {
+    if (registeredKey?.publicKey) {
       return NextResponse.json({
         success: true,
-        type: 'passkey',
-        publicKey: passkey.publicKey,
+        type: registeredKey.type,
+        publicKey: registeredKey.publicKey,
       });
     }
 

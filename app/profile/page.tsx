@@ -3,9 +3,9 @@
 import { encodeBase64 } from '@/lib/encryption';
 import { shortAddress } from '@/lib/format';
 import { generateMnemonicKeyPair } from '@/lib/keys';
-import { buildPasskeyRegisterMessage } from '@/lib/passkeyAccess';
+import { buildRegisteredKeyMessage } from '@/lib/keyAccess';
 import { derivePasskeyX25519KeyPair, randomPrfSalt } from '@/lib/passkeyClient';
-import type { PasskeyRecord, UserProfile } from '@/lib/types';
+import type { RegisteredKeyRecord, RegisteredPasskeyRecord, UserProfile } from '@/lib/types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
 
@@ -48,11 +48,23 @@ export default function ProfilePage() {
   const [keyLabelInput, setKeyLabelInput] = useState('');
   const [privKeyOnce, setPrivKeyOnce] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [passkeyRecord, setPasskeyRecord] = useState<PasskeyRecord | null>(null);
-  const [passkeyLoading, setPasskeyLoading] = useState(false);
-  const [passkeyBusy, setPasskeyBusy] = useState(false);
-  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [registeredKeyRecord, setRegisteredKeyRecord] = useState<RegisteredKeyRecord | null>(null);
+  const [registeredKeyLoading, setRegisteredKeyLoading] = useState(false);
+  const [registeredKeyBusy, setRegisteredKeyBusy] = useState(false);
+  const [registeredKeyError, setRegisteredKeyError] = useState<string | null>(null);
   const [passkeySupported, setPasskeySupported] = useState(false);
+
+  const passkeyRecord = useMemo<RegisteredPasskeyRecord | null>(() => {
+    return registeredKeyRecord?.type === 'passkey' ? registeredKeyRecord : null;
+  }, [registeredKeyRecord]);
+
+  const seedKeyRecord = useMemo(() => {
+    return registeredKeyRecord?.type === 'seed' ? registeredKeyRecord : null;
+  }, [registeredKeyRecord]);
+
+  const passkeyLoading = registeredKeyLoading;
+  const passkeyBusy = registeredKeyBusy;
+  const passkeyError = registeredKeyError;
 
   const passkeyCredentialPreview = useMemo(() => {
     if (!passkeyRecord?.credentialId) return null;
@@ -76,33 +88,33 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!address) {
-      setPasskeyRecord(null);
-      setPasskeyLoading(false);
+      setRegisteredKeyRecord(null);
+      setRegisteredKeyLoading(false);
       return;
     }
     let cancelled = false;
     const run = async () => {
-      setPasskeyLoading(true);
-      setPasskeyError(null);
+      setRegisteredKeyLoading(true);
+      setRegisteredKeyError(null);
       try {
         const params = new URLSearchParams({ address });
-        const res = await fetch(`/api/passkeys/status?${params.toString()}`);
+        const res = await fetch(`/api/keys/status?${params.toString()}`);
         const payload = await res.json().catch(() => null);
         if (!res.ok || !payload?.success) {
-          throw new Error(payload?.error || 'Failed to fetch passkey status');
+          throw new Error(payload?.error || 'Failed to fetch key status');
         }
         if (!cancelled) {
-          setPasskeyRecord(payload.record ?? null);
+          setRegisteredKeyRecord(payload.record ?? null);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         if (!cancelled) {
-          setPasskeyRecord(null);
-          setPasskeyError(message);
+          setRegisteredKeyRecord(null);
+          setRegisteredKeyError(message);
         }
       } finally {
         if (!cancelled) {
-          setPasskeyLoading(false);
+          setRegisteredKeyLoading(false);
         }
       }
     };
@@ -228,10 +240,10 @@ export default function ProfilePage() {
       return;
     }
 
-    setPasskeyBusy(true);
-    setPasskeyError(null);
+    setRegisteredKeyBusy(true);
+    setRegisteredKeyError(null);
     try {
-      const message = buildPasskeyRegisterMessage(address);
+      const message = buildRegisteredKeyMessage(address);
       const signature = await signMessageAsync({ message });
 
       const challenge = window.crypto.getRandomValues(new Uint8Array(32));
@@ -282,10 +294,11 @@ export default function ProfilePage() {
       });
       const prfSaltB64 = encodeBase64(prfSaltBytes);
 
-      const registerRes = await fetch('/api/passkeys/register', {
+      const registerRes = await fetch('/api/keys/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          type: 'passkey',
           address,
           signature,
           message,
@@ -299,11 +312,11 @@ export default function ProfilePage() {
       if (!registerRes.ok || !payload?.success) {
         throw new Error(payload?.error || 'Failed to register passkey');
       }
-      setPasskeyRecord(payload.record ?? null);
-      setPasskeyError(null);
+      setRegisteredKeyRecord(payload.record ?? null);
+      setRegisteredKeyError(null);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
-          new CustomEvent('ratio1:passkey-updated', { detail: { address } })
+          new CustomEvent('ratio1:registered-key-updated', { detail: { address } })
         );
       }
     } catch (err) {
@@ -315,13 +328,13 @@ export default function ProfilePage() {
       ) {
         message = 'Passkey registration was cancelled.';
       }
-      setPasskeyError(message);
-      console.error('[passkeys] register failed', err);
+      setRegisteredKeyError(message);
+      console.error('[keys] register failed', err);
       if (message && !/cancel/i.test(message) && !/not allowed/i.test(message)) {
         alert(message);
       }
     } finally {
-      setPasskeyBusy(false);
+      setRegisteredKeyBusy(false);
     }
   }, [address, signMessageAsync]);
 
@@ -382,6 +395,11 @@ export default function ProfilePage() {
           We never store your private key. If you lose it, you will not be able to decrypt any files
           that were encrypted using your old private key.
         </div>
+        {seedKeyRecord && (
+          <div className="muted" style={{ fontSize: 12 }}>
+            Registered seed key on {new Date(seedKeyRecord.createdAt).toLocaleString()}.
+          </div>
+        )}
         {/* Key label input is placed next to the action button below */}
         {profile.fingerprintHex ? (
           <div className="col" style={{ gap: 8 }}>

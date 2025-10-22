@@ -171,7 +171,12 @@ export function SendFileCard() {
         throw new Error(receiverKeyPayload?.error || 'Failed to resolve receiver public key');
       }
       const receiverPublicKey = receiverKeyPayload.publicKey;
-      const receiverKeySource = receiverKeyPayload.type === 'passkey' ? 'passkey' : 'vault';
+      const receiverKeySource =
+        receiverKeyPayload.type === 'passkey'
+          ? 'passkey'
+          : receiverKeyPayload.type === 'seed'
+            ? 'seed'
+            : 'vault';
 
       setStatus('Encrypting file…');
       const { encryptedFile, metadata: encryptionMetadata } = await encryptFileForRecipient({

@@ -5,9 +5,9 @@ import { getTierById } from '@/lib/constants';
 import { decodeBase64, decryptFileFromEnvelope } from '@/lib/encryption';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import { derivePasskeyX25519KeyPair } from '@/lib/passkeyClient';
-import type { PasskeyRecord, StoredUploadRecord } from '@/lib/types';
+import type { RegisteredKeyRecord, RegisteredPasskeyRecord, StoredUploadRecord } from '@/lib/types';
 import { getVaultPrivateKey } from '@/lib/vaultClient';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatUnits } from 'viem';
 import { useAccount, useSignMessage } from 'wagmi';
 
@@ -23,11 +23,15 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [passkeyRecord, setPasskeyRecord] = useState<PasskeyRecord | null>(null);
-  console.log({ passkeyRecord });
-  const [passkeyLoading, setPasskeyLoading] = useState(false);
-  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [registeredKeyRecord, setRegisteredKeyRecord] = useState<RegisteredKeyRecord | null>(null);
+  const [registeredKeyLoading, setRegisteredKeyLoading] = useState(false);
+  const [registeredKeyError, setRegisteredKeyError] = useState<string | null>(null);
+  const passkeyRecord = useMemo<RegisteredPasskeyRecord | null>(() => {
+    return registeredKeyRecord?.type === 'passkey' ? registeredKeyRecord : null;
+  }, [registeredKeyRecord]);
   const passkeyKeyCacheRef = useRef<Uint8Array | null>(null);
+  const passkeyLoading = registeredKeyLoading;
+  const passkeyError = registeredKeyError;
 
   const fetchInbox = useCallback(async () => {
     if (!address) {
@@ -87,28 +91,27 @@ export default function InboxPage() {
   const fetchPasskeyStatus = useCallback(async () => {
     passkeyKeyCacheRef.current = null;
     if (!address) {
-      setPasskeyRecord(null);
-      setPasskeyLoading(false);
-      setPasskeyError(null);
+      setRegisteredKeyRecord(null);
+      setRegisteredKeyLoading(false);
+      setRegisteredKeyError(null);
       return;
     }
-    setPasskeyLoading(true);
-    setPasskeyError(null);
+    setRegisteredKeyLoading(true);
+    setRegisteredKeyError(null);
     try {
       const params = new URLSearchParams({ address });
-      const res = await fetch(`/api/passkeys/status?${params.toString()}`);
+      const res = await fetch(`/api/keys/status?${params.toString()}`);
       const payload = await res.json().catch(() => null);
       if (!res.ok || !payload?.success) {
-        throw new Error(payload?.error || 'Failed to fetch passkey status');
+        throw new Error(payload?.error || 'Failed to fetch key status');
       }
-      setPasskeyRecord(payload.record ?? null);
-      console.log('Fetched passkey record:', payload.record);
+      setRegisteredKeyRecord(payload.record ?? null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      setPasskeyRecord(null);
-      setPasskeyError(message);
+      setRegisteredKeyRecord(null);
+      setRegisteredKeyError(message);
     } finally {
-      setPasskeyLoading(false);
+      setRegisteredKeyLoading(false);
     }
   }, [address]);
 
@@ -116,7 +119,7 @@ export default function InboxPage() {
     let active = true;
     fetchPasskeyStatus().catch(() => {
       if (active) {
-        setPasskeyError((prev) => prev ?? 'Failed to fetch passkey status');
+        setRegisteredKeyError((prev) => prev ?? 'Failed to fetch key status');
       }
     });
     return () => {
@@ -127,12 +130,12 @@ export default function InboxPage() {
   useEffect(() => {
     const handler = () => {
       fetchPasskeyStatus().catch(() => {
-        setPasskeyError((prev) => prev ?? 'Failed to refresh passkey status');
+        setRegisteredKeyError((prev) => prev ?? 'Failed to refresh key status');
       });
     };
-    window.addEventListener('ratio1:passkey-updated', handler);
+    window.addEventListener('ratio1:registered-key-updated', handler);
     return () => {
-      window.removeEventListener('ratio1:passkey-updated', handler);
+      window.removeEventListener('ratio1:registered-key-updated', handler);
     };
   }, [fetchPasskeyStatus]);
 
@@ -184,7 +187,12 @@ export default function InboxPage() {
 
           const ciphertext = decodeBase64(base64Data);
           let privateKey: Uint8Array;
-          const keySource = encryption.keySource === 'passkey' ? 'passkey' : 'vault';
+          const keySource =
+            encryption.keySource === 'passkey'
+              ? 'passkey'
+              : encryption.keySource === 'seed'
+                ? 'seed'
+                : 'vault';
 
           if (keySource === 'passkey') {
             if (passkeyLoading) {
@@ -211,6 +219,11 @@ export default function InboxPage() {
               passkeyKeyCacheRef.current = cached;
             }
             privateKey = cached;
+          } else if (keySource === 'seed') {
+            //TODO implement seed key decryption
+            throw new Error(
+              'Seed key decryption is not yet available. Use your seed-based client to decrypt this file.'
+            );
           } else {
             if (!signMessageAsync) {
               throw new Error('Wallet signer not available');

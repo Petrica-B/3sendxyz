@@ -243,9 +243,6 @@ export default function ProfilePage() {
     setRegisteredKeyBusy(true);
     setRegisteredKeyError(null);
     try {
-      const message = buildRegisteredKeyMessage(address);
-      const signature = await signMessageAsync({ message });
-
       const challenge = window.crypto.getRandomValues(new Uint8Array(32));
       const userId = new TextEncoder().encode(address.toLowerCase());
 
@@ -293,6 +290,8 @@ export default function ProfilePage() {
         salt: prfSaltBytes,
       });
       const prfSaltB64 = encodeBase64(prfSaltBytes);
+      const message = buildRegisteredKeyMessage(address, x25519PublicKey);
+      const signature = await signMessageAsync({ message });
 
       const registerRes = await fetch('/api/keys/register', {
         method: 'POST',

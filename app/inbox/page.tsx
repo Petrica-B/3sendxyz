@@ -23,7 +23,6 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [passkeyRecord, setPasskeyRecord] = useState<PasskeyRecord | null>(null);
   console.log({ passkeyRecord });
   const [passkeyLoading, setPasskeyLoading] = useState(false);
@@ -84,25 +83,6 @@ export default function InboxPage() {
       return next;
     });
   }, [records]);
-
-  // Check if user has generated a key pair (profile fingerprint)
-  useEffect(() => {
-    try {
-      if (!address) {
-        setHasKey(null);
-        return;
-      }
-      const raw = localStorage.getItem(`profile:${address.toLowerCase()}`);
-      if (!raw) {
-        setHasKey(false);
-        return;
-      }
-      const parsed = JSON.parse(raw) as { fingerprintHex?: string };
-      setHasKey(Boolean(parsed?.fingerprintHex));
-    } catch {
-      setHasKey(false);
-    }
-  }, [address]);
 
   const fetchPasskeyStatus = useCallback(async () => {
     passkeyKeyCacheRef.current = null;
@@ -289,39 +269,6 @@ export default function InboxPage() {
         <div className="hero">
           <div className="headline">Inbox</div>
           <div className="subhead">Connect your wallet to see incoming files.</div>
-        </div>
-      </main>
-    );
-  }
-
-  const missingKeys = hasKey === false && !passkeyRecord;
-  if (missingKeys && !passkeyLoading) {
-    return (
-      <main className="col" style={{ gap: 16 }}>
-        <div className="hero">
-          <div className="headline">Inbox</div>
-          <div className="subhead">Set up your encryption keys to receive and decrypt files.</div>
-        </div>
-        <div
-          className="card"
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 8,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 700 }}>Encryption required</div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Generate a vault key pair or register a passkey so files can be delivered and
-              decrypted.
-            </div>
-          </div>
-          <a href="/profile" className="button" style={{ textDecoration: 'none' }}>
-            Go to Profile
-          </a>
         </div>
       </main>
     );

@@ -1,34 +1,11 @@
 import { PASSKEY_CSTORE_HKEY, VAULT_CSTORE_HKEY } from '@/lib/constants';
+import { parsePasskeyRecord } from '@/lib/passkey';
 import { createVaultRecord, getVaultPrivateKeySecret, parseVaultRecord } from '@/lib/vault';
 import type { PasskeyRecord, VaultKeyRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-
-function parsePasskeyRecord(raw: string | null | undefined): PasskeyRecord | null {
-  if (!raw || typeof raw !== 'string') return null;
-  try {
-    const parsed = JSON.parse(raw) as PasskeyRecord;
-    if (!parsed || typeof parsed !== 'object') return null;
-    if (typeof parsed.credentialId !== 'string') return null;
-    if (typeof parsed.publicKey !== 'string') return null;
-    const prfSalt = typeof parsed.prfSalt === 'string' ? parsed.prfSalt : '';
-    return {
-      credentialId: parsed.credentialId,
-      publicKey: parsed.publicKey,
-      algorithm: typeof parsed.algorithm === 'number' ? parsed.algorithm : undefined,
-      createdAt:
-        typeof parsed.createdAt === 'number' && Number.isFinite(parsed.createdAt)
-          ? parsed.createdAt
-          : Date.now(),
-      label: typeof parsed.label === 'string' ? parsed.label : undefined,
-      prfSalt,
-    };
-  } catch {
-    return null;
-  }
-}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

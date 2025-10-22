@@ -49,7 +49,12 @@ export async function POST(request: Request) {
   if (!address || typeof address !== 'string' || address.trim().length === 0) {
     return NextResponse.json({ success: false, error: 'Missing address' }, { status: 400 });
   }
-  if (!signature || typeof signature !== 'string' || signature.trim().length === 0 || !isHex(signature)) {
+  if (
+    !signature ||
+    typeof signature !== 'string' ||
+    signature.trim().length === 0 ||
+    !isHex(signature)
+  ) {
     return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 });
   }
   if (!message || typeof message !== 'string' || message.trim().length === 0) {
@@ -68,7 +73,10 @@ export async function POST(request: Request) {
           : null;
 
   if (!keyPublicBase64) {
-    return NextResponse.json({ success: false, error: 'Missing passkey public key' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'Missing passkey public key' },
+      { status: 400 }
+    );
   }
 
   if (!prfSalt || typeof prfSalt !== 'string' || prfSalt.trim().length === 0) {
@@ -93,21 +101,36 @@ export async function POST(request: Request) {
       signature: signature as `0x${string}`,
     });
     if (getAddress(recovered) !== normalized) {
-      return NextResponse.json({ success: false, error: 'Signature does not match address' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: 'Signature does not match address' },
+        { status: 401 }
+      );
     }
   } catch (error) {
     console.warn('[passkeys] Failed to recover address from signature', error);
-    return NextResponse.json({ success: false, error: 'Failed to validate signature' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to validate signature' },
+      { status: 400 }
+    );
   }
 
   if (!isBase64(credentialId)) {
-    return NextResponse.json({ success: false, error: 'credentialId must be base64 encoded' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'credentialId must be base64 encoded' },
+      { status: 400 }
+    );
   }
   if (!isBase64(keyPublicBase64)) {
-    return NextResponse.json({ success: false, error: 'passkey public key must be base64 encoded' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'passkey public key must be base64 encoded' },
+      { status: 400 }
+    );
   }
   if (!isBase64(prfSalt)) {
-    return NextResponse.json({ success: false, error: 'prfSalt must be base64 encoded' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'prfSalt must be base64 encoded' },
+      { status: 400 }
+    );
   }
 
   let credentialIdBuf: Buffer;
@@ -118,7 +141,10 @@ export async function POST(request: Request) {
     publicKeyBuf = Buffer.from(keyPublicBase64, 'base64');
     prfSaltBuf = Buffer.from(prfSalt, 'base64');
   } catch {
-    return NextResponse.json({ success: false, error: 'Failed to decode credential payload' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to decode credential payload' },
+      { status: 400 }
+    );
   }
 
   if (credentialIdBuf.length === 0) {
@@ -136,7 +162,8 @@ export async function POST(request: Request) {
     publicKey: keyPublicBase64,
     algorithm: typeof algorithm === 'number' && Number.isInteger(algorithm) ? algorithm : undefined,
     createdAt: Date.now(),
-    label: typeof label === 'string' && label.trim().length > 0 ? label.trim().slice(0, 30) : undefined,
+    label:
+      typeof label === 'string' && label.trim().length > 0 ? label.trim().slice(0, 30) : undefined,
     prfSalt,
   };
 
@@ -150,17 +177,11 @@ export async function POST(request: Request) {
     });
 
     try {
-      const existingVault = await ratio1.cstore.hget({
+      const vaultValue = await ratio1.cstore.hget({
         hkey: VAULT_CSTORE_HKEY,
         key,
       });
-      const vaultValue =
-        typeof existingVault === 'string'
-          ? existingVault
-          : existingVault && typeof existingVault === 'object' && 'result' in existingVault
-            ? (existingVault as { result?: unknown }).result
-            : null;
-      const parsedVault = parseVaultRecord(typeof vaultValue === 'string' ? vaultValue : null);
+      const parsedVault = parseVaultRecord(vaultValue);
       if (parsedVault) {
         const nextVault = {
           ...parsedVault,

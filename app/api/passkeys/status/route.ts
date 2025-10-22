@@ -26,17 +26,11 @@ export async function GET(request: Request) {
     const key = normalized.toLowerCase();
     let record: PasskeyRecord | null = null;
     try {
-      const existing = await ratio1.cstore.hget({
+      const value = await ratio1.cstore.hget({
         hkey: PASSKEY_CSTORE_HKEY,
         key,
       });
-      const value =
-        typeof existing === 'string'
-          ? existing
-          : existing && typeof existing === 'object' && 'result' in existing
-            ? (existing as { result?: unknown }).result
-            : null;
-      record = parsePasskeyRecord(typeof value === 'string' ? value : null);
+      record = parsePasskeyRecord(value);
     } catch (error) {
       console.warn('[passkeys] hget failed', error);
     }

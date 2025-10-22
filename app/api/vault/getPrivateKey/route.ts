@@ -1,7 +1,12 @@
 import { VAULT_CSTORE_HKEY } from '@/lib/constants';
-import { createVaultRecord, decryptPrivateKey, getVaultPrivateKeySecret, parseVaultRecord } from '@/lib/vault';
-import { buildVaultAccessMessage } from '@/lib/vaultAccess';
 import type { VaultKeyRecord } from '@/lib/types';
+import {
+  createVaultRecord,
+  decryptPrivateKey,
+  getVaultPrivateKeySecret,
+  parseVaultRecord,
+} from '@/lib/vault';
+import { buildVaultAccessMessage } from '@/lib/vaultAccess';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 import { getAddress, isHex, recoverMessageAddress } from 'viem';
@@ -65,11 +70,17 @@ export async function POST(request: Request) {
       signature: signature as `0x${string}`,
     });
     if (getAddress(recovered) !== normalizedAddress) {
-      return NextResponse.json({ success: false, error: 'Signature does not match address' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: 'Signature does not match address' },
+        { status: 401 }
+      );
     }
   } catch (error) {
     console.warn('[vault] Failed to recover address from signature', error);
-    return NextResponse.json({ success: false, error: 'Failed to validate signature' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to validate signature' },
+      { status: 400 }
+    );
   }
 
   try {
@@ -80,17 +91,11 @@ export async function POST(request: Request) {
     let record: VaultKeyRecord | null = null;
 
     try {
-      const existing = await ratio1.cstore.hget({
+      const existingValue = await ratio1.cstore.hget({
         hkey: VAULT_CSTORE_HKEY,
         key: addressKey,
       });
-      const existingValue =
-        typeof existing === 'string'
-          ? existing
-          : existing && typeof existing === 'object' && 'result' in existing
-            ? (existing as { result?: unknown }).result
-            : null;
-      record = parseVaultRecord(typeof existingValue === 'string' ? existingValue : null);
+      record = parseVaultRecord(existingValue);
     } catch (error) {
       console.warn('[vault] hget failed', error);
     }

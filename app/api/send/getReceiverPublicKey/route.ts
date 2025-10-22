@@ -1,7 +1,7 @@
 import { PASSKEY_CSTORE_HKEY, VAULT_CSTORE_HKEY } from '@/lib/constants';
 import { parsePasskeyRecord } from '@/lib/passkey';
-import { createVaultRecord, getVaultPrivateKeySecret, parseVaultRecord } from '@/lib/vault';
 import type { PasskeyRecord, VaultKeyRecord } from '@/lib/types';
+import { createVaultRecord, getVaultPrivateKeySecret, parseVaultRecord } from '@/lib/vault';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 
@@ -21,17 +21,11 @@ export async function GET(request: Request) {
 
     let passkey: PasskeyRecord | null = null;
     try {
-      const passkeyExisting = await ratio1.cstore.hget({
+      const passkeyValue = await ratio1.cstore.hget({
         hkey: PASSKEY_CSTORE_HKEY,
         key: addressKey,
       });
-      const passkeyValue =
-        typeof passkeyExisting === 'string'
-          ? passkeyExisting
-          : passkeyExisting && typeof passkeyExisting === 'object' && 'result' in passkeyExisting
-            ? (passkeyExisting as { result?: unknown }).result
-            : null;
-      passkey = parsePasskeyRecord(typeof passkeyValue === 'string' ? passkeyValue : null);
+      passkey = parsePasskeyRecord(passkeyValue);
     } catch (error) {
       console.warn('[passkey] hget failed', error);
     }
@@ -47,17 +41,11 @@ export async function GET(request: Request) {
     let record: VaultKeyRecord | null = null;
 
     try {
-      const existing = await ratio1.cstore.hget({
+      const existingValue = await ratio1.cstore.hget({
         hkey: VAULT_CSTORE_HKEY,
         key: addressKey,
       });
-      const existingValue =
-        typeof existing === 'string'
-          ? existing
-          : existing && typeof existing === 'object' && 'result' in existing
-            ? (existing as { result?: unknown }).result
-            : null;
-      record = parseVaultRecord(typeof existingValue === 'string' ? existingValue : null);
+      record = parseVaultRecord(existingValue);
     } catch (error) {
       console.warn('[vault] hget failed', error);
     }

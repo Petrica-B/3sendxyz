@@ -72,7 +72,11 @@ export async function POST(request: Request) {
       if (Number.isFinite(parsed) && parsed > 0) {
         parsedOriginalSize = parsed;
       }
-    } else if (typeof originalSizeRaw === 'number' && Number.isFinite(originalSizeRaw) && originalSizeRaw > 0) {
+    } else if (
+      typeof originalSizeRaw === 'number' &&
+      Number.isFinite(originalSizeRaw) &&
+      originalSizeRaw > 0
+    ) {
       parsedOriginalSize = Math.floor(originalSizeRaw);
     }
 
@@ -108,12 +112,18 @@ export async function POST(request: Request) {
         }
         encryptionMetadata = parsed;
       } catch {
-        return NextResponse.json({ success: false, error: 'Invalid encryption metadata' }, { status: 400 });
+        return NextResponse.json(
+          { success: false, error: 'Invalid encryption metadata' },
+          { status: 400 }
+        );
       }
     }
 
     if (!encryptionMetadata) {
-      return NextResponse.json({ success: false, error: 'Missing encryption metadata' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Missing encryption metadata' },
+        { status: 400 }
+      );
     }
 
     if (
@@ -121,7 +131,10 @@ export async function POST(request: Request) {
       (encryptionMetadata.plaintextLength as number) > 0 &&
       Math.floor(encryptionMetadata.plaintextLength as number) !== effectiveFileSize
     ) {
-      return NextResponse.json({ success: false, error: 'Plaintext size mismatch' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Plaintext size mismatch' },
+        { status: 400 }
+      );
     }
 
     if (
@@ -129,7 +142,10 @@ export async function POST(request: Request) {
       (encryptionMetadata.ciphertextLength as number) > 0 &&
       Math.floor(encryptionMetadata.ciphertextLength as number) !== file.size
     ) {
-      return NextResponse.json({ success: false, error: 'Ciphertext size mismatch' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Ciphertext size mismatch' },
+        { status: 400 }
+      );
     }
 
     const originalFilename =
@@ -206,10 +222,7 @@ export async function POST(request: Request) {
       filename: file.name,
       secret: recipientKey,
     });
-    const cid =
-      uploadResult && typeof uploadResult === 'object' && 'cid' in uploadResult
-        ? (uploadResult as { cid: string }).cid
-        : undefined;
+    const cid = uploadResult.cid;
     if (!cid) {
       throw new Error('Failed to store file in R1FS');
     }

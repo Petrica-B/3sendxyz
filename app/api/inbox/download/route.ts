@@ -29,15 +29,8 @@ export async function POST(request: Request) {
       secret: recipientKey,
     });
 
-    const payload =
-      downloadResult && typeof downloadResult === 'object' && 'file_base64_str' in downloadResult
-        ? downloadResult
-        : downloadResult && typeof downloadResult === 'object' && 'result' in downloadResult
-          ? (downloadResult as { result: { file_base64_str?: string; filename?: string } }).result
-          : null;
-
-    const fileBase64 = payload?.file_base64_str;
-    const fileName = payload?.filename ?? filename ?? `${cid}.bin`;
+    const fileBase64 = downloadResult?.file_base64_str;
+    const fileName = downloadResult?.filename ?? filename ?? `${cid}.bin`;
 
     if (!fileBase64) {
       throw new Error('Missing file data from R1FS');

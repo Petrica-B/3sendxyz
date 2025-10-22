@@ -1,3 +1,16 @@
+export type EncryptionMetadata = {
+  version: string;
+  algorithm: string;
+  keyDerivation?: string;
+  ephemeralPublicKey: string;
+  iv: string;
+  recipientPublicKey?: string;
+  plaintextLength?: number;
+  ciphertextLength?: number;
+  recipient?: string;
+  keySource?: 'vault' | 'passkey' | 'seed';
+};
+
 export type StoredUploadRecord = {
   cid: string;
   filename: string;
@@ -10,6 +23,11 @@ export type StoredUploadRecord = {
   tierId: number;
   usdcAmount: string;
   r1Amount: string;
+  originalFilename?: string;
+  originalMimeType?: string;
+  originalFilesize?: number;
+  encryptedFilesize?: number;
+  encryption?: EncryptionMetadata;
 };
 
 export type TierConfig = {
@@ -35,3 +53,38 @@ export type UserProfile = {
   keyCreatedAt?: number;
   keyLabel?: string; // user-defined label for the key pair
 };
+
+export type VaultKeyRecord = {
+  publicKey: string;
+  privateKey: string;
+  createdAt?: number;
+  passkeyPublicKey?: string;
+  passkeyCredentialId?: string;
+  passkeyPrfSalt?: string;
+};
+
+export type RegisteredKeyType = 'passkey' | 'seed';
+
+type RegisteredKeyRecordBase = {
+  type: RegisteredKeyType;
+  publicKey: string;
+  createdAt: number;
+  label?: string;
+};
+
+export type RegisteredPasskeyRecord = RegisteredKeyRecordBase & {
+  type: 'passkey';
+  credentialId: string;
+  prfSalt: string;
+  algorithm?: number;
+};
+
+export type RegisteredSeedRecord = RegisteredKeyRecordBase & {
+  type: 'seed';
+  fingerprint?: string;
+  derivationPath?: string;
+};
+
+export type RegisteredKeyRecord = RegisteredPasskeyRecord | RegisteredSeedRecord;
+
+export type PasskeyRecord = RegisteredPasskeyRecord;

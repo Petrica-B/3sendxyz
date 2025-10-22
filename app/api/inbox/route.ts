@@ -40,10 +40,7 @@ export async function GET(request: Request) {
     let allEntries: Record<string, string> = {};
 
     try {
-      const response = await ratio1.cstore.hgetall({ hkey });
-      if (response && typeof response === 'object') {
-        allEntries = response as Record<string, string>;
-      }
+      allEntries = await ratio1.cstore.hgetall({ hkey });
     } catch (err) {
       console.warn('[inbox] hgetall empty or failed', err);
       allEntries = {};

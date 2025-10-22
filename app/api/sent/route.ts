@@ -39,12 +39,9 @@ export async function GET(request: Request) {
     const hkey = `${SENT_FILES_CSTORE_HKEY}_${initiatorLc}`;
     let allEntries: Record<string, string> = {};
     try {
-      const response = await ratio1.cstore.hgetall({
+      allEntries = await ratio1.cstore.hgetall({
         hkey,
       });
-      if (response && typeof response === 'object') {
-        allEntries = response as Record<string, string>;
-      }
     } catch (err) {
       console.warn('[sent] hgetall empty or failed', err);
       allEntries = {};

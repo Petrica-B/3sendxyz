@@ -2,11 +2,14 @@
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { getTierById } from '@/lib/constants';
+import { decodeBase64, decryptFileFromEnvelope } from '@/lib/encryption';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
-import type { StoredUploadRecord } from '@/lib/types';
-import { useCallback, useEffect, useState } from 'react';
+import { derivePasskeyX25519KeyPair } from '@/lib/passkeyClient';
+import type { RegisteredKeyRecord, RegisteredPasskeyRecord, StoredUploadRecord } from '@/lib/types';
+import { getVaultPrivateKey } from '@/lib/vaultClient';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatUnits } from 'viem';
-import { useAccount } from 'wagmi';
+import { useAccount, useSignMessage } from 'wagmi';
 
 type ReceivedItem = StoredUploadRecord & { id: string };
 
@@ -14,12 +17,21 @@ const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.
 
 export default function InboxPage() {
   const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const [records, setRecords] = useState<ReceivedItem[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [registeredKeyRecord, setRegisteredKeyRecord] = useState<RegisteredKeyRecord | null>(null);
+  const [registeredKeyLoading, setRegisteredKeyLoading] = useState(false);
+  const [registeredKeyError, setRegisteredKeyError] = useState<string | null>(null);
+  const passkeyRecord = useMemo<RegisteredPasskeyRecord | null>(() => {
+    return registeredKeyRecord?.type === 'passkey' ? registeredKeyRecord : null;
+  }, [registeredKeyRecord]);
+  const passkeyKeyCacheRef = useRef<Uint8Array | null>(null);
+  const passkeyLoading = registeredKeyLoading;
+  const passkeyError = registeredKeyError;
 
   const fetchInbox = useCallback(async () => {
     if (!address) {
@@ -76,65 +88,193 @@ export default function InboxPage() {
     });
   }, [records]);
 
-  // Check if user has generated a key pair (profile fingerprint)
-  useEffect(() => {
+  const fetchPasskeyStatus = useCallback(async () => {
+    passkeyKeyCacheRef.current = null;
+    if (!address) {
+      setRegisteredKeyRecord(null);
+      setRegisteredKeyLoading(false);
+      setRegisteredKeyError(null);
+      return;
+    }
+    setRegisteredKeyLoading(true);
+    setRegisteredKeyError(null);
     try {
-      if (!address) {
-        setHasKey(null);
-        return;
+      const params = new URLSearchParams({ address });
+      const res = await fetch(`/api/keys/status?${params.toString()}`);
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to fetch key status');
       }
-      const raw = localStorage.getItem(`profile:${address.toLowerCase()}`);
-      if (!raw) {
-        setHasKey(false);
-        return;
-      }
-      const parsed = JSON.parse(raw) as { fingerprintHex?: string };
-      setHasKey(Boolean(parsed?.fingerprintHex));
-    } catch {
-      setHasKey(false);
+      setRegisteredKeyRecord(payload.record ?? null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setRegisteredKeyRecord(null);
+      setRegisteredKeyError(message);
+    } finally {
+      setRegisteredKeyLoading(false);
     }
   }, [address]);
 
-  const onDownload = useCallback(async (item: ReceivedItem) => {
-    try {
-      setDownloadingId(item.id);
-      const response = await fetch('/api/inbox/download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          cid: item.cid,
-          recipient: item.recipient,
-          filename: item.filename,
-        }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.success || !payload?.file?.base64) {
-        throw new Error(payload?.error || 'Download failed');
+  useEffect(() => {
+    let active = true;
+    fetchPasskeyStatus().catch(() => {
+      if (active) {
+        setRegisteredKeyError((prev) => prev ?? 'Failed to fetch key status');
       }
-      const rawBase64 = payload.file.base64;
-      const downloadUrl =
-        typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
-          ? rawBase64
-          : `data:application/octet-stream;base64,${rawBase64 ?? ''}`;
-      const fileName =
-        payload.file.filename && typeof payload.file.filename === 'string'
-          ? payload.file.filename
-          : item.filename;
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      alert(message);
-    } finally {
-      setDownloadingId((current) => (current === item.id ? null : current));
-    }
-  }, []);
+    });
+    return () => {
+      active = false;
+    };
+  }, [fetchPasskeyStatus]);
+
+  useEffect(() => {
+    const handler = () => {
+      fetchPasskeyStatus().catch(() => {
+        setRegisteredKeyError((prev) => prev ?? 'Failed to refresh key status');
+      });
+    };
+    window.addEventListener('ratio1:registered-key-updated', handler);
+    return () => {
+      window.removeEventListener('ratio1:registered-key-updated', handler);
+    };
+  }, [fetchPasskeyStatus]);
+
+  const onDownload = useCallback(
+    async (item: ReceivedItem) => {
+      try {
+        setDownloadingId(item.id);
+        const response = await fetch('/api/inbox/download', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            cid: item.cid,
+            recipient: item.recipient,
+            filename: item.filename,
+          }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.success || !payload?.file?.base64) {
+          throw new Error(payload?.error || 'Download failed');
+        }
+        const rawBase64 = payload.file.base64;
+        const fileName =
+          (payload.file.filename && typeof payload.file.filename === 'string'
+            ? payload.file.filename
+            : null) ??
+          item.originalFilename ??
+          item.filename;
+
+        const { encryption, originalMimeType } = item;
+        if (encryption) {
+          if (!address) {
+            throw new Error('Wallet address required to decrypt');
+          }
+
+          let base64Data: string | null = null;
+          if (typeof rawBase64 === 'string') {
+            if (rawBase64.startsWith('data:')) {
+              const commaIndex = rawBase64.indexOf(',');
+              base64Data = commaIndex >= 0 ? rawBase64.slice(commaIndex + 1) : null;
+            } else {
+              base64Data = rawBase64;
+            }
+          }
+          if (!base64Data) {
+            throw new Error('Encrypted payload missing data');
+          }
+
+          const ciphertext = decodeBase64(base64Data);
+          let privateKey: Uint8Array;
+          const keySource =
+            encryption.keySource === 'passkey'
+              ? 'passkey'
+              : encryption.keySource === 'seed'
+                ? 'seed'
+                : 'vault';
+
+          if (keySource === 'passkey') {
+            if (passkeyLoading) {
+              throw new Error('Passkey status is still loading. Please try again momentarily.');
+            }
+            if (!passkeyRecord) {
+              throw new Error('No passkey registered. Visit your profile to register a passkey.');
+            }
+            if (!passkeyRecord.prfSalt || !passkeyRecord.credentialId) {
+              throw new Error('Passkey record is incomplete. Please re-register your passkey.');
+            }
+            let cached = passkeyKeyCacheRef.current;
+            if (!cached) {
+              const saltBytes = decodeBase64(passkeyRecord.prfSalt);
+              const { privateKey: derivedPrivateKey, publicKey: derivedPublicKey } =
+                await derivePasskeyX25519KeyPair({
+                  credentialIdB64: passkeyRecord.credentialId,
+                  salt: saltBytes,
+                });
+              if (passkeyRecord.publicKey && derivedPublicKey !== passkeyRecord.publicKey) {
+                throw new Error('Passkey verification failed. Public key mismatch.');
+              }
+              cached = new Uint8Array(derivedPrivateKey);
+              passkeyKeyCacheRef.current = cached;
+            }
+            privateKey = cached;
+          } else if (keySource === 'seed') {
+            //TODO implement seed key decryption
+            throw new Error(
+              'Seed key decryption is not yet available. Use your seed-based client to decrypt this file.'
+            );
+          } else {
+            if (!signMessageAsync) {
+              throw new Error('Wallet signer not available');
+            }
+            privateKey = await getVaultPrivateKey(address, signMessageAsync);
+          }
+
+          const plaintext = await decryptFileFromEnvelope({
+            ciphertext,
+            metadata: encryption,
+            recipientPrivateKey: privateKey,
+          });
+
+          const mimeType =
+            typeof originalMimeType === 'string' && originalMimeType.trim().length > 0
+              ? originalMimeType
+              : 'application/octet-stream';
+          const plainBuffer = plaintext.buffer.slice(
+            plaintext.byteOffset,
+            plaintext.byteOffset + plaintext.byteLength
+          ) as ArrayBuffer;
+          const blob = new Blob([plainBuffer], { type: mimeType });
+          const downloadUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(downloadUrl);
+        } else {
+          const downloadUrl =
+            typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
+              ? rawBase64
+              : `data:application/octet-stream;base64,${rawBase64 ?? ''}`;
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        alert(message);
+      } finally {
+        setDownloadingId((current) => (current === item.id ? null : current));
+      }
+    },
+    [address, signMessageAsync, passkeyRecord]
+  );
 
   if (!isConnected || !address) {
     return (
@@ -147,32 +287,14 @@ export default function InboxPage() {
     );
   }
 
-  if (hasKey === false) {
-    return (
-      <main className="col" style={{ gap: 16 }}>
-        <div className="hero">
-          <div className="headline">Inbox</div>
-          <div className="subhead">Set up your encryption keys to receive and decrypt files.</div>
-        </div>
-        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontWeight: 700 }}>Encryption required</div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Generate your key pair so files can be delivered and decrypted.
-            </div>
-          </div>
-          <a href="/profile" className="button" style={{ textDecoration: 'none' }}>Go to Profile</a>
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="col" style={{ gap: 24 }}>
       <div className="hero">
         <div className="headline">Inbox</div>
         <div className="subhead">Files sent to your wallet.</div>
       </div>
+
+      {passkeyError && <div style={{ color: '#f87171', fontSize: 12 }}>{passkeyError}</div>}
 
       <section className="col" style={{ gap: 12 }}>
         {loading && (

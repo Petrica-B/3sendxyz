@@ -16,7 +16,6 @@ const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.
 export default function OutboxPage() {
   const { address, isConnected } = useAccount();
   const [records, setRecords] = useState<SentItem[]>([]);
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,25 +53,6 @@ export default function OutboxPage() {
     fetchSent();
   }, [fetchSent]);
 
-  // Check if user has generated a key pair (profile fingerprint)
-  useEffect(() => {
-    try {
-      if (!address) {
-        setHasKey(null);
-        return;
-      }
-      const raw = localStorage.getItem(`profile:${address.toLowerCase()}`);
-      if (!raw) {
-        setHasKey(false);
-        return;
-      }
-      const parsed = JSON.parse(raw) as { fingerprintHex?: string };
-      setHasKey(Boolean(parsed?.fingerprintHex));
-    } catch {
-      setHasKey(false);
-    }
-  }, [address]);
-
   useEffect(() => {
     const handler = () => {
       fetchSent().catch(() => {});
@@ -99,26 +79,6 @@ export default function OutboxPage() {
         <div className="hero">
           <div className="headline">Outbox</div>
           <div className="subhead">Connect your wallet to send files.</div>
-        </div>
-      </main>
-    );
-  }
-
-  if (hasKey === false) {
-    return (
-      <main className="col" style={{ gap: 16 }}>
-        <div className="hero">
-          <div className="headline">Outbox</div>
-          <div className="subhead">Set up your encryption keys before sending files.</div>
-        </div>
-        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontWeight: 700 }}>Encryption required</div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Generate your key pair to enable Outbox and encrypt files end‑to‑end.
-            </div>
-          </div>
-          <a href="/profile" className="button" style={{ textDecoration: 'none' }}>Go to Profile</a>
         </div>
       </main>
     );

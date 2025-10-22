@@ -6,6 +6,7 @@ import {
   R1_CONTRACT_ADDRESS,
   resolveTierBySize,
 } from '@/lib/constants';
+import { encryptFileForRecipient } from '@/lib/encryption';
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import { QuoteData } from '@/lib/types';
 import { useQuery } from '@tanstack/react-query';
@@ -125,6 +126,13 @@ export function SendFileCard() {
 
   const onSend = useCallback(async () => {
     if (!address || !file) return;
+    const selectedFile = file;
+    const originalFilename = selectedFile.name;
+    const originalMimeType =
+      selectedFile.type && selectedFile.type.trim().length > 0
+        ? selectedFile.type
+        : 'application/octet-stream';
+    const originalSize = selectedFile.size;
     setError(null);
     setSending(true);
     setStatus('Preparing payment…');
@@ -149,13 +157,42 @@ export function SendFileCard() {
 
       const maxR1Amount = currentQuote.maxR1WithSlippage;
 
+      setStatus('Resolving recipient key…');
+      const receiverKeyResponse = await fetch(
+        `/api/send/getReceiverPublicKey?address=${encodeURIComponent(recipient)}`,
+        { method: 'GET' }
+      );
+      const receiverKeyPayload = await receiverKeyResponse.json().catch(() => null);
+      if (
+        !receiverKeyResponse.ok ||
+        !receiverKeyPayload?.success ||
+        typeof receiverKeyPayload.publicKey !== 'string'
+      ) {
+        throw new Error(receiverKeyPayload?.error || 'Failed to resolve receiver public key');
+      }
+      const receiverPublicKey = receiverKeyPayload.publicKey;
+      const receiverKeySource =
+        receiverKeyPayload.type === 'passkey'
+          ? 'passkey'
+          : receiverKeyPayload.type === 'seed'
+            ? 'seed'
+            : 'vault';
+
+      setStatus('Encrypting file…');
+      const { encryptedFile, metadata: encryptionMetadata } = await encryptFileForRecipient({
+        file: selectedFile,
+        recipientPublicKey: receiverPublicKey,
+        recipientAddress: recipient,
+      });
+      encryptionMetadata.keySource = receiverKeySource;
+
       setStatus('Checking R1 allowance…');
-      const allowance = (await publicClient.readContract({
+      const allowance = await publicClient.readContract({
         address: R1_CONTRACT_ADDRESS,
         abi: Erc20Abi,
         functionName: 'allowance',
         args: [address, MANAGER_CONTRACT_ADDRESS],
-      })) as bigint;
+      });
 
       if (allowance < maxR1Amount) {
         setStatus('Approving R1 spend…');
@@ -183,9 +220,9 @@ export function SendFileCard() {
       const handshakeMsg = `ratio1/handshake\nfrom:${address}\nto:${recipient}\ntimestamp:${startedAt}`;
       const signature = await signMessageAsync({ message: handshakeMsg });
 
-      setStatus('Uploading file…');
+      setStatus('Uploading encrypted file…');
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', encryptedFile);
       formData.append('initiator', address);
       formData.append('recipient', recipient);
       if (note) formData.append('note', note);
@@ -195,8 +232,12 @@ export function SendFileCard() {
       formData.append('paymentTxHash', paymentTxHash);
       formData.append('chainId', String(chainId));
       formData.append('tierId', String(tierInfo.id));
+      formData.append('originalFilename', originalFilename);
+      formData.append('originalMimeType', originalMimeType);
+      formData.append('originalSize', String(originalSize));
+      formData.append('encryption', JSON.stringify(encryptionMetadata));
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch('/api/send/upload', {
         method: 'POST',
         body: formData,
       });

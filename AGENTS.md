@@ -22,6 +22,8 @@ Use this guide for day-to-day development and refresh it when workflows change.
 - `npm run build` creates the production bundle and surfaces type/lint regressions pre-merge.
 - `npm run start` serves the compiled bundle for production parity smoke tests.
 
+DO NOT run `npm run build` to verify connect typings or coding. Just use `npm run lint`.
+
 ## Coding Style & Naming Conventions
 
 TypeScript is mandatory; share common shapes through `lib/types.ts`. Follow Prettier defaults (2 spaces, semicolons) and Tailwind utility classes for layout before writing custom CSS. Name components with PascalCase files, hooks with the `use` prefix, and helper exports in `camelCase`. Keep async workflows in `app/api/*` or `lib` helpers instead of embedding them in component bodies.

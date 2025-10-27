@@ -1,3 +1,5 @@
+import { x25519 } from '@noble/curves/ed25519';
+
 // Client-side RSA key generation and export helpers
 
 type CryptoGlobal = typeof globalThis & { crypto?: Crypto };
@@ -90,4 +92,27 @@ export async function generateMnemonicKeyPair(wordCount = 12): Promise<Generated
   const digest = await subtle.digest('SHA-256', new TextEncoder().encode(mnemonic));
   const fingerprintHex = ab2hex(digest);
   return { mnemonic, words, fingerprintHex, createdAt: Date.now() };
+}
+
+export type DerivedSeedKeyPair = {
+  privateKey: Uint8Array;
+  publicKeyBase64: string;
+};
+
+export async function deriveSeedKeyPair(mnemonic: string): Promise<DerivedSeedKeyPair> {
+  const normalized = mnemonic.trim();
+  if (!normalized) {
+    throw new Error('Seed phrase is empty');
+  }
+  const cryptoObj: Crypto | undefined = (globalThis as CryptoGlobal).crypto;
+  const subtle: SubtleCrypto | undefined = cryptoObj?.subtle;
+  if (!cryptoObj || !subtle) throw new Error('WebCrypto not available');
+  const seedBytes = new TextEncoder().encode(normalized);
+  const digest = await subtle.digest('SHA-256', seedBytes);
+  const privateKey = new Uint8Array(digest);
+  const publicKeyBytes = x25519.getPublicKey(privateKey);
+  const buffer = new ArrayBuffer(publicKeyBytes.byteLength);
+  new Uint8Array(buffer).set(publicKeyBytes);
+  const publicKeyBase64 = ab2b64(buffer);
+  return { privateKey, publicKeyBase64 };
 }

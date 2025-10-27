@@ -52,6 +52,7 @@ export type UserProfile = {
   fingerprintHex?: string;
   keyCreatedAt?: number;
   keyLabel?: string; // user-defined label for the key pair
+  seedMnemonic?: string; // locally stored recovery phrase (never synced)
 };
 
 export type VaultKeyRecord = {

@@ -5,7 +5,12 @@ import HandleSection from '@/components/profile/HandleSection';
 import { encodeBase64 } from '@/lib/encryption';
 import { shortAddress } from '@/lib/format';
 import { buildRegisteredKeyMessage } from '@/lib/keyAccess';
-import { deriveSeedKeyPair, fingerprintMnemonic, generateMnemonicKeyPair } from '@/lib/keys';
+import {
+  deriveSeedKeyPair,
+  fingerprintMnemonic,
+  generateMnemonicKeyPair,
+  isValidMnemonic,
+} from '@/lib/keys';
 import { derivePasskeyX25519KeyPair, randomPrfSalt } from '@/lib/passkeyClient';
 import type {
   RegisteredKeyRecord,
@@ -313,6 +318,10 @@ export default function ProfilePage() {
       const words = normalized.split(' ');
       if (words.length !== 12) {
         throw new Error('Recovery phrase must contain exactly 12 words.');
+      }
+
+      if (!isValidMnemonic(normalized)) {
+        throw new Error('Recovery phrase has an invalid checksum or word.');
       }
 
       const { publicKeyBase64 } = await deriveSeedKeyPair(normalized);

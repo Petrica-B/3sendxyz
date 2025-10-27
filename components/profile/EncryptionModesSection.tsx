@@ -95,8 +95,8 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     }
   }, [shouldPromptSeedRecovery]);
 
-  const passkeyButtonLabel = isPasskeyActive ? 'Review & replace' : 'Switch to passkey';
-  const seedButtonLabel = isSeedActive ? 'Review & replace' : 'Switch to recovery phrase';
+  const passkeyButtonLabel = isPasskeyActive ? 'Replace' : 'Switch to passkey';
+  const seedButtonLabel = isSeedActive ? 'Replace' : 'Switch to recovery phrase';
 
   const modalTitle = useMemo(() => {
     if (!pendingSetup) return '';
@@ -336,8 +336,8 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
         >
           <div style={{ fontWeight: 600 }}>Recover your phrase on this device</div>
           <div className="muted" style={{ fontSize: 12 }}>
-            This profile uses a recovery phrase, but it is not stored locally. Enter the 12 words
-            so 3send can decrypt files on this device.
+            This profile uses a recovery phrase, but it is not stored locally. Enter the 12 words so
+            3send can decrypt files on this device.
           </div>
           <button className="button" onClick={openRecoverModal} disabled={recoverBusy}>
             Enter recovery phrase

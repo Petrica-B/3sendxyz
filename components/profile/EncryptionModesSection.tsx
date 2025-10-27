@@ -262,7 +262,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
               color: activeMode === 'light' ? 'var(--accent)' : 'var(--muted)',
             }}
           >
-            {activeMode === 'light' ? 'Active' : 'Available'}
+            {activeMode === 'light' ? 'Active' : 'Not active'}
           </span>
         </div>
         <div className="muted" style={{ fontSize: 12 }}>

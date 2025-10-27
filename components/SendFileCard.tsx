@@ -292,7 +292,7 @@ export function SendFileCard() {
         </span>
         <input
           className="input"
-          placeholder="0x… or ENS (mock)"
+          placeholder="0x…"
           value={recipient}
           onChange={(e) => setRecipient(e.target.value.trim())}
         />

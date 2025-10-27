@@ -602,10 +602,19 @@ function CopyRow(props: CopyRowProps) {
       </div>
       <button
         className="button secondary"
-        style={{ padding: '6px 10px', fontSize: 12 }}
+        style={{
+          padding: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: 32,
+          minHeight: 32,
+        }}
         onClick={copyToClipboard}
+        aria-label="Copy value"
+        title="Copy value"
       >
-        Copy
+        <ClipboardIcon />
       </button>
     </div>
   );
@@ -786,8 +795,19 @@ function RecoveryPhraseReveal(props: RecoveryPhraseRevealProps) {
         style={{ whiteSpace: 'pre', fontSize: 12, background: '#fff' }}
       />
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <button className="button" onClick={copyPrivateKey}>
-          Copy recovery phrase
+        <button
+          className="button"
+          onClick={copyPrivateKey}
+          aria-label="Copy recovery phrase"
+          title="Copy recovery phrase"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          <ClipboardIcon />
         </button>
         <button className="button secondary" onClick={downloadPrivateKey}>
           Download recovery phrase
@@ -799,6 +819,38 @@ function RecoveryPhraseReveal(props: RecoveryPhraseRevealProps) {
         )}
       </div>
     </div>
+  );
+}
+
+function ClipboardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M15.75 5.25h2.25a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 6 5.25h2.25"
+        stroke="#0f172a"
+        strokeOpacity="0.75"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.75 3.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v0.75h-4.5V3.75Z"
+        stroke="#0f172a"
+        strokeOpacity="0.75"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect
+        x="9.75"
+        y="3.75"
+        width="4.5"
+        height="1.5"
+        rx="0.75"
+        fill="#0f172a"
+        fillOpacity="0.75"
+      />
+    </svg>
   );
 }
 
@@ -818,10 +870,22 @@ function SeedIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
-        d="M12 2C9.8 5.5 8.5 8.6 8.5 11.5c0 3.6 1.9 6.5 3.5 10.5 1.6-4 3.5-6.9 3.5-10.5C15.5 8.6 14.2 5.5 12 2Zm0 16.3c-.9-2.4-1.5-4.1-1.5-6.8 0-1.9.6-3.9 1.5-5.8.9 1.9 1.5 3.8 1.5 5.8 0 2.6-.6 4.4-1.5 6.8Z"
-        fill="#0f172a"
-        fillOpacity="0.75"
+        d="M15.75 5.25a3.75 3.75 0 1 0-5.625 3.231v8.269a1.5 1.5 0 0 0 3 0V15h2.25a1.5 1.5 0 0 0 0-3H13.125V8.481A3.751 3.751 0 0 0 15.75 5.25Z"
+        stroke="#0f172a"
+        strokeOpacity="0.75"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
+      <path
+        d="m9 16.5 2.625 2.625"
+        stroke="#0f172a"
+        strokeOpacity="0.75"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="5.25" r="0.75" fill="#0f172a" fillOpacity="0.75" />
     </svg>
   );
 }

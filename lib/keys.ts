@@ -1,5 +1,7 @@
 // Client-side RSA key generation and export helpers
 
+type CryptoGlobal = typeof globalThis & { crypto?: Crypto };
+
 export type GeneratedKeyPair = {
   publicKeyPem: string;
   privateKeyPem: string;
@@ -13,8 +15,7 @@ function toPem(base64: string, header: string, footer: string): string {
 }
 
 async function exportKey(key: CryptoKey, format: 'spki' | 'pkcs8'): Promise<ArrayBuffer> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subtle: SubtleCrypto | undefined = (globalThis as any)?.crypto?.subtle;
+  const subtle: SubtleCrypto | undefined = (globalThis as CryptoGlobal).crypto?.subtle;
   if (!subtle) throw new Error('WebCrypto not available');
   return subtle.exportKey(format, key);
 }
@@ -34,8 +35,7 @@ function ab2hex(buf: ArrayBuffer): string {
 }
 
 export async function generateRsaKeyPair(): Promise<GeneratedKeyPair> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cryptoObj: Crypto | undefined = (globalThis as any)?.crypto;
+  const cryptoObj: Crypto | undefined = (globalThis as CryptoGlobal).crypto;
   const subtle: SubtleCrypto | undefined = cryptoObj?.subtle;
   if (!subtle) throw new Error('WebCrypto not available');
 
@@ -80,8 +80,7 @@ export type GeneratedMnemonicPair = {
 };
 
 export async function generateMnemonicKeyPair(wordCount = 12): Promise<GeneratedMnemonicPair> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cryptoObj: Crypto | undefined = (globalThis as any)?.crypto;
+  const cryptoObj: Crypto | undefined = (globalThis as CryptoGlobal).crypto;
   const subtle: SubtleCrypto | undefined = cryptoObj?.subtle;
   if (!cryptoObj || !subtle) throw new Error('WebCrypto not available');
   const bytes = new Uint8Array(wordCount);

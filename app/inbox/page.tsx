@@ -272,8 +272,8 @@ export default function InboxPage() {
       } finally {
         setDownloadingId((current) => (current === item.id ? null : current));
       }
-    },
-    [address, signMessageAsync, passkeyRecord]
+  },
+    [address, signMessageAsync, passkeyRecord, passkeyLoading]
   );
 
   if (!isConnected || !address) {

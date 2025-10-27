@@ -18,6 +18,7 @@ Use this guide for day-to-day development and refresh it when workflows change.
 - `npm install` installs dependencies; rerun after dependency updates land.
 - `cp .env.example .env.local` and set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for RainbowKit; keep the file untracked.
 - `npm run dev` starts the hot-reload server on `http://localhost:3000` with mock inbox/outbox seeds.
+- `npm run lint` runs Next.js ESLint checks; fix warnings before sending changes for review.
 - `npm run build` creates the production bundle and surfaces type/lint regressions pre-merge.
 - `npm run start` serves the compiled bundle for production parity smoke tests.
 

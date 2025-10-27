@@ -119,7 +119,6 @@ export function SendFileCard() {
     tierInfo,
     sizeExceedsLimit,
     chainId,
-    MANAGER_CONTRACT_ADDRESS,
     quoteLoading,
     quoteData,
   ]);
@@ -265,7 +264,6 @@ export function SendFileCard() {
     address,
     chainId,
     file,
-    MANAGER_CONTRACT_ADDRESS,
     note,
     publicClient,
     quoteData,

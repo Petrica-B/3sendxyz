@@ -313,11 +313,11 @@ export default function ProfilePage() {
 
       const normalized = mnemonicInput.trim().toLowerCase().split(/\s+/).join(' ');
       if (!normalized) {
-        throw new Error('Enter your 12-word recovery phrase to continue.');
+        throw new Error('Enter your 24-word recovery phrase to continue.');
       }
       const words = normalized.split(' ');
-      if (words.length !== 12) {
-        throw new Error('Recovery phrase must contain exactly 12 words.');
+      if (words.length !== 24) {
+        throw new Error('Recovery phrase must contain exactly 24 words.');
       }
 
       if (!isValidMnemonic(normalized)) {

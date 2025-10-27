@@ -115,7 +115,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
         ? `${descriptionBegin}Use Face ID, Touch ID, or a device passkey. We only store the public key.`
         : 'Your browser does not support passkeys. Please switch to Safari, Chrome, or Edge on a compatible device.';
     }
-    return `${descriptionBegin}Generate a 12-word phrase. Store it offline: 3send never keeps a copy.`;
+    return `${descriptionBegin}Generate a 24-word phrase. Store it offline: 3send never keeps a copy.`;
   }, [pendingSetup, passkeySupported, activeMethod]);
 
   const handleSetup = async () => {
@@ -173,12 +173,12 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
   const handleRecoverSeed = async () => {
     const trimmed = recoveryPhraseInput.trim();
     if (!trimmed) {
-      setRecoverError('Enter your 12-word recovery phrase to continue.');
+      setRecoverError('Enter your 24-word recovery phrase to continue.');
       return;
     }
     const words = trimmed.split(/\s+/);
-    if (words.length !== 12) {
-      setRecoverError('Recovery phrase must contain exactly 12 words.');
+    if (words.length !== 24) {
+      setRecoverError('Recovery phrase must contain exactly 24 words.');
       return;
     }
     setRecoverError(null);
@@ -283,7 +283,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
         />
         <EncryptionOptionCard
           title="Recovery phrase"
-          description="A 12-word seed that only you retain. Ideal when you want fully offline control."
+          description="A 24-word seed that only you retain. Ideal when you want fully offline control."
           badge={isSeedActive ? 'Active' : undefined}
           actionLabel={seedButtonLabel}
           onClick={() => setPendingSetup('seed')}
@@ -339,7 +339,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
         >
           <div style={{ fontWeight: 600 }}>Recover your phrase on this device</div>
           <div className="muted" style={{ fontSize: 12 }}>
-            This profile uses a recovery phrase, but it is not stored locally. Enter the 12 words so
+            This profile uses a recovery phrase, but it is not stored locally. Enter the 24 words so
             3send can decrypt files on this device.
           </div>
           <button className="button" onClick={openRecoverModal} disabled={recoverBusy}>
@@ -509,7 +509,7 @@ function ActiveKeyDetails(props: ActiveKeyDetailsProps) {
         Secured with{' '}
         {activeMethod === 'passkey'
           ? 'a hardware-backed passkey managed by your device.'
-          : 'a 12-word recovery phrase that only you control.'}
+          : 'a 24-word recovery phrase that only you control.'}
       </div>
 
       {registeredKeyFingerprint && (
@@ -733,13 +733,13 @@ function RecoverSeedModal(props: RecoverSeedModalProps) {
       >
         <div style={{ fontWeight: 700, fontSize: 18 }}>Restore recovery phrase</div>
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.6 }}>
-          Paste or type the 12 words assigned to this profile. We only keep a copy in your
+          Paste or type the 24 words assigned to this profile. We only keep a copy in your
           browser&apos;s local storage.
         </div>
         <textarea
           className="input mono"
           rows={4}
-          placeholder="twelve words separated by spaces"
+          placeholder="24 words separated by spaces"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           disabled={busy}
@@ -785,7 +785,7 @@ function RecoveryPhraseReveal(props: RecoveryPhraseRevealProps) {
       }}
     >
       <div style={{ color: '#92400e', fontSize: 12, fontWeight: 700 }}>
-        Save this 12-word recovery phrase now. It cannot be recovered by anyone, including 3send.
+        Save this 24-word recovery phrase now. It cannot be recovered by anyone, including 3send.
       </div>
       <textarea
         readOnly

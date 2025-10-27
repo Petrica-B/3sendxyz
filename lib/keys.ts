@@ -87,13 +87,13 @@ export async function generateRsaKeyPair(): Promise<GeneratedKeyPair> {
 }
 
 export type GeneratedMnemonicPair = {
-  mnemonic: string; // 12-word private key phrase
+  mnemonic: string; // 24-word private key phrase
   words: string[];
   fingerprintHex: string;
   createdAt: number;
 };
 
-export async function generateMnemonicKeyPair(wordCount = 12): Promise<GeneratedMnemonicPair> {
+export async function generateMnemonicKeyPair(wordCount = 24): Promise<GeneratedMnemonicPair> {
   const cryptoObj: Crypto | undefined = (globalThis as CryptoGlobal).crypto;
   const subtle: SubtleCrypto | undefined = cryptoObj?.subtle;
   if (!cryptoObj || !subtle) throw new Error('WebCrypto not available');

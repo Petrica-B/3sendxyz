@@ -1,9 +1,11 @@
 'use client';
 
+import { loadProfile } from '../profile/storage';
 import { AddressLink, TxLink } from '@/components/Links';
 import { getTierById } from '@/lib/constants';
 import { decodeBase64, decryptFileFromEnvelope } from '@/lib/encryption';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
+import { deriveSeedKeyPair } from '@/lib/keys';
 import { derivePasskeyX25519KeyPair } from '@/lib/passkeyClient';
 import type { RegisteredKeyRecord, RegisteredPasskeyRecord, StoredUploadRecord } from '@/lib/types';
 import { getVaultPrivateKey } from '@/lib/vaultClient';
@@ -30,6 +32,7 @@ export default function InboxPage() {
     return registeredKeyRecord?.type === 'passkey' ? registeredKeyRecord : null;
   }, [registeredKeyRecord]);
   const passkeyKeyCacheRef = useRef<Uint8Array | null>(null);
+  const seedKeyCacheRef = useRef<{ privateKey: Uint8Array; publicKey: string } | null>(null);
   const passkeyLoading = registeredKeyLoading;
   const passkeyError = registeredKeyError;
 
@@ -90,6 +93,7 @@ export default function InboxPage() {
 
   const fetchPasskeyStatus = useCallback(async () => {
     passkeyKeyCacheRef.current = null;
+    seedKeyCacheRef.current = null;
     if (!address) {
       setRegisteredKeyRecord(null);
       setRegisteredKeyLoading(false);
@@ -138,6 +142,10 @@ export default function InboxPage() {
       window.removeEventListener('ratio1:registered-key-updated', handler);
     };
   }, [fetchPasskeyStatus]);
+
+  useEffect(() => {
+    seedKeyCacheRef.current = null;
+  }, [address]);
 
   const onDownload = useCallback(
     async (item: ReceivedItem) => {
@@ -220,10 +228,53 @@ export default function InboxPage() {
             }
             privateKey = cached;
           } else if (keySource === 'seed') {
-            //TODO implement seed key decryption
-            throw new Error(
-              'Seed key decryption is not yet available. Use your seed-based client to decrypt this file.'
-            );
+            if (registeredKeyLoading) {
+              throw new Error('Key status is still loading. Please try again momentarily.');
+            }
+            if (!registeredKeyRecord || registeredKeyRecord.type !== 'seed') {
+              throw new Error(
+                'No seed key registered. Visit your profile to register a recovery phrase.'
+              );
+            }
+            let cached = seedKeyCacheRef.current;
+            if (!cached) {
+              let mnemonic: string | null = null;
+              try {
+                const profile = loadProfile(address);
+                const stored =
+                  typeof profile.seedMnemonic === 'string' ? profile.seedMnemonic.trim() : '';
+                mnemonic = stored.length > 0 ? stored : null;
+              } catch {
+                mnemonic = null;
+              }
+              if (!mnemonic) {
+                throw new Error(
+                  'Recovery phrase not found on this device. Restore it from your backup in Profile.'
+                );
+              }
+              const { privateKey: derivedPrivateKey, publicKeyBase64 } =
+                await deriveSeedKeyPair(mnemonic);
+              if (publicKeyBase64 !== registeredKeyRecord.publicKey) {
+                throw new Error(
+                  'Stored recovery phrase does not match the registered seed key. Re-register your seed.'
+                );
+              }
+              cached = {
+                privateKey: new Uint8Array(derivedPrivateKey),
+                publicKey: publicKeyBase64,
+              };
+              seedKeyCacheRef.current = cached;
+            }
+            if (
+              typeof encryption.recipientPublicKey === 'string' &&
+              encryption.recipientPublicKey.trim().length > 0 &&
+              encryption.recipientPublicKey !== cached.publicKey
+            ) {
+              throw new Error(
+                'Encrypted payload recipient does not match your registered seed key.'
+              );
+            }
+            privateKey = cached.privateKey;
           } else {
             if (!signMessageAsync) {
               throw new Error('Wallet signer not available');
@@ -272,8 +323,15 @@ export default function InboxPage() {
       } finally {
         setDownloadingId((current) => (current === item.id ? null : current));
       }
-  },
-    [address, signMessageAsync, passkeyRecord, passkeyLoading]
+    },
+    [
+      address,
+      signMessageAsync,
+      passkeyRecord,
+      passkeyLoading,
+      registeredKeyLoading,
+      registeredKeyRecord,
+    ]
   );
 
   if (!isConnected || !address) {

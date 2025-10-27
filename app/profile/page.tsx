@@ -5,7 +5,7 @@ import HandleSection from '@/components/profile/HandleSection';
 import { encodeBase64 } from '@/lib/encryption';
 import { shortAddress } from '@/lib/format';
 import { buildRegisteredKeyMessage } from '@/lib/keyAccess';
-import { deriveSeedKeyPair, generateMnemonicKeyPair } from '@/lib/keys';
+import { deriveSeedKeyPair, fingerprintMnemonic, generateMnemonicKeyPair } from '@/lib/keys';
 import { derivePasskeyX25519KeyPair, randomPrfSalt } from '@/lib/passkeyClient';
 import type {
   RegisteredKeyRecord,
@@ -75,7 +75,7 @@ export default function ProfilePage() {
     const p = loadProfile(address);
     setProfile(p);
     setHandleInput(p.handle ?? '');
-    setKeyLabelInput((p.keyLabel ?? '').slice(0, 15));
+    setKeyLabelInput('');
   }, [address]);
 
   useEffect(() => {
@@ -297,6 +297,49 @@ export default function ProfilePage() {
     setPrivKeyOnce(stored);
   }, [profile.seedMnemonic, registeredKeyRecord]);
 
+  const recoverSeedFromInput = useCallback(
+    async (mnemonicInput: string) => {
+      if (!address) {
+        throw new Error('Wallet address missing. Connect your wallet and try again.');
+      }
+      if (registeredKeyRecord?.type !== 'seed') {
+        throw new Error('Recovery phrase is not the active key for this profile.');
+      }
+
+      const normalized = mnemonicInput.trim().toLowerCase().split(/\s+/).join(' ');
+      if (!normalized) {
+        throw new Error('Enter your 12-word recovery phrase to continue.');
+      }
+      const words = normalized.split(' ');
+      if (words.length !== 12) {
+        throw new Error('Recovery phrase must contain exactly 12 words.');
+      }
+
+      const { publicKeyBase64 } = await deriveSeedKeyPair(normalized);
+      if (publicKeyBase64 !== registeredKeyRecord.publicKey) {
+        throw new Error('That recovery phrase does not match the registered key.');
+      }
+
+      const fingerprintHex = await fingerprintMnemonic(normalized);
+      if (seedKeyRecord?.fingerprint && fingerprintHex !== seedKeyRecord.fingerprint) {
+        console.warn('[keys] recovered fingerprint does not match registered fingerprint');
+      }
+
+      const nextProfile: UserProfile = {
+        ...profile,
+        seedMnemonic: normalized,
+        fingerprintHex,
+        keyLabel: seedKeyRecord?.label ?? profile.keyLabel,
+        keyCreatedAt: registeredKeyRecord.createdAt ?? profile.keyCreatedAt,
+      };
+      saveProfile(address, nextProfile);
+      setProfile(nextProfile);
+      hidePrivKeyOnce();
+      alert('Recovery phrase saved locally. You can reveal it from this device when needed.');
+    },
+    [address, hidePrivKeyOnce, profile, registeredKeyRecord, seedKeyRecord]
+  );
+
   const onRegisterPasskey = useCallback(async () => {
     if (!address) return;
     if (typeof window === 'undefined' || typeof navigator === 'undefined') {
@@ -477,7 +520,9 @@ export default function ProfilePage() {
         downloadPrivateKey={downloadPrivateKey}
         copyToClipboard={copyToClipboard}
         hasStoredSeed={hasActiveSeedMnemonic}
+        needsSeedRecovery={registeredKeyRecord?.type === 'seed' && !hasActiveSeedMnemonic}
         onRevealStoredSeed={revealStoredSeed}
+        onRecoverSeed={recoverSeedFromInput}
         isRecoveryPhraseVisible={registeredKeyRecord?.type === 'seed' && Boolean(privKeyOnce)}
         onHideRecoveryPhrase={hidePrivKeyOnce}
       />

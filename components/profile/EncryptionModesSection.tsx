@@ -4,7 +4,7 @@ import type {
   RegisteredSeedRecord,
   UserProfile,
 } from '@/lib/types';
-import { type CSSProperties, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 
 type EncryptionModesSectionProps = {
   activeMode: 'light' | 'pro';
@@ -29,7 +29,9 @@ type EncryptionModesSectionProps = {
   downloadPrivateKey: () => void;
   copyToClipboard: (value: string, successMessage: string, fallbackMessage?: string) => void;
   hasStoredSeed: boolean;
+  needsSeedRecovery: boolean;
   onRevealStoredSeed: () => void;
+  onRecoverSeed: (mnemonic: string) => Promise<void> | void;
   isRecoveryPhraseVisible: boolean;
   onHideRecoveryPhrase: () => void;
 };
@@ -66,7 +68,9 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     downloadPrivateKey,
     copyToClipboard,
     hasStoredSeed,
+    needsSeedRecovery,
     onRevealStoredSeed,
+    onRecoverSeed,
     isRecoveryPhraseVisible,
     onHideRecoveryPhrase,
   } = props;
@@ -76,6 +80,20 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
   const [pendingSetup, setPendingSetup] = useState<SetupMethod | null>(null);
   const [modalBusy, setModalBusy] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [recoverModalOpen, setRecoverModalOpen] = useState(false);
+  const [recoveryPhraseInput, setRecoveryPhraseInput] = useState('');
+  const [recoverBusy, setRecoverBusy] = useState(false);
+  const [recoverError, setRecoverError] = useState<string | null>(null);
+
+  const shouldPromptSeedRecovery = isSeedActive && needsSeedRecovery;
+
+  useEffect(() => {
+    if (!shouldPromptSeedRecovery) {
+      setRecoverModalOpen(false);
+      setRecoveryPhraseInput('');
+      setRecoverError(null);
+    }
+  }, [shouldPromptSeedRecovery]);
 
   const passkeyButtonLabel = isPasskeyActive ? 'Review & replace' : 'Switch to passkey';
   const seedButtonLabel = isSeedActive ? 'Review & replace' : 'Switch to recovery phrase';
@@ -134,6 +152,46 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     if (modalBusy) return;
     setModalError(null);
     setPendingSetup(null);
+  };
+
+  const openRecoverModal = () => {
+    setRecoveryPhraseInput('');
+    setRecoverError(null);
+    setRecoverModalOpen(true);
+  };
+
+  const closeRecoverModal = () => {
+    if (recoverBusy) return;
+    setRecoverModalOpen(false);
+    setRecoverError(null);
+    setRecoveryPhraseInput('');
+  };
+
+  const handleRecoverSeed = async () => {
+    const trimmed = recoveryPhraseInput.trim();
+    if (!trimmed) {
+      setRecoverError('Enter your 12-word recovery phrase to continue.');
+      return;
+    }
+    const words = trimmed.split(/\s+/);
+    if (words.length !== 12) {
+      setRecoverError('Recovery phrase must contain exactly 12 words.');
+      return;
+    }
+    setRecoverError(null);
+    setRecoverBusy(true);
+    try {
+      const normalized = words.map((word) => word.toLowerCase()).join(' ');
+      await onRecoverSeed(normalized);
+      setRecoverModalOpen(false);
+      setRecoveryPhraseInput('');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to import the recovery phrase.';
+      setRecoverError(message);
+    } finally {
+      setRecoverBusy(false);
+    }
   };
 
   const handleRevealStoredSeed = () => {
@@ -266,6 +324,27 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
         </div>
       )}
 
+      {shouldPromptSeedRecovery && (
+        <div
+          className="col"
+          style={{
+            gap: 8,
+            padding: 12,
+            borderRadius: 8,
+            background: 'var(--panel)',
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>Recover your phrase on this device</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            This profile uses a recovery phrase, but it is not stored locally. Enter the 12 words
+            so 3send can decrypt files on this device.
+          </div>
+          <button className="button" onClick={openRecoverModal} disabled={recoverBusy}>
+            Enter recovery phrase
+          </button>
+        </div>
+      )}
+
       {isSeedActive && hasStoredSeed && (
         <button
           className="button secondary"
@@ -282,6 +361,17 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
           copyPrivateKey={copyPrivateKey}
           downloadPrivateKey={downloadPrivateKey}
           onClose={onHideRecoveryPhrase}
+        />
+      )}
+
+      {recoverModalOpen && (
+        <RecoverSeedModal
+          value={recoveryPhraseInput}
+          onChange={(value) => setRecoveryPhraseInput(value)}
+          onClose={closeRecoverModal}
+          onConfirm={handleRecoverSeed}
+          busy={recoverBusy}
+          error={recoverError}
         />
       )}
 
@@ -589,6 +679,70 @@ function SetupModal(props: SetupModalProps) {
           </button>
           <button className="button" onClick={onContinue} disabled={busy}>
             {busy ? 'Please wait…' : 'Continue'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type RecoverSeedModalProps = {
+  value: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  busy: boolean;
+  error: string | null;
+};
+
+function RecoverSeedModal(props: RecoverSeedModalProps) {
+  const { value, onChange, onClose, onConfirm, busy, error } = props;
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(17, 24, 39, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        zIndex: 50,
+      }}
+    >
+      <div
+        className="card col"
+        style={{
+          gap: 12,
+          maxWidth: 420,
+          width: '100%',
+          boxShadow: '0 10px 40px rgba(15, 23, 42, 0.25)',
+        }}
+      >
+        <div style={{ fontWeight: 700, fontSize: 18 }}>Restore recovery phrase</div>
+        <div className="muted" style={{ fontSize: 12, lineHeight: 1.6 }}>
+          Paste or type the 12 words assigned to this profile. We only keep a copy in your
+          browser&apos;s local storage.
+        </div>
+        <textarea
+          className="input mono"
+          rows={4}
+          placeholder="twelve words separated by spaces"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={busy}
+          style={{ fontSize: 12 }}
+        />
+        <div className="muted" style={{ fontSize: 12 }}>
+          We validate it against the registered public key before saving anything locally.
+        </div>
+        {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button className="button secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button className="button" onClick={onConfirm} disabled={busy}>
+            {busy ? 'Recovering…' : 'Save phrase'}
           </button>
         </div>
       </div>

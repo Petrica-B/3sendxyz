@@ -116,3 +116,16 @@ export async function deriveSeedKeyPair(mnemonic: string): Promise<DerivedSeedKe
   const publicKeyBase64 = ab2b64(buffer);
   return { privateKey, publicKeyBase64 };
 }
+
+export async function fingerprintMnemonic(mnemonic: string): Promise<string> {
+  const normalized = mnemonic.trim();
+  if (!normalized) {
+    throw new Error('Seed phrase is empty');
+  }
+  const cryptoObj: Crypto | undefined = (globalThis as CryptoGlobal).crypto;
+  const subtle: SubtleCrypto | undefined = cryptoObj?.subtle;
+  if (!cryptoObj || !subtle) throw new Error('WebCrypto not available');
+  const seedBytes = new TextEncoder().encode(normalized);
+  const digest = await subtle.digest('SHA-256', seedBytes);
+  return ab2hex(digest);
+}

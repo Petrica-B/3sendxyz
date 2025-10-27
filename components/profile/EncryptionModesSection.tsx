@@ -95,8 +95,16 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     }
   }, [shouldPromptSeedRecovery]);
 
-  const passkeyButtonLabel = isPasskeyActive ? 'Replace' : 'Switch to passkey';
-  const seedButtonLabel = isSeedActive ? 'Replace' : 'Switch to recovery phrase';
+  const passkeyButtonLabel = isPasskeyActive
+    ? 'Replace'
+    : activeMethod === null
+      ? 'Set up passkey'
+      : 'Switch to passkey';
+  const seedButtonLabel = isSeedActive
+    ? 'Replace'
+    : activeMethod === null
+      ? 'Set up recovery phrase'
+      : 'Switch to recovery phrase';
 
   const modalTitle = useMemo(() => {
     if (!pendingSetup) return '';

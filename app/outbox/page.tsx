@@ -119,6 +119,10 @@ export default function OutboxPage() {
               } catch {}
               const r1Display = r1Burn ? Number.parseFloat(r1Burn).toFixed(6) : null;
               const usdDisplay = usdBurn ? Number.parseFloat(usdBurn).toFixed(2) : null;
+              const hasPlainNote = typeof item.note === 'string' && item.note.length > 0;
+              const hasEncryptedNote =
+                !hasPlainNote &&
+                Boolean(item.encryption?.noteCiphertext && item.encryption?.noteIv);
               return (
                 <div key={item.id} className="transferItem">
                   <div style={{ flex: 1 }}>
@@ -144,7 +148,7 @@ export default function OutboxPage() {
                           burned: {r1Display ?? '—'} R1{' '}
                           {usdDisplay ? `(≈ ${usdDisplay} USDC)` : ''}
                         </div>
-                        <div>note: {item.note ? item.note : '—'}</div>
+                        <div>note: {hasPlainNote ? item.note : hasEncryptedNote ? '(encrypted)' : '—'}</div>
                         <div>sent at: {formatDateShort(item.sentAt)}</div>
                       </div>
                     )}

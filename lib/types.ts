@@ -9,6 +9,10 @@ export type EncryptionMetadata = {
   ciphertextLength?: number;
   recipient?: string;
   keySource?: 'vault' | 'passkey' | 'seed';
+  noteCiphertext?: string;
+  noteIv?: string;
+  noteEncoding?: 'utf-8';
+  noteLength?: number;
 };
 
 export type StoredUploadRecord = {

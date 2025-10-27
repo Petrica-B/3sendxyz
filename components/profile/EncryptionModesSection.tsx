@@ -105,15 +105,18 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
 
   const modalDescription = useMemo(() => {
     if (!pendingSetup) return '';
+    const descriptionBegin =
+      activeMethod !== null
+        ? 'You will replace your current key. All the files already received will not be unlockable anymore.\n'
+        : 'Set up your new encryption key.';
+
     if (pendingSetup === 'passkey') {
       return passkeySupported
-        ? 'Use Face ID, Touch ID, or a device passkey. We only store the public key.'
+        ? `${descriptionBegin}Use Face ID, Touch ID, or a device passkey. We only store the public key.`
         : 'Your browser does not support passkeys. Please switch to Safari, Chrome, or Edge on a compatible device.';
     }
-    return isSeedActive
-      ? 'Replace your current recovery phrase. The old phrase will no longer decrypt new files.'
-      : 'Generate a 12-word phrase. Store it offline—3send never keeps a copy.';
-  }, [pendingSetup, passkeySupported, isSeedActive]);
+    return `${descriptionBegin}Generate a 12-word phrase. Store it offline: 3send never keeps a copy.`;
+  }, [pendingSetup, passkeySupported, activeMethod]);
 
   const handleSetup = async () => {
     if (!pendingSetup) return;

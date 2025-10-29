@@ -6,6 +6,13 @@ import type {
 } from '@/lib/types';
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 
+type SetupMethod = 'passkey' | 'seed';
+export type PasskeyRegistrationStep =
+  | 'prompt-device'
+  | 'derive-key'
+  | 'sign-wallet'
+  | 'register-server';
+
 type EncryptionModesSectionProps = {
   activeMode: 'light' | 'pro';
   activeMethod: RegisteredKeyRecord['type'] | null;
@@ -23,7 +30,9 @@ type EncryptionModesSectionProps = {
   onKeyLabelChange: (value: string) => void;
   onGenerateSeed: () => Promise<void> | void;
   onRegenerateSeed: () => Promise<void> | void;
-  onRegisterPasskey: () => Promise<void> | void;
+  onRegisterPasskey: (
+    onStatusChange?: (step: PasskeyRegistrationStep) => void
+  ) => Promise<void> | void;
   privKeyOnce: string | null;
   copyPrivateKey: () => Promise<void> | void;
   downloadPrivateKey: () => void;
@@ -35,8 +44,6 @@ type EncryptionModesSectionProps = {
   isRecoveryPhraseVisible: boolean;
   onHideRecoveryPhrase: () => void;
 };
-
-type SetupMethod = 'passkey' | 'seed';
 
 const gridStyle: CSSProperties = {
   display: 'grid',
@@ -84,6 +91,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
   const [recoveryPhraseInput, setRecoveryPhraseInput] = useState('');
   const [recoverBusy, setRecoverBusy] = useState(false);
   const [recoverError, setRecoverError] = useState<string | null>(null);
+  const [passkeyStatus, setPasskeyStatus] = useState<PasskeyRegistrationStep | null>(null);
 
   const shouldPromptSeedRecovery = isSeedActive && needsSeedRecovery;
 
@@ -94,6 +102,12 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
       setRecoverError(null);
     }
   }, [shouldPromptSeedRecovery]);
+
+  useEffect(() => {
+    if (pendingSetup !== 'passkey') {
+      setPasskeyStatus(null);
+    }
+  }, [pendingSetup]);
 
   const passkeyButtonLabel = isPasskeyActive
     ? 'Replace'
@@ -143,7 +157,8 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     setModalBusy(true);
     try {
       if (pendingSetup === 'passkey') {
-        await onRegisterPasskey();
+        setPasskeyStatus('prompt-device');
+        await onRegisterPasskey((step) => setPasskeyStatus(step));
       } else if (isSeedActive) {
         await onRegenerateSeed();
       } else {
@@ -156,6 +171,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
       setModalError(message);
     } finally {
       setModalBusy(false);
+      setPasskeyStatus(null);
     }
   };
 
@@ -163,6 +179,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     if (modalBusy) return;
     setModalError(null);
     setPendingSetup(null);
+    setPasskeyStatus(null);
   };
 
   const openRecoverModal = () => {
@@ -397,6 +414,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
           onContinue={handleSetup}
           busy={modalBusy}
           error={modalError}
+          passkeyStatus={pendingSetup === 'passkey' ? passkeyStatus : null}
         />
       )}
     </section>
@@ -638,6 +656,7 @@ type SetupModalProps = {
   onContinue: () => void;
   busy: boolean;
   error: string | null;
+  passkeyStatus: PasskeyRegistrationStep | null;
 };
 
 function SetupModal(props: SetupModalProps) {
@@ -651,7 +670,34 @@ function SetupModal(props: SetupModalProps) {
     onContinue,
     busy,
     error,
+    passkeyStatus,
   } = props;
+
+  let primaryButtonLabel: string;
+  if (!busy) {
+    primaryButtonLabel = method === 'passkey' ? 'Start passkey registration' : 'Continue';
+  } else if (method !== 'passkey') {
+    primaryButtonLabel = 'Please wait…';
+  } else {
+    switch (passkeyStatus) {
+      case 'prompt-device':
+        primaryButtonLabel = 'Confirm on your device…';
+        break;
+      case 'derive-key':
+        primaryButtonLabel = 'Deriving encryption key…';
+        break;
+      case 'sign-wallet':
+        primaryButtonLabel = 'Approve wallet signature…';
+        break;
+      case 'register-server':
+        primaryButtonLabel = 'Saving passkey…';
+        break;
+      default:
+        primaryButtonLabel = 'Registering passkey…';
+        break;
+    }
+  }
+
   return (
     <div
       style={{
@@ -698,7 +744,7 @@ function SetupModal(props: SetupModalProps) {
             Cancel
           </button>
           <button className="button" onClick={onContinue} disabled={busy}>
-            {busy ? 'Please wait…' : 'Continue'}
+            {primaryButtonLabel}
           </button>
         </div>
       </div>

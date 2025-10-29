@@ -37,7 +37,6 @@ export default function InboxPage() {
   const passkeyRecord = useMemo<RegisteredPasskeyRecord | null>(() => {
     return registeredKeyRecord?.type === 'passkey' ? registeredKeyRecord : null;
   }, [registeredKeyRecord]);
-  const passkeyKeyCacheRef = useRef<Uint8Array | null>(null);
   const seedKeyCacheRef = useRef<{ privateKey: Uint8Array; publicKey: string } | null>(null);
   const passkeyLoading = registeredKeyLoading;
   const passkeyError = registeredKeyError;
@@ -105,7 +104,6 @@ export default function InboxPage() {
   }, [records]);
 
   const fetchPasskeyStatus = useCallback(async () => {
-    passkeyKeyCacheRef.current = null;
     seedKeyCacheRef.current = null;
     if (!address) {
       setRegisteredKeyRecord(null);
@@ -161,7 +159,9 @@ export default function InboxPage() {
   }, [address]);
 
   const resolveRecipientPrivateKey = useCallback(
-    async (item: ReceivedItem): Promise<Uint8Array> => {
+    async (
+      item: ReceivedItem
+    ): Promise<{ privateKey: Uint8Array; source: 'passkey' | 'seed' | 'vault' }> => {
       const { encryption } = item;
       if (!encryption) {
         throw new Error('No encryption metadata for this transfer.');
@@ -187,21 +187,19 @@ export default function InboxPage() {
         if (!passkeyRecord.prfSalt || !passkeyRecord.credentialId) {
           throw new Error('Passkey record is incomplete. Please re-register your passkey.');
         }
-        let cached = passkeyKeyCacheRef.current;
-        if (!cached) {
-          const saltBytes = decodeBase64(passkeyRecord.prfSalt);
-          const { privateKey: derivedPrivateKey, publicKey: derivedPublicKey } =
-            await derivePasskeyX25519KeyPair({
-              credentialIdB64: passkeyRecord.credentialId,
-              salt: saltBytes,
-            });
-          if (passkeyRecord.publicKey && derivedPublicKey !== passkeyRecord.publicKey) {
-            throw new Error('Passkey verification failed. Public key mismatch.');
-          }
-          cached = new Uint8Array(derivedPrivateKey);
-          passkeyKeyCacheRef.current = cached;
+        const saltBytes = decodeBase64(passkeyRecord.prfSalt);
+        const { privateKey: derivedPrivateKey, publicKey: derivedPublicKey } =
+          await derivePasskeyX25519KeyPair({
+            credentialIdB64: passkeyRecord.credentialId,
+            salt: saltBytes,
+          });
+        if (passkeyRecord.publicKey && derivedPublicKey !== passkeyRecord.publicKey) {
+          derivedPrivateKey.fill(0);
+          throw new Error('Passkey verification failed. Public key mismatch.');
         }
-        return cached;
+        const privateKey = new Uint8Array(derivedPrivateKey);
+        derivedPrivateKey.fill(0);
+        return { privateKey, source: 'passkey' };
       }
 
       if (keySource === 'seed') {
@@ -248,13 +246,14 @@ export default function InboxPage() {
         ) {
           throw new Error('Encrypted payload recipient does not match your registered seed key.');
         }
-        return cached.privateKey;
+        return { privateKey: cached.privateKey, source: 'seed' };
       }
 
       if (!signMessageAsync) {
         throw new Error('Wallet signer not available');
       }
-      return getVaultPrivateKey(address, signMessageAsync);
+      const privateKey = await getVaultPrivateKey(address, signMessageAsync);
+      return { privateKey, source: 'vault' };
     },
     [address, passkeyLoading, passkeyRecord, registeredKeyLoading, registeredKeyRecord, signMessageAsync]
   );
@@ -302,31 +301,36 @@ export default function InboxPage() {
           }
 
           const ciphertext = decodeBase64(base64Data);
-          const privateKey = await resolveRecipientPrivateKey(item);
+          const { privateKey, source } = await resolveRecipientPrivateKey(item);
+          try {
+            const plaintext = await decryptFileFromEnvelope({
+              ciphertext,
+              metadata: encryption,
+              recipientPrivateKey: privateKey,
+            });
 
-          const plaintext = await decryptFileFromEnvelope({
-            ciphertext,
-            metadata: encryption,
-            recipientPrivateKey: privateKey,
-          });
-
-          const mimeType =
-            typeof originalMimeType === 'string' && originalMimeType.trim().length > 0
-              ? originalMimeType
-              : 'application/octet-stream';
-          const plainBuffer = plaintext.buffer.slice(
-            plaintext.byteOffset,
-            plaintext.byteOffset + plaintext.byteLength
-          ) as ArrayBuffer;
-          const blob = new Blob([plainBuffer], { type: mimeType });
-          const downloadUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = downloadUrl;
-          a.download = fileName;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(downloadUrl);
+            const mimeType =
+              typeof originalMimeType === 'string' && originalMimeType.trim().length > 0
+                ? originalMimeType
+                : 'application/octet-stream';
+            const plainBuffer = plaintext.buffer.slice(
+              plaintext.byteOffset,
+              plaintext.byteOffset + plaintext.byteLength
+            ) as ArrayBuffer;
+            const blob = new Blob([plainBuffer], { type: mimeType });
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(downloadUrl);
+          } finally {
+            if (source === 'passkey') {
+              privateKey.fill(0);
+            }
+          }
         } else {
           const downloadUrl =
             typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
@@ -370,15 +374,21 @@ export default function InboxPage() {
         };
       });
       try {
-        const privateKey = await resolveRecipientPrivateKey(item);
-        const noteText = await decryptNoteFromEnvelope({
-          metadata: item.encryption,
-          recipientPrivateKey: privateKey,
-        });
-        setNoteStates((prev) => ({
-          ...prev,
-          [item.id]: { status: 'success', value: noteText },
-        }));
+        const { privateKey, source } = await resolveRecipientPrivateKey(item);
+        try {
+          const noteText = await decryptNoteFromEnvelope({
+            metadata: item.encryption,
+            recipientPrivateKey: privateKey,
+          });
+          setNoteStates((prev) => ({
+            ...prev,
+            [item.id]: { status: 'success', value: noteText },
+          }));
+        } finally {
+          if (source === 'passkey') {
+            privateKey.fill(0);
+          }
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         setNoteStates((prev) => {

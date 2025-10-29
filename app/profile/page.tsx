@@ -1,6 +1,8 @@
 'use client';
 
-import EncryptionModesSection from '@/components/profile/EncryptionModesSection';
+import EncryptionModesSection, {
+  type PasskeyRegistrationStep,
+} from '@/components/profile/EncryptionModesSection';
 import HandleSection from '@/components/profile/HandleSection';
 import { encodeBase64 } from '@/lib/encryption';
 import { shortAddress } from '@/lib/format';
@@ -349,128 +351,135 @@ export default function ProfilePage() {
     [address, hidePrivKeyOnce, profile, registeredKeyRecord, seedKeyRecord]
   );
 
-  const onRegisterPasskey = useCallback(async () => {
-    if (!address) return;
-    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-      alert('Passkeys are not supported in this environment.');
-      return;
-    }
-    if (!window.PublicKeyCredential) {
-      alert('Passkeys are not supported by this browser.');
-      return;
-    }
-    if (!signMessageAsync) {
-      alert('Wallet signer not available. Connect your wallet to continue.');
-      return;
-    }
-
-    setRegisteredKeyBusy(true);
-    setRegisteredKeyError(null);
-    try {
-      const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-      const userId = new TextEncoder().encode(address.toLowerCase());
-
-      const creationOptions: PublicKeyCredentialCreationOptions = {
-        challenge,
-        rp: {
-          name: '3send',
-          id: window.location.hostname,
-        },
-        user: {
-          id: userId,
-          name: `3send: ${address}`,
-          displayName: `3send: ${address}`,
-        },
-        pubKeyCredParams: [
-          { type: 'public-key', alg: -8 },
-          { type: 'public-key', alg: -7 },
-        ],
-        timeout: 60_000,
-        attestation: 'direct',
-        authenticatorSelection: {
-          residentKey: 'preferred',
-          userVerification: 'preferred',
-        },
-      };
-
-      const credential = (await navigator.credentials.create({
-        publicKey: creationOptions,
-      })) as PasskeyCredential | null;
-
-      if (!credential) {
-        throw new Error('Passkey registration was cancelled.');
+  const onRegisterPasskey = useCallback(
+    async (onStatusChange?: (step: PasskeyRegistrationStep) => void) => {
+      if (!address) return;
+      if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+        alert('Passkeys are not supported in this environment.');
+        return;
+      }
+      if (!window.PublicKeyCredential) {
+        alert('Passkeys are not supported by this browser.');
+        return;
+      }
+      if (!signMessageAsync) {
+        alert('Wallet signer not available. Connect your wallet to continue.');
+        return;
       }
 
-      const attestationResponse = credential.response;
-      const algorithm =
-        typeof attestationResponse.getPublicKeyAlgorithm === 'function'
-          ? attestationResponse.getPublicKeyAlgorithm()
-          : undefined;
-
-      const credentialIdB64 = encodeBase64(new Uint8Array(credential.rawId));
-      const prfSaltBytes = randomPrfSalt();
-      const { publicKey: x25519PublicKey } = await derivePasskeyX25519KeyPair({
-        credentialIdB64,
-        salt: prfSaltBytes,
-      });
-      const prfSaltB64 = encodeBase64(prfSaltBytes);
-      const message = buildRegisteredKeyMessage(address, x25519PublicKey);
-      const signature = await signMessageAsync({ message });
-
-      const registerRes = await fetch('/api/keys/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'passkey',
-          address,
-          signature,
-          message,
-          credentialId: credentialIdB64,
-          passkeyPublicKey: x25519PublicKey,
-          algorithm,
-          prfSalt: prfSaltB64,
-        }),
-      });
-      const payload = await registerRes.json().catch(() => null);
-      if (!registerRes.ok || !payload?.success) {
-        throw new Error(payload?.error || 'Failed to register passkey');
-      }
-      setRegisteredKeyRecord(payload.record ?? null);
+      setRegisteredKeyBusy(true);
       setRegisteredKeyError(null);
-      setProfile((prev) => {
-        const next: UserProfile = { ...prev };
-        delete (next as Record<string, unknown>).keyLabel;
-        delete (next as Record<string, unknown>).fingerprintHex;
-        delete (next as Record<string, unknown>).keyCreatedAt;
-        delete (next as Record<string, unknown>).seedMnemonic;
-        saveProfile(address, next);
-        return next;
-      });
-      setKeyLabelInput('');
-      hidePrivKeyOnce();
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('ratio1:registered-key-updated', { detail: { address } })
-        );
+      try {
+        onStatusChange?.('prompt-device');
+        const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+        const userId = new TextEncoder().encode(address.toLowerCase());
+
+        const creationOptions: PublicKeyCredentialCreationOptions = {
+          challenge,
+          rp: {
+            name: '3send',
+            id: window.location.hostname,
+          },
+          user: {
+            id: userId,
+            name: `3send: ${address}`,
+            displayName: `3send: ${address}`,
+          },
+          pubKeyCredParams: [
+            { type: 'public-key', alg: -8 },
+            { type: 'public-key', alg: -7 },
+          ],
+          timeout: 60_000,
+          attestation: 'direct',
+          authenticatorSelection: {
+            residentKey: 'preferred',
+            userVerification: 'preferred',
+          },
+        };
+
+        const credential = (await navigator.credentials.create({
+          publicKey: creationOptions,
+        })) as PasskeyCredential | null;
+
+        if (!credential) {
+          throw new Error('Passkey registration was cancelled.');
+        }
+
+        const attestationResponse = credential.response;
+        const algorithm =
+          typeof attestationResponse.getPublicKeyAlgorithm === 'function'
+            ? attestationResponse.getPublicKeyAlgorithm()
+            : undefined;
+
+        const credentialIdB64 = encodeBase64(new Uint8Array(credential.rawId));
+        const prfSaltBytes = randomPrfSalt();
+        onStatusChange?.('derive-key');
+        const { publicKey: x25519PublicKey } = await derivePasskeyX25519KeyPair({
+          credentialIdB64,
+          salt: prfSaltBytes,
+        });
+        const prfSaltB64 = encodeBase64(prfSaltBytes);
+        const message = buildRegisteredKeyMessage(address, x25519PublicKey);
+        onStatusChange?.('sign-wallet');
+        const signature = await signMessageAsync({ message });
+
+        onStatusChange?.('register-server');
+        const registerRes = await fetch('/api/keys/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'passkey',
+            address,
+            signature,
+            message,
+            credentialId: credentialIdB64,
+            passkeyPublicKey: x25519PublicKey,
+            algorithm,
+            prfSalt: prfSaltB64,
+          }),
+        });
+        const payload = await registerRes.json().catch(() => null);
+        if (!registerRes.ok || !payload?.success) {
+          throw new Error(payload?.error || 'Failed to register passkey');
+        }
+        setRegisteredKeyRecord(payload.record ?? null);
+        setRegisteredKeyError(null);
+        setProfile((prev) => {
+          const next: UserProfile = { ...prev };
+          delete (next as Record<string, unknown>).keyLabel;
+          delete (next as Record<string, unknown>).fingerprintHex;
+          delete (next as Record<string, unknown>).keyCreatedAt;
+          delete (next as Record<string, unknown>).seedMnemonic;
+          saveProfile(address, next);
+          return next;
+        });
+        setKeyLabelInput('');
+        hidePrivKeyOnce();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('ratio1:registered-key-updated', { detail: { address } })
+          );
+        }
+      } catch (err) {
+        let message =
+          err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
+        if (
+          err instanceof DOMException &&
+          (err.name === 'AbortError' || err.name === 'NotAllowedError')
+        ) {
+          message = 'Passkey registration was cancelled.';
+        }
+        setRegisteredKeyError(message);
+        console.error('[keys] register failed', err);
+        if (message && !/cancel/i.test(message) && !/not allowed/i.test(message)) {
+          alert(message);
+        }
+      } finally {
+        setRegisteredKeyBusy(false);
       }
-    } catch (err) {
-      let message =
-        err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
-      if (
-        err instanceof DOMException &&
-        (err.name === 'AbortError' || err.name === 'NotAllowedError')
-      ) {
-        message = 'Passkey registration was cancelled.';
-      }
-      setRegisteredKeyError(message);
-      console.error('[keys] register failed', err);
-      if (message && !/cancel/i.test(message) && !/not allowed/i.test(message)) {
-        alert(message);
-      }
-    } finally {
-      setRegisteredKeyBusy(false);
-    }
-  }, [address, signMessageAsync, hidePrivKeyOnce]);
+    },
+    [address, signMessageAsync, hidePrivKeyOnce]
+  );
 
   if (!isConnected || !address) {
     return (

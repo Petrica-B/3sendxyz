@@ -212,7 +212,6 @@ export async function POST(request: Request) {
 
     const sentAt = typeof sentAtRaw === 'string' ? Number(sentAtRaw) : Date.now();
     const sentTimestamp = Number.isFinite(sentAt) ? sentAt : Date.now();
-    const note = formData.get('note');
 
     const ratio1 = createEdgeSdk();
     const fileBase64 = await file.arrayBuffer();

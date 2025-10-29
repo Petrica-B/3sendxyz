@@ -1,3 +1,20 @@
+export type EncryptionMetadata = {
+  version: string;
+  algorithm: string;
+  keyDerivation?: string;
+  ephemeralPublicKey: string;
+  iv: string;
+  recipientPublicKey?: string;
+  plaintextLength?: number;
+  ciphertextLength?: number;
+  recipient?: string;
+  keySource?: 'vault' | 'passkey' | 'seed';
+  noteCiphertext?: string;
+  noteIv?: string;
+  noteEncoding?: 'utf-8';
+  noteLength?: number;
+};
+
 export type StoredUploadRecord = {
   cid: string;
   filename: string;
@@ -10,6 +27,11 @@ export type StoredUploadRecord = {
   tierId: number;
   usdcAmount: string;
   r1Amount: string;
+  originalFilename?: string;
+  originalMimeType?: string;
+  originalFilesize?: number;
+  encryptedFilesize?: number;
+  encryption?: EncryptionMetadata;
 };
 
 export type TierConfig = {
@@ -34,4 +56,40 @@ export type UserProfile = {
   fingerprintHex?: string;
   keyCreatedAt?: number;
   keyLabel?: string; // user-defined label for the key pair
+  seedMnemonic?: string; // locally stored recovery phrase (never synced)
 };
+
+export type VaultKeyRecord = {
+  publicKey: string;
+  privateKey: string;
+  createdAt?: number;
+  passkeyPublicKey?: string;
+  passkeyCredentialId?: string;
+  passkeyPrfSalt?: string;
+};
+
+export type RegisteredKeyType = 'passkey' | 'seed';
+
+type RegisteredKeyRecordBase = {
+  type: RegisteredKeyType;
+  publicKey: string;
+  createdAt: number;
+  label?: string;
+};
+
+export type RegisteredPasskeyRecord = RegisteredKeyRecordBase & {
+  type: 'passkey';
+  credentialId: string;
+  prfSalt: string;
+  algorithm?: number;
+};
+
+export type RegisteredSeedRecord = RegisteredKeyRecordBase & {
+  type: 'seed';
+  fingerprint?: string;
+  derivationPath?: string;
+};
+
+export type RegisteredKeyRecord = RegisteredPasskeyRecord | RegisteredSeedRecord;
+
+export type PasskeyRecord = RegisteredPasskeyRecord;

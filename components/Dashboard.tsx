@@ -155,7 +155,7 @@ export default function Dashboard() {
   return (
     <div className="col" style={{ gap: 12 }}>
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontWeight: 700 }}>Platform's stats</div>
+        <div style={{ fontWeight: 700 }}>Platform&apos;s stats</div>
         <div
           style={{
             display: 'grid',

@@ -4,7 +4,7 @@ import {
   resolveTierBySize,
 } from '@/lib/constants';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
-import type { StoredUploadRecord } from '@/lib/types';
+import type { EncryptionMetadata, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 import { Buffer } from 'node:buffer';
@@ -40,6 +40,10 @@ export async function POST(request: Request) {
     const paymentTx = formData.get('paymentTxHash');
     const chainIdRaw = formData.get('chainId');
     const tierIdRaw = formData.get('tierId');
+    const originalSizeRaw = formData.get('originalSize');
+    const originalFilenameRaw = formData.get('originalFilename');
+    const originalMimeTypeRaw = formData.get('originalMimeType');
+    const encryptionRaw = formData.get('encryption');
 
     if (!(file instanceof File)) {
       return NextResponse.json({ success: false, error: 'Missing file' }, { status: 400 });
@@ -62,7 +66,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing chainId' }, { status: 400 });
     }
 
-    const expectedTier = resolveTierBySize(file.size);
+    let parsedOriginalSize: number | null = null;
+    if (typeof originalSizeRaw === 'string' && originalSizeRaw.trim().length > 0) {
+      const parsed = Number.parseInt(originalSizeRaw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        parsedOriginalSize = parsed;
+      }
+    } else if (
+      typeof originalSizeRaw === 'number' &&
+      Number.isFinite(originalSizeRaw) &&
+      originalSizeRaw > 0
+    ) {
+      parsedOriginalSize = Math.floor(originalSizeRaw);
+    }
+
+    const effectiveFileSize = parsedOriginalSize ?? file.size;
+
+    const expectedTier = resolveTierBySize(effectiveFileSize);
     if (!expectedTier) {
       return NextResponse.json(
         { success: false, error: 'File exceeds maximum allowed size' },
@@ -73,6 +93,69 @@ export async function POST(request: Request) {
     if (typeof tierIdRaw === 'string' && Number(tierIdRaw) !== expectedTier.id) {
       return NextResponse.json({ success: false, error: 'Tier mismatch' }, { status: 400 });
     }
+
+    let encryptionMetadata: EncryptionMetadata | undefined;
+    if (typeof encryptionRaw === 'string' && encryptionRaw.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(encryptionRaw) as EncryptionMetadata;
+        if (!parsed || typeof parsed !== 'object') {
+          throw new Error('invalid');
+        }
+        if (typeof parsed.version !== 'string' || parsed.version.trim().length === 0) {
+          throw new Error('invalid');
+        }
+        if (typeof parsed.algorithm !== 'string' || parsed.algorithm.trim().length === 0) {
+          throw new Error('invalid');
+        }
+        if (typeof parsed.ephemeralPublicKey !== 'string' || typeof parsed.iv !== 'string') {
+          throw new Error('invalid');
+        }
+        encryptionMetadata = parsed;
+      } catch {
+        return NextResponse.json(
+          { success: false, error: 'Invalid encryption metadata' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (!encryptionMetadata) {
+      return NextResponse.json(
+        { success: false, error: 'Missing encryption metadata' },
+        { status: 400 }
+      );
+    }
+
+    if (
+      Number.isFinite(encryptionMetadata.plaintextLength) &&
+      (encryptionMetadata.plaintextLength as number) > 0 &&
+      Math.floor(encryptionMetadata.plaintextLength as number) !== effectiveFileSize
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Plaintext size mismatch' },
+        { status: 400 }
+      );
+    }
+
+    if (
+      Number.isFinite(encryptionMetadata.ciphertextLength) &&
+      (encryptionMetadata.ciphertextLength as number) > 0 &&
+      Math.floor(encryptionMetadata.ciphertextLength as number) !== file.size
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Ciphertext size mismatch' },
+        { status: 400 }
+      );
+    }
+
+    const originalFilename =
+      typeof originalFilenameRaw === 'string' && originalFilenameRaw.trim().length > 0
+        ? originalFilenameRaw
+        : undefined;
+    const originalMimeType =
+      typeof originalMimeTypeRaw === 'string' && originalMimeTypeRaw.trim().length > 0
+        ? originalMimeTypeRaw
+        : undefined;
 
     const rpcDetails = getRpcUrl(chainId);
     if (!rpcDetails) {
@@ -129,7 +212,6 @@ export async function POST(request: Request) {
 
     const sentAt = typeof sentAtRaw === 'string' ? Number(sentAtRaw) : Date.now();
     const sentTimestamp = Number.isFinite(sentAt) ? sentAt : Date.now();
-    const noteValue = typeof note === 'string' && note.trim().length > 0 ? note : undefined;
 
     const ratio1 = createEdgeSdk();
     const fileBase64 = await file.arrayBuffer();
@@ -139,26 +221,36 @@ export async function POST(request: Request) {
       filename: file.name,
       secret: recipientKey,
     });
-    const cid =
-      uploadResult && typeof uploadResult === 'object' && 'cid' in uploadResult
-        ? (uploadResult as { cid: string }).cid
-        : undefined;
+    const cid = uploadResult.cid;
     if (!cid) {
       throw new Error('Failed to store file in R1FS');
     }
 
+    const hasEncryptedNote =
+      typeof encryptionMetadata.noteCiphertext === 'string' &&
+      encryptionMetadata.noteCiphertext.trim().length > 0 &&
+      typeof encryptionMetadata.noteIv === 'string' &&
+      encryptionMetadata.noteIv.trim().length > 0;
+
+    const noteValue = typeof note === 'string' && note.trim().length > 0 ? note : undefined;
+
     const record: StoredUploadRecord = {
       cid,
-      filename: file.name,
+      filename: originalFilename ?? file.name,
       recipient: recipientKey,
       initiator: initiatorAddr,
-      note: noteValue,
+      note: hasEncryptedNote ? undefined : noteValue,
       txHash: paymentTx,
-      filesize: file.size,
+      filesize: effectiveFileSize,
       sentAt: sentTimestamp,
       tierId: expectedTier.id,
       usdcAmount: eventUsdcAmount.toString(),
       r1Amount: eventR1Amount.toString(),
+      originalFilename: originalFilename ?? file.name,
+      originalMimeType,
+      originalFilesize: parsedOriginalSize ?? undefined,
+      encryptedFilesize: file.size,
+      encryption: encryptionMetadata,
     };
 
     await ratio1.cstore.hset({

@@ -45,6 +45,7 @@ export function Navbar() {
         <nav className="navlinks">
           <NavItem href="/" label="Home" />
           <NavItem href="/pricing" label="Pricing" />
+          <NavItem href="/docs" label="Docs" />
           {isConnected && <NavItem href="/outbox" label="Outbox" />}
           {isConnected && <NavItem href="/inbox" label="Inbox" />}
         </nav>

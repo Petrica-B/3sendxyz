@@ -212,7 +212,6 @@ export async function POST(request: Request) {
 
     const sentAt = typeof sentAtRaw === 'string' ? Number(sentAtRaw) : Date.now();
     const sentTimestamp = Number.isFinite(sentAt) ? sentAt : Date.now();
-    const noteValue = typeof note === 'string' && note.trim().length > 0 ? note : undefined;
 
     const ratio1 = createEdgeSdk();
     const fileBase64 = await file.arrayBuffer();
@@ -227,12 +226,20 @@ export async function POST(request: Request) {
       throw new Error('Failed to store file in R1FS');
     }
 
+    const hasEncryptedNote =
+      typeof encryptionMetadata.noteCiphertext === 'string' &&
+      encryptionMetadata.noteCiphertext.trim().length > 0 &&
+      typeof encryptionMetadata.noteIv === 'string' &&
+      encryptionMetadata.noteIv.trim().length > 0;
+
+    const noteValue = typeof note === 'string' && note.trim().length > 0 ? note : undefined;
+
     const record: StoredUploadRecord = {
       cid,
       filename: originalFilename ?? file.name,
       recipient: recipientKey,
       initiator: initiatorAddr,
-      note: noteValue,
+      note: hasEncryptedNote ? undefined : noteValue,
       txHash: paymentTx,
       filesize: effectiveFileSize,
       sentAt: sentTimestamp,

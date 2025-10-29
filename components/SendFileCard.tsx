@@ -178,10 +178,12 @@ export function SendFileCard() {
             : 'vault';
 
       setStatus('Encrypting file…');
+      const hasNote = typeof note === 'string' && note.trim().length > 0;
       const { encryptedFile, metadata: encryptionMetadata } = await encryptFileForRecipient({
         file: selectedFile,
         recipientPublicKey: receiverPublicKey,
         recipientAddress: recipient,
+        note: hasNote ? note : undefined,
       });
       encryptionMetadata.keySource = receiverKeySource;
 
@@ -224,7 +226,6 @@ export function SendFileCard() {
       formData.append('file', encryptedFile);
       formData.append('initiator', address);
       formData.append('recipient', recipient);
-      if (note) formData.append('note', note);
       formData.append('handshakeMessage', handshakeMsg);
       formData.append('signature', signature);
       formData.append('sentAt', String(startedAt));

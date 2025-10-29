@@ -3,7 +3,7 @@
 import { loadProfile } from '../profile/storage';
 import { AddressLink, TxLink } from '@/components/Links';
 import { getTierById } from '@/lib/constants';
-import { decodeBase64, decryptFileFromEnvelope } from '@/lib/encryption';
+import { decodeBase64, decryptFileFromEnvelope, decryptNoteFromEnvelope } from '@/lib/encryption';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import { deriveSeedKeyPair } from '@/lib/keys';
 import { derivePasskeyX25519KeyPair } from '@/lib/passkeyClient';
@@ -14,6 +14,11 @@ import { formatUnits } from 'viem';
 import { useAccount, useSignMessage } from 'wagmi';
 
 type ReceivedItem = StoredUploadRecord & { id: string };
+type NoteState = {
+  status: 'idle' | 'decrypting' | 'success' | 'error';
+  value?: string;
+  error?: string;
+};
 
 const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.initiator}`;
 
@@ -28,6 +33,7 @@ export default function InboxPage() {
   const [registeredKeyRecord, setRegisteredKeyRecord] = useState<RegisteredKeyRecord | null>(null);
   const [registeredKeyLoading, setRegisteredKeyLoading] = useState(false);
   const [registeredKeyError, setRegisteredKeyError] = useState<string | null>(null);
+  const [noteStates, setNoteStates] = useState<Record<string, NoteState>>({});
   const passkeyRecord = useMemo<RegisteredPasskeyRecord | null>(() => {
     return registeredKeyRecord?.type === 'passkey' ? registeredKeyRecord : null;
   }, [registeredKeyRecord]);
@@ -89,6 +95,13 @@ export default function InboxPage() {
       }
       return next;
     });
+    setNoteStates((prev) => {
+      const next: Record<string, NoteState> = {};
+      for (const record of records) {
+        next[record.id] = prev[record.id] ?? { status: 'idle' };
+      }
+      return next;
+    });
   }, [records]);
 
   const fetchPasskeyStatus = useCallback(async () => {
@@ -147,6 +160,105 @@ export default function InboxPage() {
     seedKeyCacheRef.current = null;
   }, [address]);
 
+  const resolveRecipientPrivateKey = useCallback(
+    async (item: ReceivedItem): Promise<Uint8Array> => {
+      const { encryption } = item;
+      if (!encryption) {
+        throw new Error('No encryption metadata for this transfer.');
+      }
+      if (!address) {
+        throw new Error('Wallet address required to decrypt');
+      }
+
+      const keySource =
+        encryption.keySource === 'passkey'
+          ? 'passkey'
+          : encryption.keySource === 'seed'
+            ? 'seed'
+            : 'vault';
+
+      if (keySource === 'passkey') {
+        if (passkeyLoading) {
+          throw new Error('Passkey status is still loading. Please try again momentarily.');
+        }
+        if (!passkeyRecord) {
+          throw new Error('No passkey registered. Visit your profile to register a passkey.');
+        }
+        if (!passkeyRecord.prfSalt || !passkeyRecord.credentialId) {
+          throw new Error('Passkey record is incomplete. Please re-register your passkey.');
+        }
+        let cached = passkeyKeyCacheRef.current;
+        if (!cached) {
+          const saltBytes = decodeBase64(passkeyRecord.prfSalt);
+          const { privateKey: derivedPrivateKey, publicKey: derivedPublicKey } =
+            await derivePasskeyX25519KeyPair({
+              credentialIdB64: passkeyRecord.credentialId,
+              salt: saltBytes,
+            });
+          if (passkeyRecord.publicKey && derivedPublicKey !== passkeyRecord.publicKey) {
+            throw new Error('Passkey verification failed. Public key mismatch.');
+          }
+          cached = new Uint8Array(derivedPrivateKey);
+          passkeyKeyCacheRef.current = cached;
+        }
+        return cached;
+      }
+
+      if (keySource === 'seed') {
+        if (registeredKeyLoading) {
+          throw new Error('Key status is still loading. Please try again momentarily.');
+        }
+        if (!registeredKeyRecord || registeredKeyRecord.type !== 'seed') {
+          throw new Error(
+            'No seed key registered. Visit your profile to register a recovery phrase.'
+          );
+        }
+        let cached = seedKeyCacheRef.current;
+        if (!cached) {
+          let mnemonic: string | null = null;
+          try {
+            const profile = loadProfile(address);
+            const stored =
+              typeof profile.seedMnemonic === 'string' ? profile.seedMnemonic.trim() : '';
+            mnemonic = stored.length > 0 ? stored : null;
+          } catch {
+            mnemonic = null;
+          }
+          if (!mnemonic) {
+            throw new Error(
+              'Recovery phrase not found on this device. Restore it from your backup in Profile.'
+            );
+          }
+          const { privateKey: derivedPrivateKey, publicKeyBase64 } = await deriveSeedKeyPair(mnemonic);
+          if (publicKeyBase64 !== registeredKeyRecord.publicKey) {
+            throw new Error(
+              'Stored recovery phrase does not match the registered seed key. Re-register your seed.'
+            );
+          }
+          cached = {
+            privateKey: new Uint8Array(derivedPrivateKey),
+            publicKey: publicKeyBase64,
+          };
+          seedKeyCacheRef.current = cached;
+        }
+        if (
+          typeof encryption.recipientPublicKey === 'string' &&
+          encryption.recipientPublicKey.trim().length > 0 &&
+          encryption.recipientPublicKey !== cached.publicKey
+        ) {
+          throw new Error('Encrypted payload recipient does not match your registered seed key.');
+        }
+        return cached.privateKey;
+      }
+
+      if (!signMessageAsync) {
+        throw new Error('Wallet signer not available');
+      }
+      return getVaultPrivateKey(address, signMessageAsync);
+    },
+    [address, passkeyLoading, passkeyRecord, registeredKeyLoading, registeredKeyRecord, signMessageAsync]
+  );
+
   const onDownload = useCallback(
     async (item: ReceivedItem) => {
       try {
@@ -176,10 +288,6 @@ export default function InboxPage() {
 
         const { encryption, originalMimeType } = item;
         if (encryption) {
-          if (!address) {
-            throw new Error('Wallet address required to decrypt');
-          }
-
           let base64Data: string | null = null;
           if (typeof rawBase64 === 'string') {
             if (rawBase64.startsWith('data:')) {
@@ -194,93 +302,7 @@ export default function InboxPage() {
           }
 
           const ciphertext = decodeBase64(base64Data);
-          let privateKey: Uint8Array;
-          const keySource =
-            encryption.keySource === 'passkey'
-              ? 'passkey'
-              : encryption.keySource === 'seed'
-                ? 'seed'
-                : 'vault';
-
-          if (keySource === 'passkey') {
-            if (passkeyLoading) {
-              throw new Error('Passkey status is still loading. Please try again momentarily.');
-            }
-            if (!passkeyRecord) {
-              throw new Error('No passkey registered. Visit your profile to register a passkey.');
-            }
-            if (!passkeyRecord.prfSalt || !passkeyRecord.credentialId) {
-              throw new Error('Passkey record is incomplete. Please re-register your passkey.');
-            }
-            let cached = passkeyKeyCacheRef.current;
-            if (!cached) {
-              const saltBytes = decodeBase64(passkeyRecord.prfSalt);
-              const { privateKey: derivedPrivateKey, publicKey: derivedPublicKey } =
-                await derivePasskeyX25519KeyPair({
-                  credentialIdB64: passkeyRecord.credentialId,
-                  salt: saltBytes,
-                });
-              if (passkeyRecord.publicKey && derivedPublicKey !== passkeyRecord.publicKey) {
-                throw new Error('Passkey verification failed. Public key mismatch.');
-              }
-              cached = new Uint8Array(derivedPrivateKey);
-              passkeyKeyCacheRef.current = cached;
-            }
-            privateKey = cached;
-          } else if (keySource === 'seed') {
-            if (registeredKeyLoading) {
-              throw new Error('Key status is still loading. Please try again momentarily.');
-            }
-            if (!registeredKeyRecord || registeredKeyRecord.type !== 'seed') {
-              throw new Error(
-                'No seed key registered. Visit your profile to register a recovery phrase.'
-              );
-            }
-            let cached = seedKeyCacheRef.current;
-            if (!cached) {
-              let mnemonic: string | null = null;
-              try {
-                const profile = loadProfile(address);
-                const stored =
-                  typeof profile.seedMnemonic === 'string' ? profile.seedMnemonic.trim() : '';
-                mnemonic = stored.length > 0 ? stored : null;
-              } catch {
-                mnemonic = null;
-              }
-              if (!mnemonic) {
-                throw new Error(
-                  'Recovery phrase not found on this device. Restore it from your backup in Profile.'
-                );
-              }
-              const { privateKey: derivedPrivateKey, publicKeyBase64 } =
-                await deriveSeedKeyPair(mnemonic);
-              if (publicKeyBase64 !== registeredKeyRecord.publicKey) {
-                throw new Error(
-                  'Stored recovery phrase does not match the registered seed key. Re-register your seed.'
-                );
-              }
-              cached = {
-                privateKey: new Uint8Array(derivedPrivateKey),
-                publicKey: publicKeyBase64,
-              };
-              seedKeyCacheRef.current = cached;
-            }
-            if (
-              typeof encryption.recipientPublicKey === 'string' &&
-              encryption.recipientPublicKey.trim().length > 0 &&
-              encryption.recipientPublicKey !== cached.publicKey
-            ) {
-              throw new Error(
-                'Encrypted payload recipient does not match your registered seed key.'
-              );
-            }
-            privateKey = cached.privateKey;
-          } else {
-            if (!signMessageAsync) {
-              throw new Error('Wallet signer not available');
-            }
-            privateKey = await getVaultPrivateKey(address, signMessageAsync);
-          }
+          const privateKey = await resolveRecipientPrivateKey(item);
 
           const plaintext = await decryptFileFromEnvelope({
             ciphertext,
@@ -324,14 +346,51 @@ export default function InboxPage() {
         setDownloadingId((current) => (current === item.id ? null : current));
       }
     },
-    [
-      address,
-      signMessageAsync,
-      passkeyRecord,
-      passkeyLoading,
-      registeredKeyLoading,
-      registeredKeyRecord,
-    ]
+    [resolveRecipientPrivateKey]
+  );
+
+  const onDecryptNote = useCallback(
+    async (item: ReceivedItem) => {
+      if (
+        !item.encryption ||
+        !item.encryption.noteCiphertext ||
+        !item.encryption.noteIv
+      ) {
+        setNoteStates((prev) => ({
+          ...prev,
+          [item.id]: { status: 'error', error: 'No encrypted note found.' },
+        }));
+        return;
+      }
+      setNoteStates((prev) => {
+        const previous = prev[item.id];
+        return {
+          ...prev,
+          [item.id]: { status: 'decrypting', value: previous?.value },
+        };
+      });
+      try {
+        const privateKey = await resolveRecipientPrivateKey(item);
+        const noteText = await decryptNoteFromEnvelope({
+          metadata: item.encryption,
+          recipientPrivateKey: privateKey,
+        });
+        setNoteStates((prev) => ({
+          ...prev,
+          [item.id]: { status: 'success', value: noteText },
+        }));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setNoteStates((prev) => {
+          const previous = prev[item.id];
+          return {
+            ...prev,
+            [item.id]: { status: 'error', error: message, value: previous?.value },
+          };
+        });
+      }
+    },
+    [resolveRecipientPrivateKey]
   );
 
   if (!isConnected || !address) {
@@ -379,6 +438,11 @@ export default function InboxPage() {
               } catch {}
               const r1Display = r1Burn ? Number.parseFloat(r1Burn).toFixed(6) : null;
               const usdDisplay = usdBurn ? Number.parseFloat(usdBurn).toFixed(2) : null;
+              const noteState = noteStates[item.id];
+              const hasPlainNote = typeof item.note === 'string' && item.note.length > 0;
+              const hasEncryptedNote =
+                !hasPlainNote &&
+                Boolean(item.encryption?.noteCiphertext && item.encryption?.noteIv);
               return (
                 <div key={item.id} className="transferItem">
                   <div style={{ flex: 1 }}>
@@ -400,7 +464,36 @@ export default function InboxPage() {
                         <div>
                           burned: {r1Display ?? '—'} R1 {usdDisplay ? `(≈ ${usdDisplay} USDC)` : ''}
                         </div>
-                        <div>note: {item.note ?? '—'}</div>
+                        <div>
+                          note:{' '}
+                          {hasPlainNote ? (
+                            item.note
+                          ) : hasEncryptedNote ? (
+                            noteState?.status === 'success' ? (
+                              noteState.value && noteState.value.length > 0 ? noteState.value : '—'
+                            ) : (
+                              <>
+                                <span>(encrypted)</span>
+                                <button
+                                  type="button"
+                                  className="button secondary"
+                                  style={{ marginLeft: 8, padding: '2px 8px', fontSize: 11 }}
+                                  onClick={() => onDecryptNote(item)}
+                                  disabled={noteState?.status === 'decrypting'}
+                                >
+                                  {noteState?.status === 'decrypting' ? 'Decrypting…' : 'Decrypt note'}
+                                </button>
+                              </>
+                            )
+                          ) : (
+                            '—'
+                          )}
+                        </div>
+                        {hasEncryptedNote && noteState?.status === 'error' && (
+                          <div style={{ color: '#f87171', fontSize: 11, marginTop: 4 }}>
+                            {noteState.error}
+                          </div>
+                        )}
                         <div>received: {formatDateShort(item.sentAt)}</div>
                       </div>
                     )}

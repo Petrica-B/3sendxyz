@@ -48,6 +48,11 @@ export type QuoteData = {
   r1Amount: bigint;
   r1Decimals: number;
   maxR1WithSlippage: bigint;
+  minR1WithSlippage: bigint;
+  wethAddress?: `0x${string}`;
+  wethAmount?: bigint;
+  wethDecimals?: number;
+  maxWethWithSlippage?: bigint;
 };
 
 export type UserProfile = {

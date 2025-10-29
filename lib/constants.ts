@@ -12,6 +12,8 @@ export const REGISTERED_KEYS_CSTORE_HKEY = '3sendxyz_register_keys';
 export const MANAGER_CONTRACT_ADDRESS =
   '0x3adD1000920ef08D902fCc9de8053fdcaF708c9E' as `0x${string}`;
 export const R1_CONTRACT_ADDRESS = '0x277CbD0Cf25F4789Bc04035eCd03d811FAf73691' as `0x${string}`;
+export const USDC_CONTRACT_ADDRESS =
+  '0xfD9A4a17D76087f7c94950b67c3A5b7638427ECF' as `0x${string}`;
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;

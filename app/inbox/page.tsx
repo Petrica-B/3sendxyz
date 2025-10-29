@@ -195,7 +195,9 @@ export default function InboxPage() {
           });
         if (passkeyRecord.publicKey && derivedPublicKey !== passkeyRecord.publicKey) {
           derivedPrivateKey.fill(0);
-          throw new Error('Passkey verification failed. Public key mismatch.');
+          throw new Error(
+            'This transfer was encrypted with your previous passkey. Files sent before you rotated passkeys require that passkey to decrypt.'
+          );
         }
         const privateKey = new Uint8Array(derivedPrivateKey);
         derivedPrivateKey.fill(0);
@@ -244,7 +246,9 @@ export default function InboxPage() {
           encryption.recipientPublicKey.trim().length > 0 &&
           encryption.recipientPublicKey !== cached.publicKey
         ) {
-          throw new Error('Encrypted payload recipient does not match your registered seed key.');
+          throw new Error(
+            'This transfer was encrypted with your previous recovery phrase. Files sent before you rotated keys require that seed to decrypt.'
+          );
         }
         return { privateKey: cached.privateKey, source: 'seed' };
       }
@@ -453,6 +457,38 @@ export default function InboxPage() {
               const hasEncryptedNote =
                 !hasPlainNote &&
                 Boolean(item.encryption?.noteCiphertext && item.encryption?.noteIv);
+              const encryption = item.encryption;
+              const keySource = encryption?.keySource;
+              const recipientPublicKey =
+                typeof encryption?.recipientPublicKey === 'string' &&
+                encryption.recipientPublicKey.trim().length > 0
+                  ? encryption.recipientPublicKey
+                  : null;
+              let keyRotationWarning: string | null = null;
+              let keyRotationLocked = false;
+              if (
+                !registeredKeyLoading &&
+                encryption &&
+                (keySource === 'passkey' || keySource === 'seed')
+              ) {
+                const record = registeredKeyRecord;
+                const keyMismatch =
+                  !record ||
+                  record.type !== keySource ||
+                  (recipientPublicKey && record.publicKey !== recipientPublicKey);
+                if (keyMismatch) {
+                  keyRotationLocked = true;
+                  keyRotationWarning =
+                    keySource === 'passkey'
+                      ? 'Encrypted with your previous passkey. Files sent before you rotated passkeys cannot be decrypted with this credential.'
+                      : 'Encrypted with your previous recovery phrase. Files sent before you rotated keys cannot be decrypted with the seed stored on this device.';
+                }
+              }
+              const downloadDisabled = downloadingId === item.id || keyRotationLocked;
+              const decryptNoteDisabled = noteState?.status === 'decrypting' || keyRotationLocked;
+              const rotationDisabledStyles = keyRotationLocked
+                ? { opacity: 0.55, cursor: 'not-allowed' as const }
+                : null;
               return (
                 <div key={item.id} className="transferItem">
                   <div style={{ flex: 1 }}>
@@ -462,6 +498,19 @@ export default function InboxPage() {
                     <div className="muted mono" style={{ fontSize: 12 }}>
                       {formatBytes(item.filesize)} · received {formatDate(item.sentAt)}
                     </div>
+                    {keyRotationWarning && (
+                      <div
+                        style={{
+                          color: '#fb923c',
+                          fontSize: 12,
+                          marginTop: 6,
+                          lineHeight: 1.4,
+                          maxWidth: 320,
+                        }}
+                      >
+                        {keyRotationWarning}
+                      </div>
+                    )}
                     {expanded[item.id] && (
                       <div className="details mono" style={{ fontSize: 12 }}>
                         <div>
@@ -487,9 +536,15 @@ export default function InboxPage() {
                                 <button
                                   type="button"
                                   className="button secondary"
-                                  style={{ marginLeft: 8, padding: '2px 8px', fontSize: 11 }}
+                                  style={{
+                                    marginLeft: 8,
+                                    padding: '2px 8px',
+                                    fontSize: 11,
+                                    ...(rotationDisabledStyles ?? {}),
+                                  }}
                                   onClick={() => onDecryptNote(item)}
-                                  disabled={noteState?.status === 'decrypting'}
+                                  disabled={decryptNoteDisabled}
+                                  title={keyRotationLocked ? keyRotationWarning ?? undefined : undefined}
                                 >
                                   {noteState?.status === 'decrypting' ? 'Decrypting…' : 'Decrypt note'}
                                 </button>
@@ -513,7 +568,9 @@ export default function InboxPage() {
                       <button
                         className="button"
                         onClick={() => onDownload(item)}
-                        disabled={downloadingId === item.id}
+                        disabled={downloadDisabled}
+                        style={rotationDisabledStyles ?? undefined}
+                        title={keyRotationLocked ? keyRotationWarning ?? undefined : undefined}
                       >
                         {downloadingId === item.id ? 'Downloading…' : 'Download'}
                       </button>

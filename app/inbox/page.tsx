@@ -1,6 +1,5 @@
 'use client';
 
-import { loadProfile } from '../profile/storage';
 import { AddressLink, TxLink } from '@/components/Links';
 import { getTierById } from '@/lib/constants';
 import { decodeBase64, decryptFileFromEnvelope, decryptNoteFromEnvelope } from '@/lib/encryption';
@@ -12,6 +11,7 @@ import { getVaultPrivateKey } from '@/lib/vaultClient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatUnits } from 'viem';
 import { useAccount, useSignMessage } from 'wagmi';
+import { loadProfile } from '../profile/storage';
 
 type ReceivedItem = StoredUploadRecord & { id: string };
 type NoteState = {
@@ -229,7 +229,8 @@ export default function InboxPage() {
               'Recovery phrase not found on this device. Restore it from your backup in Profile.'
             );
           }
-          const { privateKey: derivedPrivateKey, publicKeyBase64 } = await deriveSeedKeyPair(mnemonic);
+          const { privateKey: derivedPrivateKey, publicKeyBase64 } =
+            await deriveSeedKeyPair(mnemonic);
           if (publicKeyBase64 !== registeredKeyRecord.publicKey) {
             throw new Error(
               'Stored recovery phrase does not match the registered seed key. Re-register your seed.'
@@ -259,7 +260,14 @@ export default function InboxPage() {
       const privateKey = await getVaultPrivateKey(address, signMessageAsync);
       return { privateKey, source: 'vault' };
     },
-    [address, passkeyLoading, passkeyRecord, registeredKeyLoading, registeredKeyRecord, signMessageAsync]
+    [
+      address,
+      passkeyLoading,
+      passkeyRecord,
+      registeredKeyLoading,
+      registeredKeyRecord,
+      signMessageAsync,
+    ]
   );
 
   const onDownload = useCallback(
@@ -359,11 +367,7 @@ export default function InboxPage() {
 
   const onDecryptNote = useCallback(
     async (item: ReceivedItem) => {
-      if (
-        !item.encryption ||
-        !item.encryption.noteCiphertext ||
-        !item.encryption.noteIv
-      ) {
+      if (!item.encryption || !item.encryption.noteCiphertext || !item.encryption.noteIv) {
         setNoteStates((prev) => ({
           ...prev,
           [item.id]: { status: 'error', error: 'No encrypted note found.' },
@@ -521,7 +525,7 @@ export default function InboxPage() {
                         </div>
                         <div>tier: {tier ? tier.label : `Tier ${item.tierId}`}</div>
                         <div>
-                          burned: {r1Display ?? '—'} R1 {usdDisplay ? `(≈ ${usdDisplay} USDC)` : ''}
+                          burned: {r1Display ?? '—'} R1 {usdDisplay ? `(≈ ${usdDisplay} $)` : ''}
                         </div>
                         <div>
                           note:{' '}
@@ -529,7 +533,11 @@ export default function InboxPage() {
                             item.note
                           ) : hasEncryptedNote ? (
                             noteState?.status === 'success' ? (
-                              noteState.value && noteState.value.length > 0 ? noteState.value : '—'
+                              noteState.value && noteState.value.length > 0 ? (
+                                noteState.value
+                              ) : (
+                                '—'
+                              )
                             ) : (
                               <>
                                 <span>(encrypted)</span>
@@ -544,9 +552,15 @@ export default function InboxPage() {
                                   }}
                                   onClick={() => onDecryptNote(item)}
                                   disabled={decryptNoteDisabled}
-                                  title={keyRotationLocked ? keyRotationWarning ?? undefined : undefined}
+                                  title={
+                                    keyRotationLocked
+                                      ? (keyRotationWarning ?? undefined)
+                                      : undefined
+                                  }
                                 >
-                                  {noteState?.status === 'decrypting' ? 'Decrypting…' : 'Decrypt note'}
+                                  {noteState?.status === 'decrypting'
+                                    ? 'Decrypting…'
+                                    : 'Decrypt note'}
                                 </button>
                               </>
                             )
@@ -570,7 +584,7 @@ export default function InboxPage() {
                         onClick={() => onDownload(item)}
                         disabled={downloadDisabled}
                         style={rotationDisabledStyles ?? undefined}
-                        title={keyRotationLocked ? keyRotationWarning ?? undefined : undefined}
+                        title={keyRotationLocked ? (keyRotationWarning ?? undefined) : undefined}
                       >
                         {downloadingId === item.id ? 'Downloading…' : 'Download'}
                       </button>

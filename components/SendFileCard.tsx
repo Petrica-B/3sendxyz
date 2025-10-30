@@ -5,13 +5,14 @@ import {
   MAX_FILE_BYTES,
   R1_CONTRACT_ADDRESS,
   USDC_CONTRACT_ADDRESS,
+  WETH_CONTRACT_ADDRESS,
   resolveTierBySize,
 } from '@/lib/constants';
 import { encryptFileForRecipient } from '@/lib/encryption';
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import { QuoteData } from '@/lib/types';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatUnits, isAddress } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSignMessage, useWriteContract } from 'wagmi';
 
@@ -63,6 +64,26 @@ export function SendFileCard() {
   const [error, setError] = useState<string | null>(null);
   const [paymentAsset, setPaymentAsset] = useState<PaymentAsset>('R1');
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const waitForTransaction = useCallback(
+    async (hash: `0x${string}`, pendingLabel: string) => {
+      if (!publicClient) {
+        throw new Error('Unable to connect to the network client.');
+      }
+      setStatus(pendingLabel);
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+        confirmations: 1,
+      });
+      if (receipt.status !== 'success') {
+        throw new Error('Transaction failed on-chain.');
+      }
+      return receipt;
+    },
+    [publicClient],
+  );
+
   const tierInfo = useMemo(() => {
     if (!file) return null;
     return resolveTierBySize(file.size);
@@ -111,47 +132,35 @@ export function SendFileCard() {
       };
 
       try {
-        const wethResult = await publicClient.readContract({
-          address: MANAGER_CONTRACT_ADDRESS,
-          abi: Manager3sendAbi,
-          functionName: 'weth',
+        const wethDecimalsRaw = await publicClient.readContract({
+          address: WETH_CONTRACT_ADDRESS,
+          abi: Erc20Abi,
+          functionName: 'decimals',
           args: [],
         });
 
-        const wethAddress =
-          typeof wethResult === 'string' ? (wethResult as `0x${string}`) : null;
+        const wethDecimals =
+          typeof wethDecimalsRaw === 'number' ? wethDecimalsRaw : Number(wethDecimalsRaw ?? 18);
 
-        if (wethAddress) {
-          const wethDecimalsRaw = await publicClient.readContract({
-            address: wethAddress,
-            abi: Erc20Abi,
-            functionName: 'decimals',
-            args: [],
+        const path = [WETH_CONTRACT_ADDRESS, USDC_CONTRACT_ADDRESS] as const;
+
+        const [, wethAmount, usdcEquivalent] = (await publicClient.readContract({
+          address: MANAGER_CONTRACT_ADDRESS,
+          abi: Manager3sendAbi,
+          functionName: 'quotePaymentWithToken',
+          args: [tierInfo.id, WETH_CONTRACT_ADDRESS, path],
+        })) as readonly [bigint, bigint, bigint];
+
+        quote.wethAddress = WETH_CONTRACT_ADDRESS;
+        quote.wethAmount = wethAmount;
+        quote.wethDecimals = wethDecimals;
+        quote.maxWethWithSlippage = addTenPercentBuffer(wethAmount);
+
+        if (usdcEquivalent !== usdcAmount && process.env.NODE_ENV !== 'production') {
+          console.warn('USDC quote mismatch between base and ETH path', {
+            expected: usdcAmount,
+            fromEth: usdcEquivalent,
           });
-
-          const wethDecimals =
-            typeof wethDecimalsRaw === 'number' ? wethDecimalsRaw : Number(wethDecimalsRaw ?? 18);
-
-          const path = [wethAddress, USDC_CONTRACT_ADDRESS] as const;
-
-          const [, wethAmount, usdcEquivalent] = (await publicClient.readContract({
-            address: MANAGER_CONTRACT_ADDRESS,
-            abi: Manager3sendAbi,
-            functionName: 'quotePaymentWithToken',
-            args: [tierInfo.id, wethAddress, path],
-          })) as readonly [bigint, bigint, bigint];
-
-          quote.wethAddress = wethAddress;
-          quote.wethAmount = wethAmount;
-          quote.wethDecimals = wethDecimals;
-          quote.maxWethWithSlippage = addTenPercentBuffer(wethAmount);
-
-          if (usdcEquivalent !== usdcAmount && process.env.NODE_ENV !== 'production') {
-            console.warn('USDC quote mismatch between base and ETH path', {
-              expected: usdcAmount,
-              fromEth: usdcEquivalent,
-            });
-          }
         }
       } catch (err) {
         if (process.env.NODE_ENV !== 'production') {
@@ -331,13 +340,15 @@ export function SendFileCard() {
     if (!quoteData) return [];
     const items: Array<{ label: string; value: string; helper?: string }> = [
       {
-        label: 'USDC equivalent',
-        value: usdcDisplay ? `${usdcDisplay} USDC` : '—',
+        label: 'USD equivalent',
+        value: usdcDisplay ? `${usdcDisplay} $` : '—',
       },
       {
         label: 'R1 burned',
         value: r1Display ? `${r1Display} R1` : '—',
-        helper: r1MinDisplay ? `We guard for at least ${r1MinDisplay} R1 after slippage.` : undefined,
+        helper: r1MinDisplay
+          ? `We guard for at least ${r1MinDisplay} R1 after slippage.`
+          : undefined,
       },
     ];
 
@@ -364,7 +375,16 @@ export function SendFileCard() {
     }
 
     return items;
-  }, [paymentAsset, quoteData, usdcDisplay, r1Display, r1MinDisplay, r1MaxDisplay, ethDisplay, ethMaxDisplay]);
+  }, [
+    paymentAsset,
+    quoteData,
+    usdcDisplay,
+    r1Display,
+    r1MinDisplay,
+    r1MaxDisplay,
+    ethDisplay,
+    ethMaxDisplay,
+  ]);
 
   const activeBalanceDisplay = useMemo(() => {
     if (!walletBalances) return null;
@@ -374,13 +394,37 @@ export function SendFileCard() {
       ).toFixed(6)} R1`;
     }
     if (paymentAsset === 'USDC') {
-      return `${Number.parseFloat(
-        formatUnits(walletBalances.usdcBalance, USDC_DECIMALS)
-      ).toFixed(2)} USDC`;
+      return `${Number.parseFloat(formatUnits(walletBalances.usdcBalance, USDC_DECIMALS)).toFixed(
+        2
+      )} USDC`;
     }
     const decimals = quoteData?.wethDecimals ?? 18;
     return `${Number.parseFloat(formatUnits(walletBalances.ethBalance, decimals)).toFixed(6)} ETH`;
   }, [walletBalances, paymentAsset, quoteData]);
+
+  const paymentAmountByAsset = useMemo<Record<PaymentAsset, string | null>>(() => {
+    const map: Record<PaymentAsset, string | null> = {
+      R1: null,
+      USDC: null,
+      ETH: null,
+    };
+    if (!quoteData) return map;
+
+    map.R1 = r1MaxDisplay ? `${r1MaxDisplay} R1 max` : r1Display ? `${r1Display} R1` : null;
+    map.USDC = usdcDisplay ? `${usdcDisplay} USDC` : null;
+
+    if (quoteData.maxWethWithSlippage && quoteData.wethDecimals != null) {
+      map.ETH = ethMaxDisplay
+        ? `${ethMaxDisplay} ETH max`
+        : ethDisplay
+          ? `${ethDisplay} ETH`
+          : null;
+    } else if (ethDisplay) {
+      map.ETH = `${ethDisplay} ETH`;
+    }
+
+    return map;
+  }, [ethDisplay, ethMaxDisplay, quoteData, r1Display, r1MaxDisplay, usdcDisplay]);
 
   const onSend = useCallback(async () => {
     if (!address || !file) return;
@@ -478,7 +522,7 @@ export function SendFileCard() {
             functionName: 'approve',
             args: [MANAGER_CONTRACT_ADDRESS, maxR1Amount],
           });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          await waitForTransaction(approveHash, 'Confirming R1 approval on-chain…');
         }
 
         setStatus('Paying with R1…');
@@ -488,7 +532,7 @@ export function SendFileCard() {
           functionName: 'transferPayment',
           args: [tierInfo.id, maxR1Amount],
         });
-        await publicClient.waitForTransactionReceipt({ hash: transferHash });
+        await waitForTransaction(transferHash, 'Waiting for R1 burn confirmation…');
         paymentTxHash = transferHash;
       } else if (paymentAsset === 'USDC') {
         setStatus('Checking USDC balance…');
@@ -518,7 +562,7 @@ export function SendFileCard() {
             functionName: 'approve',
             args: [MANAGER_CONTRACT_ADDRESS, usdcAmount],
           });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          await waitForTransaction(approveHash, 'Confirming USDC approval on-chain…');
         }
 
         setStatus('Paying with USDC…');
@@ -528,7 +572,7 @@ export function SendFileCard() {
           functionName: 'transferPaymentWithUSDC',
           args: [tierInfo.id, minR1Amount],
         });
-        await publicClient.waitForTransactionReceipt({ hash: transferHash });
+        await waitForTransaction(transferHash, 'Waiting for USDC swap confirmation…');
         paymentTxHash = transferHash;
       } else {
         if (
@@ -553,7 +597,7 @@ export function SendFileCard() {
           args: [tierInfo.id, minR1Amount],
           value: currentQuote.maxWethWithSlippage,
         });
-        await publicClient.waitForTransactionReceipt({ hash: transferHash });
+        await waitForTransaction(transferHash, 'Waiting for ETH swap confirmation…');
         paymentTxHash = transferHash;
       }
 
@@ -593,12 +637,16 @@ export function SendFileCard() {
       }
 
       setFile(null);
+      setRecipient('');
       setNote('');
       setStatus(null);
       await refetchQuote();
       await refetchWalletBalances();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ratio1:upload-completed'));
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     } catch (err) {
       console.error(err);
@@ -622,6 +670,7 @@ export function SendFileCard() {
     signMessageAsync,
     tierInfo,
     paymentAsset,
+    waitForTransaction,
     writeContractAsync,
   ]);
 
@@ -646,6 +695,8 @@ export function SendFileCard() {
           placeholder="0x…"
           value={recipient}
           onChange={(e) => setRecipient(e.target.value.trim())}
+          autoComplete="off"
+          data-1p-ignore
         />
         {!recipient ? null : isAddress(recipient) ? (
           <span className="muted" style={{ fontSize: 12 }}>
@@ -663,6 +714,7 @@ export function SendFileCard() {
         <div className="dropzone">
           <input
             type="file"
+            ref={fileInputRef}
             onChange={(e) => {
               setFile(e.target.files?.[0] || null);
               setError(null);
@@ -709,7 +761,7 @@ export function SendFileCard() {
             {!quoteLoading && !quoteError && quoteData && (
               <div className="col" style={{ gap: 12 }}>
                 <div className="col" style={{ gap: 8 }}>
-                  <span className="muted mono" style={{ fontSize: 12 }}>
+                  <span className="muted mono" style={{ fontSize: 12, color: '#334155' }}>
                     Payment asset
                   </span>
                   <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -718,6 +770,9 @@ export function SendFileCard() {
                       const isDisabled =
                         option.id === 'ETH' &&
                         (!quoteData.wethAmount || !quoteData.maxWethWithSlippage);
+                      const amountCopy =
+                        paymentAmountByAsset[option.id] ??
+                        (quoteLoading ? 'Fetching…' : 'Quote unavailable');
                       return (
                         <button
                           key={option.id}
@@ -736,20 +791,35 @@ export function SendFileCard() {
                             textAlign: 'left' as const,
                             borderRadius: 12,
                             border: isActive
-                              ? '1px solid rgba(148, 163, 184, 0.6)'
-                              : '1px solid rgba(148, 163, 184, 0.2)',
-                            background: isActive ? '#1e293b' : '#0f172a',
-                            color: '#e2e8f0',
+                              ? '1px solid rgba(15, 23, 42, 0.4)'
+                              : '1px solid rgba(148, 163, 184, 0.45)',
+                            background: isActive ? '#f1f5f9' : '#ffffff',
+                            color: '#0f172a',
                             opacity: isDisabled ? 0.5 : 1,
                             cursor: isDisabled ? 'not-allowed' : 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: 4,
-                            transition: 'background 0.2s ease, border 0.2s ease',
+                            gap: 6,
+                            transition: 'background 0.2s ease, border 0.2s ease, color 0.2s ease',
+                            boxShadow: isActive
+                              ? '0 8px 20px rgba(15, 23, 42, 0.08)'
+                              : '0 4px 14px rgba(15, 23, 42, 0.05)',
                           }}
                         >
-                          <span style={{ fontWeight: 600, fontSize: 13 }}>{option.label}</span>
-                          <span className="muted" style={{ fontSize: 11 }}>
+                          <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+                            <span style={{ fontWeight: 600, fontSize: 13 }}>{option.label}</span>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: '#0f172a',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {amountCopy ?? '—'}
+                            </span>
+                          </div>
+                          <span className="muted" style={{ fontSize: 11, color: '#475569' }}>
                             {option.helper}
                           </span>
                         </button>
@@ -764,23 +834,29 @@ export function SendFileCard() {
                     gap: 8,
                     padding: 12,
                     borderRadius: 12,
-                    background: '#0f172a',
-                    border: '1px solid rgba(148, 163, 184, 0.12)',
+                    background: '#ffffff',
+                    border: '1px solid rgba(148, 163, 184, 0.4)',
+                    boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
                   }}
                 >
-                  <span className="muted mono" style={{ fontSize: 11, letterSpacing: 0.6 }}>
+                  <span
+                    className="muted mono"
+                    style={{ fontSize: 14, letterSpacing: 0.6, color: '#334155' }}
+                  >
                     Payment summary
                   </span>
                   {summaryItems.map((item) => (
                     <div key={item.label} className="col" style={{ gap: 2 }}>
                       <div className="row" style={{ justifyContent: 'space-between', gap: 12 }}>
-                        <span className="muted" style={{ fontSize: 12 }}>
+                        <span className="muted" style={{ fontSize: 12, color: '#475569' }}>
                           {item.label}
                         </span>
-                        <span style={{ fontSize: 13, fontWeight: 600 }}>{item.value}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                          {item.value}
+                        </span>
                       </div>
                       {item.helper && (
-                        <span className="muted" style={{ fontSize: 11 }}>
+                        <span className="muted" style={{ fontSize: 11, color: '#64748b' }}>
                           {item.helper}
                         </span>
                       )}
@@ -789,14 +865,21 @@ export function SendFileCard() {
                   {activeBalanceDisplay && (
                     <div
                       className="row"
-                      style={{ justifyContent: 'space-between', gap: 12, fontSize: 12 }}
+                      style={{
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        fontSize: 12,
+                        color: '#334155',
+                      }}
                     >
-                      <span className="muted">Wallet balance</span>
-                      <span>{activeBalanceDisplay}</span>
+                      <span className="muted" style={{ color: '#475569' }}>
+                        Wallet balance
+                      </span>
+                      <span style={{ fontWeight: 600 }}>{activeBalanceDisplay}</span>
                     </div>
                   )}
                   {insufficientMessage && (
-                    <div style={{ color: '#f87171', fontSize: 12 }}>{insufficientMessage}</div>
+                    <div style={{ color: '#dc2626', fontSize: 12 }}>{insufficientMessage}</div>
                   )}
                 </div>
               </div>
@@ -814,6 +897,8 @@ export function SendFileCard() {
           placeholder="Say hi to the recipient (encrypted)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
+          autoComplete="off"
+          data-1p-ignore
         />
       </label>
 

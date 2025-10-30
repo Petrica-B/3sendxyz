@@ -67,9 +67,7 @@ export default function InboxPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       const friendly =
-        message === 'Unknown error'
-          ? 'Unable to load your inbox. Please try again.'
-          : message;
+        message === 'Unknown error' ? 'Unable to load your inbox. Please try again.' : message;
       toast.error(friendly, { toastId: 'inbox-load-error' });
       setError(friendly);
     } finally {
@@ -434,9 +432,7 @@ export default function InboxPage() {
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         const friendly =
-          message === 'Unknown error'
-            ? 'Unable to decrypt this note. Please try again.'
-            : message;
+          message === 'Unknown error' ? 'Unable to decrypt this note. Please try again.' : message;
         setNoteStates((prev) => {
           const previous = prev[item.id];
           return {

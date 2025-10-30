@@ -2,12 +2,12 @@
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { SendFileCard } from '@/components/SendFileCard';
-import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import { getTierById } from '@/lib/constants';
+import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
 import { useCallback, useEffect, useState } from 'react';
-import { useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
+import { useAccount } from 'wagmi';
 
 type SentItem = StoredUploadRecord & { id: string };
 
@@ -145,10 +145,11 @@ export default function OutboxPage() {
                         </div>
                         <div>tier: {tier ? tier.label : `Tier ${item.tierId}`}</div>
                         <div>
-                          burned: {r1Display ?? '—'} R1{' '}
-                          {usdDisplay ? `(≈ ${usdDisplay} USDC)` : ''}
+                          burned: {r1Display ?? '—'} R1 {usdDisplay ? `(≈ ${usdDisplay} $)` : ''}
                         </div>
-                        <div>note: {hasPlainNote ? item.note : hasEncryptedNote ? '(encrypted)' : '—'}</div>
+                        <div>
+                          note: {hasPlainNote ? item.note : hasEncryptedNote ? '(encrypted)' : '—'}
+                        </div>
                         <div>sent at: {formatDateShort(item.sentAt)}</div>
                       </div>
                     )}
@@ -156,7 +157,9 @@ export default function OutboxPage() {
                   <div className="col" style={{ alignItems: 'flex-end', gap: 8 }}>
                     <button
                       className="button secondary"
-                      onClick={() => setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                      onClick={() =>
+                        setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                      }
                     >
                       {expanded[item.id] ? 'Hide Details' : 'Details'}
                     </button>

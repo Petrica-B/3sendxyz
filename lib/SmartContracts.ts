@@ -32,6 +32,22 @@ export const Manager3sendAbi = [
     type: 'error',
   },
   {
+    inputs: [
+      {
+        internalType: 'uint256',
+        name: 'balance',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: 'needed',
+        type: 'uint256',
+      },
+    ],
+    name: 'InsufficientBalance',
+    type: 'error',
+  },
+  {
     inputs: [],
     name: 'InvalidInitialization',
     type: 'error',
@@ -66,6 +82,17 @@ export const Manager3sendAbi = [
   {
     inputs: [],
     name: 'ReentrancyGuardReentrantCall',
+    type: 'error',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'token',
+        type: 'address',
+      },
+    ],
+    name: 'SafeERC20FailedOperation',
     type: 'error',
   },
   {
@@ -253,6 +280,16 @@ export const Manager3sendAbi = [
         type: 'address',
       },
       {
+        internalType: 'address',
+        name: 'uniswapRouterAddress',
+        type: 'address',
+      },
+      {
+        internalType: 'address',
+        name: 'wethAddress',
+        type: 'address',
+      },
+      {
         internalType: 'uint256',
         name: 'microPrice_',
         type: 'uint256',
@@ -327,6 +364,45 @@ export const Manager3sendAbi = [
       {
         internalType: 'uint256',
         name: 'r1Amount',
+        type: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'enum Manager3send.Tier',
+        name: 'tier',
+        type: 'uint8',
+      },
+      {
+        internalType: 'address',
+        name: 'paymentToken',
+        type: 'address',
+      },
+      {
+        internalType: 'address[]',
+        name: 'paymentToUsdcPath',
+        type: 'address[]',
+      },
+    ],
+    name: 'quotePaymentWithToken',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: 'r1Amount',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: 'tokenAmount',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: 'usdcEquivalent',
         type: 'uint256',
       },
     ],
@@ -422,11 +498,93 @@ export const Manager3sendAbi = [
     type: 'function',
   },
   {
+    inputs: [
+      {
+        internalType: 'enum Manager3send.Tier',
+        name: 'tier',
+        type: 'uint8',
+      },
+      {
+        internalType: 'uint256',
+        name: 'minR1Amount',
+        type: 'uint256',
+      },
+    ],
+    name: 'transferPaymentWithETH',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'enum Manager3send.Tier',
+        name: 'tier',
+        type: 'uint8',
+      },
+      {
+        internalType: 'address',
+        name: 'paymentToken',
+        type: 'address',
+      },
+      {
+        internalType: 'uint256',
+        name: 'maxPaymentAmount',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: 'minR1Amount',
+        type: 'uint256',
+      },
+      {
+        internalType: 'address[]',
+        name: 'paymentToUsdcPath',
+        type: 'address[]',
+      },
+    ],
+    name: 'transferPaymentWithToken',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'enum Manager3send.Tier',
+        name: 'tier',
+        type: 'uint8',
+      },
+      {
+        internalType: 'uint256',
+        name: 'minR1Amount',
+        type: 'uint256',
+      },
+    ],
+    name: 'transferPaymentWithUSDC',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
     inputs: [],
     name: 'uniswapPair',
     outputs: [
       {
         internalType: 'contract IUniswapV2Pair',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'uniswapRouter',
+    outputs: [
+      {
+        internalType: 'contract IUniswapV2Router',
         name: '',
         type: 'address',
       },
@@ -465,9 +623,33 @@ export const Manager3sendAbi = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+    inputs: [],
+    name: 'weth',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    stateMutability: 'payable',
+    type: 'receive',
+  },
 ] as const;
 
 export const Erc20Abi = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
   {
     name: 'approve',
     type: 'function',

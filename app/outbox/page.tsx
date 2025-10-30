@@ -6,6 +6,7 @@ import { getTierById } from '@/lib/constants';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 
@@ -43,7 +44,12 @@ export default function OutboxPage() {
       setRecords(nextRecords);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
+      const friendly =
+        message === 'Unknown error'
+          ? 'Unable to load your sent files. Please try again.'
+          : message;
+      toast.error(friendly, { toastId: 'outbox-load-error' });
+      setError(friendly);
     } finally {
       setLoading(false);
     }
@@ -99,7 +105,6 @@ export default function OutboxPage() {
             Loading sent files…
           </div>
         )}
-        {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
         {!loading && !error && records.length === 0 ? (
           <div className="muted" style={{ fontSize: 12 }}>
             No sent files yet.

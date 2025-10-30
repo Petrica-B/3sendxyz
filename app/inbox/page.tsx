@@ -9,6 +9,7 @@ import { derivePasskeyX25519KeyPair } from '@/lib/passkeyClient';
 import type { RegisteredKeyRecord, RegisteredPasskeyRecord, StoredUploadRecord } from '@/lib/types';
 import { getVaultPrivateKey } from '@/lib/vaultClient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'react-toastify';
 import { formatUnits } from 'viem';
 import { useAccount, useSignMessage } from 'wagmi';
 import { loadProfile } from '../profile/storage';
@@ -39,7 +40,6 @@ export default function InboxPage() {
   }, [registeredKeyRecord]);
   const seedKeyCacheRef = useRef<{ privateKey: Uint8Array; publicKey: string } | null>(null);
   const passkeyLoading = registeredKeyLoading;
-  const passkeyError = registeredKeyError;
 
   const fetchInbox = useCallback(async () => {
     if (!address) {
@@ -66,7 +66,12 @@ export default function InboxPage() {
       setRecords(nextRecords);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
+      const friendly =
+        message === 'Unknown error'
+          ? 'Unable to load your inbox. Please try again.'
+          : message;
+      toast.error(friendly, { toastId: 'inbox-load-error' });
+      setError(friendly);
     } finally {
       setLoading(false);
     }
@@ -123,8 +128,13 @@ export default function InboxPage() {
       setRegisteredKeyRecord(payload.record ?? null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      const friendly =
+        message === 'Unknown error'
+          ? 'Unable to check your encryption settings. Please try again.'
+          : message;
       setRegisteredKeyRecord(null);
-      setRegisteredKeyError(message);
+      toast.error(friendly, { toastId: 'inbox-key-error' });
+      setRegisteredKeyError(friendly);
     } finally {
       setRegisteredKeyLoading(false);
     }
@@ -134,7 +144,14 @@ export default function InboxPage() {
     let active = true;
     fetchPasskeyStatus().catch(() => {
       if (active) {
-        setRegisteredKeyError((prev) => prev ?? 'Failed to fetch key status');
+        setRegisteredKeyError((prev) => {
+          if (prev) {
+            return prev;
+          }
+          const friendly = 'Unable to refresh your encryption status.';
+          toast.error(friendly, { toastId: 'inbox-key-error' });
+          return friendly;
+        });
       }
     });
     return () => {
@@ -145,7 +162,14 @@ export default function InboxPage() {
   useEffect(() => {
     const handler = () => {
       fetchPasskeyStatus().catch(() => {
-        setRegisteredKeyError((prev) => prev ?? 'Failed to refresh key status');
+        setRegisteredKeyError((prev) => {
+          if (prev) {
+            return prev;
+          }
+          const friendly = 'Unable to refresh your encryption status.';
+          toast.error(friendly, { toastId: 'inbox-key-error' });
+          return friendly;
+        });
       });
     };
     window.addEventListener('ratio1:registered-key-updated', handler);
@@ -355,9 +379,17 @@ export default function InboxPage() {
           a.click();
           a.remove();
         }
+        const displayNameRaw = fileName ?? 'your file';
+        const displayName =
+          displayNameRaw.length > 60
+            ? `${displayNameRaw.slice(0, 40)}…${displayNameRaw.slice(-15)}`
+            : displayNameRaw;
+        toast.success(`Download started for ${displayName}.`);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        alert(message);
+        const friendly =
+          message === 'Unknown error' ? 'Download failed. Please try again.' : message;
+        toast.error(friendly);
       } finally {
         setDownloadingId((current) => (current === item.id ? null : current));
       }
@@ -372,6 +404,7 @@ export default function InboxPage() {
           ...prev,
           [item.id]: { status: 'error', error: 'No encrypted note found.' },
         }));
+        toast.error('This transfer does not include an encrypted note.');
         return;
       }
       setNoteStates((prev) => {
@@ -392,6 +425,7 @@ export default function InboxPage() {
             ...prev,
             [item.id]: { status: 'success', value: noteText },
           }));
+          toast.success('Note decrypted.');
         } finally {
           if (source === 'passkey') {
             privateKey.fill(0);
@@ -399,13 +433,18 @@ export default function InboxPage() {
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
+        const friendly =
+          message === 'Unknown error'
+            ? 'Unable to decrypt this note. Please try again.'
+            : message;
         setNoteStates((prev) => {
           const previous = prev[item.id];
           return {
             ...prev,
-            [item.id]: { status: 'error', error: message, value: previous?.value },
+            [item.id]: { status: 'error', error: friendly, value: previous?.value },
           };
         });
+        toast.error(friendly);
       }
     },
     [resolveRecipientPrivateKey]
@@ -428,16 +467,12 @@ export default function InboxPage() {
         <div className="headline">Inbox</div>
         <div className="subhead">Files sent to your wallet.</div>
       </div>
-
-      {passkeyError && <div style={{ color: '#f87171', fontSize: 12 }}>{passkeyError}</div>}
-
       <section className="col" style={{ gap: 12 }}>
         {loading && (
           <div className="muted" style={{ fontSize: 12 }}>
             Loading inbox…
           </div>
         )}
-        {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
         {!loading && !error && records.length === 0 ? (
           <div className="muted mb-[360px]" style={{ fontSize: 12 }}>
             No files in your inbox yet.
@@ -568,11 +603,6 @@ export default function InboxPage() {
                             '—'
                           )}
                         </div>
-                        {hasEncryptedNote && noteState?.status === 'error' && (
-                          <div style={{ color: '#f87171', fontSize: 11, marginTop: 4 }}>
-                            {noteState.error}
-                          </div>
-                        )}
                         <div>received: {formatDateShort(item.sentAt)}</div>
                       </div>
                     )}

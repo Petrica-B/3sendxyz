@@ -4,8 +4,10 @@ import { RainbowKitProvider, getDefaultConfig, lightTheme } from '@rainbow-me/ra
 import '@rainbow-me/rainbowkit/styles.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useState } from 'react';
-import { WagmiProvider } from 'wagmi';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import type { Config } from 'wagmi';
+import { WagmiProvider } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
@@ -41,6 +43,17 @@ export function Providers({ children }: { children: ReactNode }) {
         >
           {children}
         </RainbowKitProvider>
+        <ToastContainer
+          position="bottom-right"
+          autoClose={4000}
+          hideProgressBar
+          newestOnTop
+          closeOnClick
+          pauseOnFocusLoss
+          pauseOnHover
+          draggable={false}
+          theme="light"
+        />
       </QueryClientProvider>
     </WagmiProvider>
   );

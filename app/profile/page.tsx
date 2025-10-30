@@ -21,6 +21,7 @@ import type {
   UserProfile,
 } from '@/lib/types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-toastify';
 import { useAccount, useSignMessage } from 'wagmi';
 import { loadProfile, normalizeHandle, saveProfile } from './storage';
 import { useRegisteredKeyFingerprint } from './useRegisteredKeyFingerprint';
@@ -45,7 +46,7 @@ export default function ProfilePage() {
   const [registeredKeyRecord, setRegisteredKeyRecord] = useState<RegisteredKeyRecord | null>(null);
   const [registeredKeyLoading, setRegisteredKeyLoading] = useState(false);
   const [registeredKeyBusy, setRegisteredKeyBusy] = useState(false);
-  const [registeredKeyError, setRegisteredKeyError] = useState<string | null>(null);
+  const [, setRegisteredKeyError] = useState<string | null>(null);
   const [passkeySupported, setPasskeySupported] = useState(false);
 
   const passkeyRecord = useMemo<RegisteredPasskeyRecord | null>(() => {
@@ -109,7 +110,12 @@ export default function ProfilePage() {
         const message = err instanceof Error ? err.message : 'Unknown error';
         if (!cancelled) {
           setRegisteredKeyRecord(null);
-          setRegisteredKeyError(message);
+          const friendly =
+            message === 'Unknown error'
+              ? 'Unable to check your encryption settings. Please try again.'
+              : message;
+          setRegisteredKeyError(friendly);
+          toast.error(friendly, { toastId: 'profile-key-error' });
         }
       } finally {
         if (!cancelled) {
@@ -136,6 +142,7 @@ export default function ProfilePage() {
     const next: UserProfile = { ...profile, handle: normalizeHandle(handleInput) };
     saveProfile(address, next);
     setProfile(next);
+    toast.success('Handle saved.');
   }, [address, handleValid, handleInput, profile]);
 
   // Key label is captured when generating or regenerating the pair
@@ -175,6 +182,7 @@ export default function ProfilePage() {
         }
         setRegisteredKeyRecord(payload.record ?? null);
         setRegisteredKeyError(null);
+        toast.success('Recovery phrase registered.');
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('ratio1:registered-key-updated', { detail: { address } })
@@ -183,6 +191,10 @@ export default function ProfilePage() {
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to register seed key';
         setRegisteredKeyError(message);
+        toast.error(
+          message?.trim().length ? message : 'Failed to register seed key.',
+          { toastId: 'profile-seed-error' }
+        );
         throw err instanceof Error ? err : new Error(message);
       } finally {
         setRegisteredKeyBusy(false);
@@ -197,7 +209,7 @@ export default function ProfilePage() {
     try {
       const label = keyLabelInput.trim().slice(0, 15);
       if (!label) {
-        alert('Please enter a label for this key pair (e.g., Laptop key).');
+        toast.error('Add a short label so you know which device this key belongs to.');
         return;
       }
       const gen = await generateMnemonicKeyPair();
@@ -214,7 +226,9 @@ export default function ProfilePage() {
       setPrivKeyOnce(gen.mnemonic);
       await registerSeedKey({ mnemonic: gen.mnemonic, fingerprint: gen.fingerprintHex, label });
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to generate key pair');
+      const message =
+        err instanceof Error ? err.message : 'Failed to generate key pair';
+      toast.error(message, { toastId: 'profile-seed-error' });
     } finally {
       setBusy(false);
     }
@@ -226,7 +240,7 @@ export default function ProfilePage() {
     try {
       const label = keyLabelInput.trim().slice(0, 15);
       if (!label) {
-        alert('Please enter a label for this key pair (e.g., Mobile key).');
+        toast.error('Add a short label so you know which device this key belongs to.');
         return;
       }
       const gen = await generateMnemonicKeyPair();
@@ -242,7 +256,9 @@ export default function ProfilePage() {
       setPrivKeyOnce(gen.mnemonic);
       await registerSeedKey({ mnemonic: gen.mnemonic, fingerprint: gen.fingerprintHex, label });
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to regenerate key pair');
+      const message =
+        err instanceof Error ? err.message : 'Failed to regenerate key pair';
+      toast.error(message, { toastId: 'profile-seed-error' });
     } finally {
       setBusy(false);
     }
@@ -265,14 +281,14 @@ export default function ProfilePage() {
     async (value: string, successMessage: string, fallbackMessage?: string) => {
       if (!value) return;
       if (typeof navigator === 'undefined' || !navigator.clipboard) {
-        alert(fallbackMessage ?? 'Clipboard not available. Please copy manually.');
+        toast.error(fallbackMessage ?? 'Clipboard not available. Please copy manually.');
         return;
       }
       try {
         await navigator.clipboard.writeText(value);
-        alert(successMessage);
+        toast.success(successMessage);
       } catch {
-        alert(fallbackMessage ?? 'Failed to copy. Please copy manually.');
+        toast.error(fallbackMessage ?? 'Failed to copy. Please copy manually.');
       }
     },
     []
@@ -293,12 +309,12 @@ export default function ProfilePage() {
 
   const revealStoredSeed = useCallback(() => {
     if (registeredKeyRecord?.type !== 'seed') {
-      alert('Recovery phrase is not the active encryption method.');
+      toast.error('Recovery phrase is not the active encryption method.');
       return;
     }
     const stored = profile.seedMnemonic?.trim();
     if (!stored) {
-      alert('No saved recovery phrase found on this device.');
+      toast.error('No saved recovery phrase found on this device.');
       return;
     }
     setPrivKeyOnce(stored);
@@ -346,7 +362,7 @@ export default function ProfilePage() {
       saveProfile(address, nextProfile);
       setProfile(nextProfile);
       hidePrivKeyOnce();
-      alert('Recovery phrase saved locally. You can reveal it from this device when needed.');
+      toast.success('Recovery phrase saved on this device. Reveal it from this profile when needed.');
     },
     [address, hidePrivKeyOnce, profile, registeredKeyRecord, seedKeyRecord]
   );
@@ -355,15 +371,15 @@ export default function ProfilePage() {
     async (onStatusChange?: (step: PasskeyRegistrationStep) => void) => {
       if (!address) return;
       if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-        alert('Passkeys are not supported in this environment.');
+        toast.error('Passkeys are not supported in this environment.');
         return;
       }
       if (!window.PublicKeyCredential) {
-        alert('Passkeys are not supported by this browser.');
+        toast.error('Passkeys are not supported by this browser.');
         return;
       }
       if (!signMessageAsync) {
-        alert('Wallet signer not available. Connect your wallet to continue.');
+        toast.error('Wallet signer not available. Connect your wallet to continue.');
         return;
       }
 
@@ -455,6 +471,7 @@ export default function ProfilePage() {
         });
         setKeyLabelInput('');
         hidePrivKeyOnce();
+        toast.success('Passkey registered.');
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('ratio1:registered-key-updated', { detail: { address } })
@@ -472,7 +489,7 @@ export default function ProfilePage() {
         setRegisteredKeyError(message);
         console.error('[keys] register failed', err);
         if (message && !/cancel/i.test(message) && !/not allowed/i.test(message)) {
-          alert(message);
+          toast.error(message, { toastId: 'profile-passkey-error' });
         }
       } finally {
         setRegisteredKeyBusy(false);
@@ -520,7 +537,6 @@ export default function ProfilePage() {
         activeMethod={registeredKeyRecord?.type ?? null}
         registeredKeyRecord={registeredKeyRecord}
         registeredKeyLoading={registeredKeyLoading}
-        registeredKeyError={registeredKeyError}
         registeredKeyFingerprint={registeredKeyFingerprint}
         passkeySupported={passkeySupported}
         passkeyBusy={passkeyBusy}

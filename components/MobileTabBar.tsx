@@ -75,16 +75,35 @@ function PricingIcon() {
   );
 }
 
+function DocsIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M7 3h8l4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M15 3v5h5" />
+      <path d="M9 13h6" />
+      <path d="M9 17h6" />
+    </svg>
+  );
+}
 
 export function MobileTabBar() {
   const pathname = usePathname();
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 
-  // Order: Home · Pricing · Outbox · Inbox
+  // Order: Home · Pricing · Docs · Outbox · Inbox
   const items = [
     { href: '/', label: 'Home', Icon: HomeIcon },
     { href: '/pricing', label: 'Pricing', Icon: PricingIcon },
-    { href: '/outbox', label: 'Outbox', Icon: OutboxIcon },
+    { href: '/docs', label: 'Docs', Icon: DocsIcon },
+    { href: '/outbox', label: 'Outbox', Icon: OutboxIcon }, //TODO verify if these disappear when not connected
     { href: '/inbox', label: 'Inbox', Icon: InboxIcon },
   ];
 

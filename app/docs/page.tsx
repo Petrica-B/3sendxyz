@@ -1,7 +1,7 @@
 export default function DocsPage() {
   return (
     <main className="col" style={{ gap: 24 }}>
-      <section className="hero">
+      <section id="overview" className="hero">
         <div className="headline">3send Documentation. Learn More About How It Works.</div>
         <div className="subhead">
           Send files wallet-to-wallet on Base via Ratio1 End-to-end encrypted, decentralized file
@@ -15,7 +15,7 @@ export default function DocsPage() {
         </div>
       </section>
 
-      <section className="card col" style={{ gap: 16 }}>
+      <section id="encryption-modes" className="card col" style={{ gap: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send Anything, Stay Sovereign</div>
         <div className="muted" style={{ fontSize: 12 }}>
           3send lets any wallet owner send end-to-end encrypted files. Pick a recipient address, pay
@@ -41,7 +41,7 @@ export default function DocsPage() {
         </ul>
       </section>
 
-      <section className="card col" style={{ gap: 16 }}>
+      <section id="encryption-profiles" className="card col" style={{ gap: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Encryption Modes for Every Profile</div>
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
           Files are always encrypted client-side with AES-GCM keys derived from a Ratio1 session.
@@ -88,7 +88,7 @@ export default function DocsPage() {
         </div>
       </section>
 
-      <section className="card col" style={{ gap: 16 }}>
+      <section id="ratio1-integration" className="card col" style={{ gap: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 18 }}>How 3send Fits Inside Ratio1</div>
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
           Under the hood 3send is a Ratio1 dApp. Each transfer uses two primitives exposed by the
@@ -123,7 +123,7 @@ export default function DocsPage() {
         </div>
       </section>
 
-      <section className="card col" style={{ gap: 16 }}>
+      <section id="payment-flow" className="card col" style={{ gap: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Fueling the Ratio1 Economy</div>
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
           Every transfer routes through the 3send Manager contract. You can pay with ETH, USDC, or
@@ -140,7 +140,7 @@ export default function DocsPage() {
         </div>
       </section>
 
-      <section className="card col" style={{ gap: 16 }}>
+      <section id="encryption-pipeline" className="card col" style={{ gap: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Deep Dive: Encryption Pipeline</div>
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
           Want to know more about the protocol? Here is how each transfer is sealed, transported,

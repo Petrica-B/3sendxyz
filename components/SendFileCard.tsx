@@ -8,8 +8,8 @@ import {
   WETH_CONTRACT_ADDRESS,
   resolveTierBySize,
 } from '@/lib/constants';
-import { buildSendHandshakeMessage } from '@/lib/handshake';
 import { encryptFileForRecipient } from '@/lib/encryption';
+import { buildSendHandshakeMessage } from '@/lib/handshake';
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import { QuoteData } from '@/lib/types';
 import { useQuery } from '@tanstack/react-query';
@@ -67,6 +67,11 @@ export function SendFileCard() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const normalizedRecipient = useMemo(() => {
+    const trimmed = recipient.trim();
+    return isAddress(trimmed) ? trimmed.toLowerCase() : null;
+  }, [recipient]);
+
   const waitForTransaction = useCallback(
     async (hash: `0x${string}`, pendingLabel: string) => {
       if (!publicClient) {
@@ -82,7 +87,7 @@ export function SendFileCard() {
       }
       return receipt;
     },
-    [publicClient],
+    [publicClient]
   );
 
   const tierInfo = useMemo(() => {
@@ -94,6 +99,44 @@ export function SendFileCard() {
     if (!file) return false;
     return file.size > MAX_FILE_BYTES;
   }, [file]);
+
+  const {
+    data: recipientKeyData,
+    isFetching: recipientKeyLoading,
+    error: recipientKeyError,
+    refetch: refetchRecipientKey,
+  } = useQuery<{
+    publicKey: string;
+    type: 'vault' | 'passkey' | 'seed';
+  } | null>({
+    queryKey: ['recipient-key', normalizedRecipient],
+    enabled: Boolean(normalizedRecipient),
+    retry: false,
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!normalizedRecipient) return null;
+      const response = await fetch(
+        `/api/send/getReceiverPublicKey?address=${encodeURIComponent(normalizedRecipient)}`,
+        { method: 'GET' }
+      );
+      const payload = await response.json().catch(() => null);
+      if (
+        !response.ok ||
+        !payload?.success ||
+        typeof payload.publicKey !== 'string' ||
+        typeof payload.type !== 'string'
+      ) {
+        const message =
+          (payload?.error as string | undefined) || 'Failed to resolve receiver public key.';
+        throw new Error(message);
+      }
+      const type = payload.type === 'passkey' || payload.type === 'seed' ? payload.type : 'vault';
+      return {
+        publicKey: payload.publicKey,
+        type,
+      };
+    },
+  });
 
   const {
     data: quoteData,
@@ -463,25 +506,19 @@ export function SendFileCard() {
       const usdcAmount = currentQuote.usdcAmount;
 
       setStatus('Resolving recipient key…');
-      const receiverKeyResponse = await fetch(
-        `/api/send/getReceiverPublicKey?address=${encodeURIComponent(recipient)}`,
-        { method: 'GET' }
-      );
-      const receiverKeyPayload = await receiverKeyResponse.json().catch(() => null);
-      if (
-        !receiverKeyResponse.ok ||
-        !receiverKeyPayload?.success ||
-        typeof receiverKeyPayload.publicKey !== 'string'
-      ) {
-        throw new Error(receiverKeyPayload?.error || 'Failed to resolve receiver public key');
+      if (!normalizedRecipient) {
+        throw new Error('Recipient address is not valid.');
       }
-      const receiverPublicKey = receiverKeyPayload.publicKey;
-      const receiverKeySource =
-        receiverKeyPayload.type === 'passkey'
-          ? 'passkey'
-          : receiverKeyPayload.type === 'seed'
-            ? 'seed'
-            : 'vault';
+      let receiverKeyRecord = recipientKeyData ?? null;
+      if (!receiverKeyRecord) {
+        const refreshed = await refetchRecipientKey({ throwOnError: true });
+        receiverKeyRecord = refreshed.data ?? null;
+      }
+      if (!receiverKeyRecord?.publicKey) {
+        throw new Error('Failed to resolve receiver public key');
+      }
+      const receiverPublicKey = receiverKeyRecord.publicKey;
+      const receiverKeySource = receiverKeyRecord.type;
 
       setStatus('Encrypting file…');
       const hasNote = typeof note === 'string' && note.trim().length > 0;
@@ -682,7 +719,10 @@ export function SendFileCard() {
     publicClient,
     quoteData,
     recipient,
+    recipientKeyData,
+    normalizedRecipient,
     refetchQuote,
+    refetchRecipientKey,
     refetchWalletBalances,
     signMessageAsync,
     tierInfo,
@@ -716,9 +756,39 @@ export function SendFileCard() {
           data-1p-ignore
         />
         {!recipient ? null : isAddress(recipient) ? (
-          <span className="muted" style={{ fontSize: 12 }}>
-            Address looks valid
-          </span>
+          <div className="col" style={{ gap: 4 }}>
+            <span className="muted" style={{ fontSize: 12 }}>
+              Address looks valid
+            </span>
+            {normalizedRecipient ? (
+              recipientKeyLoading ? (
+                <span className="muted" style={{ fontSize: 12 }}>
+                  Checking recipient encryption mode…
+                </span>
+              ) : recipientKeyError ? (
+                <span style={{ color: '#f87171', fontSize: 12 }}>
+                  {recipientKeyError instanceof Error
+                    ? recipientKeyError.message
+                    : 'Unable to verify recipient encryption mode.'}
+                </span>
+              ) : recipientKeyData ? (
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {recipientKeyData.type === 'vault'
+                    ? 'Recipient uses Light encryption (vault managed key).'
+                    : 'Recipient has Pro encryption.'}{' '}
+                  <a
+                    className="accentLink"
+                    href="/docs#encryption-modes"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Learn about 3send encryption modes
+                  </a>
+                  .
+                </span>
+              ) : null
+            ) : null}
+          </div>
         ) : (
           <span style={{ color: '#f87171', fontSize: 12 }}>Invalid address format</span>
         )}

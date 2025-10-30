@@ -3,12 +3,17 @@ import {
   SENT_FILES_CSTORE_HKEY,
   resolveTierBySize,
 } from '@/lib/constants';
+import {
+  buildSendHandshakeMessage,
+  computeEncryptionMetadataDigest,
+  parseSendHandshakeMessage,
+} from '@/lib/handshake';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
 import type { EncryptionMetadata, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 import { Buffer } from 'node:buffer';
-import { createPublicClient, decodeEventLog, http } from 'viem';
+import { createPublicClient, decodeEventLog, http, isAddress, verifyMessage } from 'viem';
 import { base, baseSepolia, type Chain } from 'viem/chains';
 
 export const runtime = 'nodejs';
@@ -36,8 +41,10 @@ export async function POST(request: Request) {
     const recipient = formData.get('recipient');
     const initiator = formData.get('initiator');
     const note = formData.get('note');
+    const handshakeMessageRaw = formData.get('handshakeMessage');
+    const signatureRaw = formData.get('signature');
     const sentAtRaw = formData.get('sentAt');
-    const paymentTx = formData.get('paymentTxHash');
+    const paymentTxHashRaw = formData.get('paymentTxHash');
     const chainIdRaw = formData.get('chainId');
     const tierIdRaw = formData.get('tierId');
     const originalSizeRaw = formData.get('originalSize');
@@ -53,13 +60,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing recipient' }, { status: 400 });
     }
 
+    const recipientAddress = recipient.trim();
+    if (!isAddress(recipientAddress)) {
+      return NextResponse.json({ success: false, error: 'Invalid recipient address' }, { status: 400 });
+    }
+
     if (typeof initiator !== 'string' || initiator.trim().length === 0) {
       return NextResponse.json({ success: false, error: 'Missing initiator' }, { status: 400 });
     }
 
-    if (typeof paymentTx !== 'string' || !paymentTx.startsWith('0x')) {
+    const initiatorAddress = initiator.trim();
+    if (!isAddress(initiatorAddress)) {
+      return NextResponse.json({ success: false, error: 'Invalid initiator address' }, { status: 400 });
+    }
+
+    if (typeof handshakeMessageRaw !== 'string' || handshakeMessageRaw.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Missing handshakeMessage' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof signatureRaw !== 'string' || signatureRaw.trim().length === 0) {
+      return NextResponse.json({ success: false, error: 'Missing signature' }, { status: 400 });
+    }
+
+    if (!signatureRaw.trim().startsWith('0x')) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid signature format' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof paymentTxHashRaw !== 'string' || !paymentTxHashRaw.startsWith('0x')) {
       return NextResponse.json({ success: false, error: 'Missing paymentTxHash' }, { status: 400 });
     }
+
+    const handshakeMessage = handshakeMessageRaw.replace(/\r\n/g, '\n').trim();
+    if (handshakeMessage.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Missing handshakeMessage' },
+        { status: 400 }
+      );
+    }
+    const signature = signatureRaw.trim() as `0x${string}`;
+    const paymentTxHash = paymentTxHashRaw.toLowerCase() as `0x${string}`;
 
     const chainId = typeof chainIdRaw === 'string' ? Number(chainIdRaw) : Number(chainIdRaw ?? NaN);
     if (!Number.isInteger(chainId) || chainId <= 0) {
@@ -157,6 +202,122 @@ export async function POST(request: Request) {
         ? originalMimeTypeRaw
         : undefined;
 
+    const recipientKey = recipientAddress.toLowerCase();
+    const initiatorAddr = initiatorAddress.toLowerCase();
+
+    const preliminarySentAt =
+      typeof sentAtRaw === 'string'
+        ? Number(sentAtRaw)
+        : typeof sentAtRaw === 'number'
+          ? Number(sentAtRaw)
+          : Number.NaN;
+    const sentTimestampCandidate = Number.isFinite(preliminarySentAt)
+      ? Math.floor(preliminarySentAt)
+      : Date.now();
+    let sentTimestamp = sentTimestampCandidate;
+
+    let parsedHandshake;
+    try {
+      parsedHandshake = parseSendHandshakeMessage(handshakeMessage);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : 'invalid format';
+      return NextResponse.json(
+        { success: false, error: `Invalid handshake message: ${detail}` },
+        { status: 400 }
+      );
+    }
+
+    if (parsedHandshake.sender !== initiatorAddr) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake sender mismatch' },
+        { status: 400 }
+      );
+    }
+    if (parsedHandshake.recipient !== recipientKey) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake recipient mismatch' },
+        { status: 400 }
+      );
+    }
+    if (parsedHandshake.chainId !== chainId) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake chain mismatch' },
+        { status: 400 }
+      );
+    }
+    if (parsedHandshake.paymentTxHash !== paymentTxHash) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake payment hash mismatch' },
+        { status: 400 }
+      );
+    }
+    if (parsedHandshake.tierId !== expectedTier.id) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake tier mismatch' },
+        { status: 400 }
+      );
+    }
+    if (parsedHandshake.plaintextBytes !== effectiveFileSize) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake plaintext size mismatch' },
+        { status: 400 }
+      );
+    }
+    if (parsedHandshake.ciphertextBytes !== file.size) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake ciphertext size mismatch' },
+        { status: 400 }
+      );
+    }
+
+    const expectedMetadataDigest = computeEncryptionMetadataDigest(encryptionMetadata);
+    if (parsedHandshake.metadataDigest !== expectedMetadataDigest) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake metadata mismatch' },
+        { status: 400 }
+      );
+    }
+
+    if (parsedHandshake.sentAtMs !== sentTimestampCandidate) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake timestamp mismatch' },
+        { status: 400 }
+      );
+    }
+    sentTimestamp = parsedHandshake.sentAtMs;
+
+    const expectedHandshakeMessage = buildSendHandshakeMessage({
+      initiator: initiatorAddr,
+      recipient: recipientKey,
+      chainId,
+      paymentTxHash,
+      sentAt: sentTimestamp,
+      tierId: expectedTier.id,
+      plaintextBytes: effectiveFileSize,
+      ciphertextBytes: file.size,
+      originalFilename: originalFilename ?? file.name,
+      encryption: encryptionMetadata,
+    });
+
+    if (expectedHandshakeMessage !== handshakeMessage) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake message mismatch' },
+        { status: 400 }
+      );
+    }
+
+    const signatureVerified = await verifyMessage({
+      address: initiatorAddress as `0x${string}`,
+      message: handshakeMessage,
+      signature,
+    });
+    if (!signatureVerified) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake signature mismatch' },
+        { status: 400 }
+      );
+    }
+
     const rpcDetails = getRpcUrl(chainId);
     if (!rpcDetails) {
       return NextResponse.json({ success: false, error: 'Unsupported chain' }, { status: 400 });
@@ -167,7 +328,7 @@ export async function POST(request: Request) {
 
     let receipt;
     try {
-      receipt = await client.getTransactionReceipt({ hash: paymentTx as `0x${string}` });
+      receipt = await client.getTransactionReceipt({ hash: paymentTxHash });
     } catch {
       throw new Error('Payment transaction not found or not yet indexed');
     }
@@ -195,8 +356,6 @@ export async function POST(request: Request) {
       throw new Error('PaymentProcessed event not found in transaction');
     }
 
-    const recipientKey = recipient.toLowerCase();
-    const initiatorAddr = initiator.toLowerCase();
     const logTier = Number(paymentLog.args.tier ?? -1);
     if (logTier !== expectedTier.id) {
       throw new Error('Payment tier does not match file size');
@@ -209,9 +368,6 @@ export async function POST(request: Request) {
 
     const eventUsdcAmount = (paymentLog.args.usdcAmount ?? 0n) as bigint;
     const eventR1Amount = (paymentLog.args.r1Amount ?? 0n) as bigint;
-
-    const sentAt = typeof sentAtRaw === 'string' ? Number(sentAtRaw) : Date.now();
-    const sentTimestamp = Number.isFinite(sentAt) ? sentAt : Date.now();
 
     const ratio1 = createEdgeSdk();
     const fileBase64 = await file.arrayBuffer();
@@ -240,7 +396,7 @@ export async function POST(request: Request) {
       recipient: recipientKey,
       initiator: initiatorAddr,
       note: hasEncryptedNote ? undefined : noteValue,
-      txHash: paymentTx,
+      txHash: paymentTxHash,
       filesize: effectiveFileSize,
       sentAt: sentTimestamp,
       tierId: expectedTier.id,
@@ -255,12 +411,12 @@ export async function POST(request: Request) {
 
     await ratio1.cstore.hset({
       hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${recipientKey}`,
-      key: paymentTx,
+      key: paymentTxHash,
       value: JSON.stringify(record),
     });
     await ratio1.cstore.hset({
       hkey: `${SENT_FILES_CSTORE_HKEY}_${initiatorAddr}`,
-      key: paymentTx,
+      key: paymentTxHash,
       value: JSON.stringify(record),
     });
 

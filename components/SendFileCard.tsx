@@ -8,6 +8,7 @@ import {
   WETH_CONTRACT_ADDRESS,
   resolveTierBySize,
 } from '@/lib/constants';
+import { buildSendHandshakeMessage } from '@/lib/handshake';
 import { encryptFileForRecipient } from '@/lib/encryption';
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import { QuoteData } from '@/lib/types';
@@ -607,7 +608,23 @@ export function SendFileCard() {
 
       const startedAt = Date.now();
       setStatus('Signing upload…');
-      const handshakeMsg = `ratio1/handshake\nfrom:${address}\nto:${recipient}\ntimestamp:${startedAt}`;
+      const plaintextBytes =
+        typeof encryptionMetadata.plaintextLength === 'number' &&
+        Number.isFinite(encryptionMetadata.plaintextLength)
+          ? encryptionMetadata.plaintextLength
+          : originalSize;
+      const handshakeMsg = buildSendHandshakeMessage({
+        initiator: address,
+        recipient,
+        chainId,
+        paymentTxHash,
+        sentAt: startedAt,
+        tierId: tierInfo.id,
+        plaintextBytes,
+        ciphertextBytes: encryptedFile.size,
+        originalFilename,
+        encryption: encryptionMetadata,
+      });
       const signature = await signMessageAsync({ message: handshakeMsg });
 
       setStatus('Uploading encrypted file…');

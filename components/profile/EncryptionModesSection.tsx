@@ -5,6 +5,7 @@ import type {
   UserProfile,
 } from '@/lib/types';
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-toastify';
 
 type SetupMethod = 'passkey' | 'seed';
 export type PasskeyRegistrationStep =
@@ -18,7 +19,6 @@ type EncryptionModesSectionProps = {
   activeMethod: RegisteredKeyRecord['type'] | null;
   registeredKeyRecord: RegisteredKeyRecord | null;
   registeredKeyLoading: boolean;
-  registeredKeyError: string | null;
   registeredKeyFingerprint: string | null;
   passkeySupported: boolean;
   passkeyBusy: boolean;
@@ -57,7 +57,6 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     activeMethod,
     registeredKeyRecord,
     registeredKeyLoading,
-    registeredKeyError,
     registeredKeyFingerprint,
     passkeySupported,
     passkeyBusy,
@@ -144,12 +143,14 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     if (!pendingSetup) return;
     if (pendingSetup === 'passkey' && !passkeySupported) {
       setModalError('Passkeys are not supported in this browser.');
+      toast.error('Passkeys are not supported in this browser.');
       return;
     }
     if (pendingSetup === 'seed') {
       const trimmed = keyLabelInput.trim();
       if (!trimmed) {
         setModalError('Add a short label so you remember which device this phrase belongs to.');
+        toast.error('Add a short label so you remember which device this phrase belongs to.');
         return;
       }
     }
@@ -169,6 +170,9 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
       const message =
         error instanceof Error ? error.message : 'Something went wrong while configuring the key.';
       setModalError(message);
+      toast.error(message ?? 'Something went wrong while configuring the key.', {
+        toastId: 'profile-modal-error',
+      });
     } finally {
       setModalBusy(false);
       setPasskeyStatus(null);
@@ -199,11 +203,13 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
     const trimmed = recoveryPhraseInput.trim();
     if (!trimmed) {
       setRecoverError('Enter your 24-word recovery phrase to continue.');
+      toast.error('Enter your 24-word recovery phrase to continue.');
       return;
     }
     const words = trimmed.split(/\s+/);
     if (words.length !== 24) {
       setRecoverError('Recovery phrase must contain exactly 24 words.');
+      toast.error('Recovery phrase must contain exactly 24 words.');
       return;
     }
     setRecoverError(null);
@@ -217,6 +223,7 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
       const message =
         error instanceof Error ? error.message : 'Failed to import the recovery phrase.';
       setRecoverError(message);
+      toast.error(message ?? 'Failed to import the recovery phrase.');
     } finally {
       setRecoverBusy(false);
     }
@@ -287,9 +294,6 @@ export default function EncryptionModesSection(props: EncryptionModesSectionProp
         </div>
       </div>
 
-      {registeredKeyError && !registeredKeyLoading && (
-        <div style={{ color: '#f87171', fontSize: 12 }}>{registeredKeyError}</div>
-      )}
       {registeredKeyLoading && (
         <div className="muted" style={{ fontSize: 12 }}>
           Checking your encryption settings…

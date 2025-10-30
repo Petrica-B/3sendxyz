@@ -14,6 +14,7 @@ import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import { QuoteData } from '@/lib/types';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'react-toastify';
 import { formatUnits, isAddress } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSignMessage, useWriteContract } from 'wagmi';
 
@@ -62,7 +63,6 @@ export function SendFileCard() {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [paymentAsset, setPaymentAsset] = useState<PaymentAsset>('R1');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -158,15 +158,7 @@ export function SendFileCard() {
         args: [tierInfo.id],
       })) as readonly [number, bigint, bigint];
 
-      const decimalsRaw = await publicClient.readContract({
-        address: R1_CONTRACT_ADDRESS,
-        abi: Erc20Abi,
-        functionName: 'decimals',
-        args: [],
-      });
-
-      const r1Decimals = typeof decimalsRaw === 'number' ? decimalsRaw : Number(decimalsRaw ?? 18);
-
+      const r1Decimals = 18;
       const quote: QuoteData = {
         usdcAmount,
         r1Amount,
@@ -176,16 +168,7 @@ export function SendFileCard() {
       };
 
       try {
-        const wethDecimalsRaw = await publicClient.readContract({
-          address: WETH_CONTRACT_ADDRESS,
-          abi: Erc20Abi,
-          functionName: 'decimals',
-          args: [],
-        });
-
-        const wethDecimals =
-          typeof wethDecimalsRaw === 'number' ? wethDecimalsRaw : Number(wethDecimalsRaw ?? 18);
-
+        const wethDecimals = 18;
         const path = [WETH_CONTRACT_ADDRESS, USDC_CONTRACT_ADDRESS] as const;
 
         const [, wethAmount, usdcEquivalent] = (await publicClient.readContract({
@@ -215,6 +198,15 @@ export function SendFileCard() {
       return quote;
     },
   });
+
+  useEffect(() => {
+    if (quoteError) {
+      const message = (quoteError as Error)?.message?.trim().length
+        ? (quoteError as Error).message
+        : 'Failed to fetch payment quote.';
+      toast.error(message, { toastId: 'payment-quote-error' });
+    }
+  }, [quoteError]);
 
   const {
     data: walletBalances,
@@ -473,13 +465,13 @@ export function SendFileCard() {
   const onSend = useCallback(async () => {
     if (!address || !file) return;
     const selectedFile = file;
+    const targetAddress = recipient;
     const originalFilename = selectedFile.name;
     const originalMimeType =
       selectedFile.type && selectedFile.type.trim().length > 0
         ? selectedFile.type
         : 'application/octet-stream';
     const originalSize = selectedFile.size;
-    setError(null);
     setSending(true);
     setStatus('Preparing payment…');
     try {
@@ -702,11 +694,23 @@ export function SendFileCard() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      const recipientDisplay =
+        targetAddress && targetAddress.length > 10
+          ? `${targetAddress.slice(0, 6)}…${targetAddress.slice(-4)}`
+          : targetAddress || 'recipient';
+      const fileLabel = originalFilename || 'your file';
+      const fileDisplay =
+        fileLabel.length > 60 ? `${fileLabel.slice(0, 40)}…${fileLabel.slice(-15)}` : fileLabel;
+      toast.success(`Sent ${fileDisplay} to ${recipientDisplay}.`);
     } catch (err) {
       console.error(err);
       const message =
         err instanceof Error ? err.message : typeof err === 'string' ? err : 'Failed to send';
-      setError(message);
+      const friendly =
+        typeof message === 'string' && message.trim().length > 0
+          ? message
+          : 'Failed to send file. Please try again.';
+      toast.error(friendly, { toastId: 'send-file-error' });
       setStatus(null);
     } finally {
       setSending(false);
@@ -804,7 +808,6 @@ export function SendFileCard() {
             ref={fileInputRef}
             onChange={(e) => {
               setFile(e.target.files?.[0] || null);
-              setError(null);
             }}
             style={{ width: '100%' }}
           />
@@ -840,11 +843,6 @@ export function SendFileCard() {
                 Fetching payment quote…
               </div>
             )}
-            {quoteError && (
-              <div style={{ color: '#f87171', fontSize: 12 }}>
-                {(quoteError as Error).message || 'Failed to fetch payment quote.'}
-              </div>
-            )}
             {!quoteLoading && !quoteError && quoteData && (
               <div className="col" style={{ gap: 12 }}>
                 <div className="col" style={{ gap: 8 }}>
@@ -869,7 +867,6 @@ export function SendFileCard() {
                           onClick={() => {
                             if (isDisabled) return;
                             setPaymentAsset(option.id);
-                            setError(null);
                           }}
                           style={{
                             flex: '1 0 120px',
@@ -994,8 +991,6 @@ export function SendFileCard() {
           Connect your wallet to continue.
         </div>
       )}
-      {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
-
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button className="button" onClick={onSend} disabled={disabled}>
           {buttonLabel}

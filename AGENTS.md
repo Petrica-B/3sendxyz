@@ -6,7 +6,7 @@ Use this guide for day-to-day development and refresh it when workflows change.
 
 - `app/` contains App Router routes and API handlers (`app/api/*`) grouped by feature (`outbox`, `inbox`).
 - `components/` keeps reusable PascalCase UI (Providers, WalletBar, SendFileCard); keep hook/style files beside their component.
-- `lib/` centralizes mock ratio1 helpers, the upload store, formatting utilities, and shared TypeScript types.
+- `lib/` centralizes ratio1 helpers, the upload store, formatting utilities, encryption and shared TypeScript types.
 - `stubs/` stores shims such as the custom `pino-pretty` loader used during development.
 - Root configs (`tailwind.config.cjs`, `postcss.config.cjs`, `tsconfig.json`) define build and lint behavior; avoid per-feature overrides.
 
@@ -17,7 +17,7 @@ Use this guide for day-to-day development and refresh it when workflows change.
 
 - `npm install` installs dependencies; rerun after dependency updates land.
 - `cp .env.example .env.local` and set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for RainbowKit; keep the file untracked.
-- `npm run dev` starts the hot-reload server on `http://localhost:3000` with mock inbox/outbox seeds.
+- `npm run dev` starts the hot-reload server on `http://localhost:3000`.
 - `npm run lint` runs Next.js ESLint checks; fix warnings before sending changes for review.
 - `npm run build` creates the production bundle and surfaces type/lint regressions pre-merge.
 - `npm run start` serves the compiled bundle for production parity smoke tests.
@@ -38,4 +38,4 @@ Follow Conventional Commit prefixes (`feat:`, `fix:`, `chore:`) as seen in the h
 
 ## Security & Configuration Tips
 
-Never commit `.env*` files or wallet credentials. Treat `lib/ratio1.ts` and `lib/store.ts` as canonical mock protocol sources—coordinate changes there to avoid breaking session derivation. When adding secrets or external services, extend `.env.example` and document fallbacks so the app still boots in mock-only mode.
+Never commit `.env*` files or wallet credentials. Treat `lib/ratio1.ts` and `lib/store.ts` as canonical protocol sources—coordinate changes there to avoid breaking session derivation. When adding secrets or external services, extend `.env.example` and document fallbacks so the app still boots in mock-only mode.

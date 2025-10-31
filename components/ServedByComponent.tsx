@@ -2,9 +2,9 @@ import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-export default function ServedBy() {
-  const h = headers();
-  const hostId = h.get('x-vercel-id') ?? process.env.EE_HOST_ID ?? 'unknown';
+export default async function ServedBy() {
+  const h = await headers();
+  const hostId = h?.get('x-vercel-id') ?? process.env.EE_HOST_ID ?? 'unknown';
   const isUnknown = hostId.toLowerCase() === 'unknown';
 
   return (

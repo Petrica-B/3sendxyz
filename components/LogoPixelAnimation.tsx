@@ -246,7 +246,7 @@ export default function LogoPixelAnimation({
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);
     };
-  }, [src, width, height, pixelSize, fill, className]);
+  }, [src, width, height, pixelSize, fill, className, enableBursts, impactRadius]);
 
   return (
     <canvas

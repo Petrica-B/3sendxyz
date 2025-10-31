@@ -2,12 +2,12 @@ import { Footer } from '@/components/Footer';
 import MobileTabBar from '@/components/MobileTabBar';
 import { Navbar } from '@/components/Navbar';
 import { Providers } from '@/components/Providers';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: '3send.xyz — P2P File Transfer',
-  description: 'P2P file transfer dapp using ratio1 with Base wallet connect.',
+  description: 'P2P file transfer dapp using Ratio1 with Base wallet connect.',
   icons: {
     icon: [
       { url: '/favicon.ico' },
@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     shortcut: ['/favicon.ico'],
   },
   manifest: '/site.webmanifest',
+};
+
+export const viewport: Viewport = {
   themeColor: '#ffffff',
 };
 

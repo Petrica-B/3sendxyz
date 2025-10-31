@@ -1,5 +1,6 @@
 'use client';
 
+import { REQUIRED_CHAIN_ID, SUPPORTED_CHAINS } from '@/lib/constants';
 import { RainbowKitProvider, getDefaultConfig, lightTheme } from '@rainbow-me/rainbowkit';
 import '@rainbow-me/rainbowkit/styles.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,7 +9,6 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import type { Config } from 'wagmi';
 import { WagmiProvider } from 'wagmi';
-import { base, baseSepolia } from 'wagmi/chains';
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
@@ -22,7 +22,7 @@ if (!globalWithWagmi.wagmiConfig) {
   globalWithWagmi.wagmiConfig = getDefaultConfig({
     appName: '3send.xyz',
     projectId: projectId || 'demo',
-    chains: [baseSepolia, base],
+    chains: [...SUPPORTED_CHAINS],
     ssr: true,
   });
 }
@@ -35,6 +35,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
+          initialChain={REQUIRED_CHAIN_ID}
           theme={lightTheme({
             borderRadius: 'small',
             accentColor: '#F7931A',

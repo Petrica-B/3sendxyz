@@ -1,3 +1,6 @@
+import type { Chain } from 'viem/chains';
+import { baseSepolia } from 'viem/chains';
+
 import { TierConfig } from './types';
 
 export const VAULT_ACCESS_MESSAGE_PREFIX = '3send vault private key access for';
@@ -8,6 +11,21 @@ export const RECEIVED_FILES_CSTORE_HKEY = '3sendxyz_received_files';
 export const SENT_FILES_CSTORE_HKEY = '3sendxyz_sent_files';
 export const VAULT_CSTORE_HKEY = '3sendxyz_vault';
 export const REGISTERED_KEYS_CSTORE_HKEY = '3sendxyz_register_keys';
+
+export const SUPPORTED_CHAINS = [baseSepolia] as const satisfies readonly Chain[];
+export const REQUIRED_CHAIN = SUPPORTED_CHAINS[0];
+export const REQUIRED_CHAIN_ID = REQUIRED_CHAIN.id;
+export const REQUIRED_CHAIN_NAME = REQUIRED_CHAIN.name;
+export const SUPPORTED_CHAIN_IDS: ReadonlyArray<number> = SUPPORTED_CHAINS.map(
+  (chain) => chain.id
+);
+
+export const isSupportedChainId = (
+  chainId: number | null | undefined
+): chainId is (typeof SUPPORTED_CHAIN_IDS)[number] => {
+  if (typeof chainId !== 'number') return false;
+  return SUPPORTED_CHAIN_IDS.includes(chainId);
+};
 
 export const MANAGER_CONTRACT_ADDRESS = '0xbFB3524A5F441716C50d5D167B37b1e898abae89' as const;
 export const R1_CONTRACT_ADDRESS = '0x277CbD0Cf25F4789Bc04035eCd03d811FAf73691' as const;

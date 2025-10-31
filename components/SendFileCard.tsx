@@ -4,8 +4,10 @@ import {
   MANAGER_CONTRACT_ADDRESS,
   MAX_FILE_BYTES,
   R1_CONTRACT_ADDRESS,
+  REQUIRED_CHAIN_NAME,
   USDC_CONTRACT_ADDRESS,
   WETH_CONTRACT_ADDRESS,
+  isSupportedChainId,
   resolveTierBySize,
 } from '@/lib/constants';
 import { encryptFileForRecipient } from '@/lib/encryption';
@@ -57,6 +59,8 @@ export function SendFileCard() {
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const { signMessageAsync } = useSignMessage();
+  const isOnSupportedChain = isSupportedChainId(chainId);
+  const wrongNetwork = isConnected && !isOnSupportedChain;
 
   const [recipient, setRecipient] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -145,7 +149,7 @@ export function SendFileCard() {
     error: quoteError,
   } = useQuery<QuoteData>({
     queryKey: ['quote-payment', chainId, MANAGER_CONTRACT_ADDRESS, tierInfo?.id],
-    enabled: Boolean(publicClient && MANAGER_CONTRACT_ADDRESS && tierInfo),
+    enabled: Boolean(publicClient && MANAGER_CONTRACT_ADDRESS && tierInfo && isOnSupportedChain),
     refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!publicClient || !MANAGER_CONTRACT_ADDRESS || !tierInfo) {
@@ -200,13 +204,14 @@ export function SendFileCard() {
   });
 
   useEffect(() => {
+    if (!isOnSupportedChain) return;
     if (quoteError) {
       const message = (quoteError as Error)?.message?.trim().length
         ? (quoteError as Error).message
         : 'Failed to fetch payment quote.';
       toast.error(message, { toastId: 'payment-quote-error' });
     }
-  }, [quoteError]);
+  }, [isOnSupportedChain, quoteError]);
 
   const {
     data: walletBalances,
@@ -214,7 +219,7 @@ export function SendFileCard() {
     refetch: refetchWalletBalances,
   } = useQuery({
     queryKey: ['wallet-balances', chainId, MANAGER_CONTRACT_ADDRESS, address],
-    enabled: Boolean(publicClient && address && MANAGER_CONTRACT_ADDRESS),
+    enabled: Boolean(publicClient && address && MANAGER_CONTRACT_ADDRESS && isOnSupportedChain),
     refetchOnWindowFocus: false,
     staleTime: 15_000,
     queryFn: async () => {
@@ -246,7 +251,11 @@ export function SendFileCard() {
     },
   });
 
+  const quoteDataForDisplay = isOnSupportedChain ? quoteData : null;
+  const walletBalancesForDisplay = isOnSupportedChain ? walletBalances : null;
+
   useEffect(() => {
+    if (!isOnSupportedChain) return;
     if (
       paymentAsset === 'ETH' &&
       quoteData &&
@@ -254,43 +263,62 @@ export function SendFileCard() {
     ) {
       setPaymentAsset('R1');
     }
-  }, [paymentAsset, quoteData]);
+  }, [isOnSupportedChain, paymentAsset, quoteData]);
 
   const usdcDisplay = useMemo(() => {
-    if (!quoteData) return null;
-    const formatted = formatUnits(quoteData.usdcAmount, USDC_DECIMALS);
+    if (!quoteDataForDisplay) return null;
+    const formatted = formatUnits(quoteDataForDisplay.usdcAmount, USDC_DECIMALS);
     return Number.parseFloat(formatted).toFixed(2);
-  }, [quoteData]);
+  }, [quoteDataForDisplay]);
 
   const r1Display = useMemo(() => {
-    if (!quoteData) return null;
-    const formatted = formatUnits(quoteData.r1Amount, quoteData.r1Decimals);
+    if (!quoteDataForDisplay) return null;
+    const formatted = formatUnits(
+      quoteDataForDisplay.r1Amount,
+      quoteDataForDisplay.r1Decimals
+    );
     return Number.parseFloat(formatted).toFixed(6);
-  }, [quoteData]);
+  }, [quoteDataForDisplay]);
 
   const r1MaxDisplay = useMemo(() => {
-    if (!quoteData) return null;
-    const formatted = formatUnits(quoteData.maxR1WithSlippage, quoteData.r1Decimals);
+    if (!quoteDataForDisplay) return null;
+    const formatted = formatUnits(
+      quoteDataForDisplay.maxR1WithSlippage,
+      quoteDataForDisplay.r1Decimals
+    );
     return Number.parseFloat(formatted).toFixed(6);
-  }, [quoteData]);
+  }, [quoteDataForDisplay]);
 
   const r1MinDisplay = useMemo(() => {
-    if (!quoteData) return null;
-    const formatted = formatUnits(quoteData.minR1WithSlippage, quoteData.r1Decimals);
+    if (!quoteDataForDisplay) return null;
+    const formatted = formatUnits(
+      quoteDataForDisplay.minR1WithSlippage,
+      quoteDataForDisplay.r1Decimals
+    );
     return Number.parseFloat(formatted).toFixed(6);
-  }, [quoteData]);
+  }, [quoteDataForDisplay]);
 
   const ethDisplay = useMemo(() => {
-    if (!quoteData?.wethAmount || quoteData.wethDecimals == null) return null;
-    const formatted = formatUnits(quoteData.wethAmount, quoteData.wethDecimals);
+    if (!quoteDataForDisplay?.wethAmount || quoteDataForDisplay.wethDecimals == null) return null;
+    const formatted = formatUnits(
+      quoteDataForDisplay.wethAmount,
+      quoteDataForDisplay.wethDecimals
+    );
     return Number.parseFloat(formatted).toFixed(6);
-  }, [quoteData]);
+  }, [quoteDataForDisplay]);
 
   const ethMaxDisplay = useMemo(() => {
-    if (!quoteData?.maxWethWithSlippage || quoteData.wethDecimals == null) return null;
-    const formatted = formatUnits(quoteData.maxWethWithSlippage, quoteData.wethDecimals);
+    if (
+      !quoteDataForDisplay?.maxWethWithSlippage ||
+      quoteDataForDisplay.wethDecimals == null
+    )
+      return null;
+    const formatted = formatUnits(
+      quoteDataForDisplay.maxWethWithSlippage,
+      quoteDataForDisplay.wethDecimals
+    );
     return Number.parseFloat(formatted).toFixed(6);
-  }, [quoteData]);
+  }, [quoteDataForDisplay]);
 
   const disabled = useMemo(() => {
     if (!isConnected) return true;
@@ -299,7 +327,7 @@ export function SendFileCard() {
     if (sending) return true;
     if (!tierInfo) return true;
     if (sizeExceedsLimit) return true;
-    if (!chainId) return true;
+    if (!isOnSupportedChain) return true;
     if (!MANAGER_CONTRACT_ADDRESS) return true;
     if (quoteLoading) return true;
     if (!quoteData) return true;
@@ -325,7 +353,7 @@ export function SendFileCard() {
     sending,
     tierInfo,
     sizeExceedsLimit,
-    chainId,
+    isOnSupportedChain,
     quoteLoading,
     quoteData,
     balancesLoading,
@@ -334,46 +362,57 @@ export function SendFileCard() {
   ]);
 
   const insufficientMessage = useMemo(() => {
-    if (!quoteData || !walletBalances) return null;
+    if (!quoteDataForDisplay || !walletBalancesForDisplay) return null;
 
-    if (paymentAsset === 'R1' && walletBalances.r1Balance < quoteData.maxR1WithSlippage) {
+    if (
+      paymentAsset === 'R1' &&
+      walletBalancesForDisplay.r1Balance < quoteDataForDisplay.maxR1WithSlippage
+    ) {
       const needed = Number.parseFloat(
-        formatUnits(quoteData.maxR1WithSlippage, quoteData.r1Decimals)
+        formatUnits(quoteDataForDisplay.maxR1WithSlippage, quoteDataForDisplay.r1Decimals)
       ).toFixed(6);
       const available = Number.parseFloat(
-        formatUnits(walletBalances.r1Balance, quoteData.r1Decimals)
+        formatUnits(walletBalancesForDisplay.r1Balance, quoteDataForDisplay.r1Decimals)
       ).toFixed(6);
       return `You need ${needed} R1 (incl. buffer) but only have ${available} R1.`;
     }
 
-    if (paymentAsset === 'USDC' && walletBalances.usdcBalance < quoteData.usdcAmount) {
-      const needed = Number.parseFloat(formatUnits(quoteData.usdcAmount, USDC_DECIMALS)).toFixed(2);
+    if (
+      paymentAsset === 'USDC' &&
+      walletBalancesForDisplay.usdcBalance < quoteDataForDisplay.usdcAmount
+    ) {
+      const needed = Number.parseFloat(
+        formatUnits(quoteDataForDisplay.usdcAmount, USDC_DECIMALS)
+      ).toFixed(2);
       const available = Number.parseFloat(
-        formatUnits(walletBalances.usdcBalance, USDC_DECIMALS)
+        formatUnits(walletBalancesForDisplay.usdcBalance, USDC_DECIMALS)
       ).toFixed(2);
       return `You need ${needed} USDC but only have ${available} USDC.`;
     }
 
     if (
       paymentAsset === 'ETH' &&
-      quoteData.maxWethWithSlippage &&
-      walletBalances.ethBalance < quoteData.maxWethWithSlippage &&
-      quoteData.wethDecimals != null
+      quoteDataForDisplay.maxWethWithSlippage &&
+      walletBalancesForDisplay.ethBalance < quoteDataForDisplay.maxWethWithSlippage &&
+      quoteDataForDisplay.wethDecimals != null
     ) {
       const needed = Number.parseFloat(
-        formatUnits(quoteData.maxWethWithSlippage, quoteData.wethDecimals)
+        formatUnits(
+          quoteDataForDisplay.maxWethWithSlippage,
+          quoteDataForDisplay.wethDecimals
+        )
       ).toFixed(6);
       const available = Number.parseFloat(
-        formatUnits(walletBalances.ethBalance, quoteData.wethDecimals)
+        formatUnits(walletBalancesForDisplay.ethBalance, quoteDataForDisplay.wethDecimals)
       ).toFixed(6);
       return `You need about ${needed} ETH (incl. buffer) but only have ${available} ETH.`;
     }
 
     return null;
-  }, [paymentAsset, quoteData, walletBalances]);
+  }, [paymentAsset, quoteDataForDisplay, walletBalancesForDisplay]);
 
   const summaryItems = useMemo(() => {
-    if (!quoteData) return [];
+    if (!quoteDataForDisplay) return [];
     const items: Array<{ label: string; value: string; helper?: string }> = [
       {
         label: 'USD equivalent',
@@ -413,7 +452,7 @@ export function SendFileCard() {
     return items;
   }, [
     paymentAsset,
-    quoteData,
+    quoteDataForDisplay,
     usdcDisplay,
     r1Display,
     r1MinDisplay,
@@ -423,20 +462,22 @@ export function SendFileCard() {
   ]);
 
   const activeBalanceDisplay = useMemo(() => {
-    if (!walletBalances) return null;
+    if (!walletBalancesForDisplay) return null;
     if (paymentAsset === 'R1') {
       return `${Number.parseFloat(
-        formatUnits(walletBalances.r1Balance, quoteData?.r1Decimals ?? 18)
+        formatUnits(walletBalancesForDisplay.r1Balance, quoteDataForDisplay?.r1Decimals ?? 18)
       ).toFixed(6)} R1`;
     }
     if (paymentAsset === 'USDC') {
-      return `${Number.parseFloat(formatUnits(walletBalances.usdcBalance, USDC_DECIMALS)).toFixed(
-        2
-      )} USDC`;
+      return `${Number.parseFloat(
+        formatUnits(walletBalancesForDisplay.usdcBalance, USDC_DECIMALS)
+      ).toFixed(2)} USDC`;
     }
-    const decimals = quoteData?.wethDecimals ?? 18;
-    return `${Number.parseFloat(formatUnits(walletBalances.ethBalance, decimals)).toFixed(6)} ETH`;
-  }, [walletBalances, paymentAsset, quoteData]);
+    const decimals = quoteDataForDisplay?.wethDecimals ?? 18;
+    return `${Number.parseFloat(
+      formatUnits(walletBalancesForDisplay.ethBalance, decimals)
+    ).toFixed(6)} ETH`;
+  }, [walletBalancesForDisplay, paymentAsset, quoteDataForDisplay]);
 
   const paymentAmountByAsset = useMemo<Record<PaymentAsset, string | null>>(() => {
     const map: Record<PaymentAsset, string | null> = {
@@ -444,12 +485,12 @@ export function SendFileCard() {
       USDC: null,
       ETH: null,
     };
-    if (!quoteData) return map;
+    if (!quoteDataForDisplay) return map;
 
     map.R1 = r1MaxDisplay ? `${r1MaxDisplay} R1 max` : r1Display ? `${r1Display} R1` : null;
     map.USDC = usdcDisplay ? `${usdcDisplay} USDC` : null;
 
-    if (quoteData.maxWethWithSlippage && quoteData.wethDecimals != null) {
+    if (quoteDataForDisplay.maxWethWithSlippage && quoteDataForDisplay.wethDecimals != null) {
       map.ETH = ethMaxDisplay
         ? `${ethMaxDisplay} ETH max`
         : ethDisplay
@@ -460,7 +501,7 @@ export function SendFileCard() {
     }
 
     return map;
-  }, [ethDisplay, ethMaxDisplay, quoteData, r1Display, r1MaxDisplay, usdcDisplay]);
+  }, [ethDisplay, ethMaxDisplay, quoteDataForDisplay, r1Display, r1MaxDisplay, usdcDisplay]);
 
   const onSend = useCallback(async () => {
     if (!address || !file) return;
@@ -486,6 +527,9 @@ export function SendFileCard() {
       }
       if (!chainId) {
         throw new Error('Wallet chain not detected.');
+      }
+      if (!isOnSupportedChain) {
+        throw new Error(`Please switch to ${REQUIRED_CHAIN_NAME} before sending.`);
       }
 
       const currentQuote = quoteData ?? (await refetchQuote().then((res) => res.data ?? null));
@@ -729,13 +773,18 @@ export function SendFileCard() {
     refetchRecipientKey,
     refetchWalletBalances,
     signMessageAsync,
+    isOnSupportedChain,
     tierInfo,
     paymentAsset,
     waitForTransaction,
     writeContractAsync,
   ]);
 
-  const buttonLabel = sending ? (status ?? 'Processing…') : `Send with ${paymentAsset}`;
+  const buttonLabel = wrongNetwork
+    ? `Switch to ${REQUIRED_CHAIN_NAME}`
+    : sending
+      ? (status ?? 'Processing…')
+      : `Send with ${paymentAsset}`;
 
   return (
     <div className="card col" style={{ gap: 16 }}>
@@ -989,6 +1038,11 @@ export function SendFileCard() {
       {!isConnected && (
         <div className="muted" style={{ fontSize: 12 }}>
           Connect your wallet to continue.
+        </div>
+      )}
+      {wrongNetwork && (
+        <div style={{ fontSize: 12, color: '#dc2626' }}>
+          Switch your wallet network to {REQUIRED_CHAIN_NAME} to send files.
         </div>
       )}
       <div className="row" style={{ justifyContent: 'flex-end' }}>

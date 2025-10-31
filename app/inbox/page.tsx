@@ -469,11 +469,7 @@ export default function InboxPage() {
             Loading inbox…
           </div>
         )}
-        {!loading && !error && records.length === 0 ? (
-          <div className="muted mb-[360px]" style={{ fontSize: 12 }}>
-            No files in your inbox yet.
-          </div>
-        ) : (
+        {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
             {records.map((item) => {
               const tier = getTierById(item.tierId);
@@ -630,6 +626,14 @@ export default function InboxPage() {
           </div>
         )}
       </section>
+      {!loading && !error && records.length === 0 && (
+        <section className="card col" style={{ gap: 8 }}>
+          <div style={{ fontWeight: 700 }}>Your inbox is empty</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Files sent to you will appear here.
+          </div>
+        </section>
+      )}
     </main>
   );
 }

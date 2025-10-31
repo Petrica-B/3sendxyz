@@ -105,11 +105,6 @@ export default function OutboxPage() {
             Loading sent files…
           </div>
         )}
-        {!loading && !error && records.length === 0 ? (
-          <div className="muted" style={{ fontSize: 12 }}>
-            No sent files yet.
-          </div>
-        ) : null}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
             {records.map((item) => {
@@ -175,6 +170,14 @@ export default function OutboxPage() {
           </div>
         )}
       </section>
+      {!loading && !error && records.length === 0 && (
+        <section className="card col" style={{ gap: 8 }}>
+          <div style={{ fontWeight: 700 }}>Your outbox is empty</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Send a file to see it listed here.
+          </div>
+        </section>
+      )}
     </main>
   );
 }

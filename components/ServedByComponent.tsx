@@ -8,7 +8,7 @@ export default function ServedBy() {
   const isUnknown = hostId.toLowerCase() === 'unknown';
 
   return (
-    <div className="servedBy">
+    <div className="servedBy" style={{ border: '1px solid var(--border)' }}>
       <a
         href="https://ratio1.ai"
         target="_blank"

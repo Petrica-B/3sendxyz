@@ -49,12 +49,27 @@ a {
 
 /* Footer repo links as labeled pills */
 .labelLink {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  height: 28px;
+  padding: 6px 10px;
   transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
 }
 .labelLink:hover {
   color: var(--accent);
   border-color: var(--accent);
   background: #fff;
+}
+
+.labelLink svg {
+  width: 14px;
+  height: 14px;
+}
+
+.footerSep {
+  color: var(--muted);
+  margin: 0 4px;
 }
 
 .accentLink {
@@ -144,6 +159,18 @@ a {
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
+}
+
+/* Accent focus for inputs */
+.input:focus,
+.input:focus-visible,
+textarea.input:focus,
+textarea.input:focus-visible,
+select.input:focus,
+select.input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.15);
 }
 
 .button {
@@ -317,6 +344,9 @@ a {
   gap: 4px;
   flex-wrap: wrap;
   font-size: 12px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fff;
 }
 .servedBy .label {
   color: var(--muted);
@@ -416,6 +446,7 @@ a {
   }
   .servedBy {
     justify-content: center;
+    margin-bottom: 12px;
   }
 }
 @media (min-width: 768px) {
@@ -452,5 +483,22 @@ a {
   .homeCtaActions > button {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* Payment options responsive layout */
+.paymentOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.paymentOption {
+  flex: 1 0 180px;
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .paymentOption {
+    flex: 1 0 100%;
+    width: 100%;
   }
 }

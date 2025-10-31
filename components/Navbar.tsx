@@ -53,7 +53,6 @@ export function Navbar() {
         <nav className="navlinks">
           <NavItem href="/" label="Home" />
           <NavItem href="/pricing" label="Pricing" />
-          <NavItem href="/docs" label="Docs" />
           {isConnected && <NavItem href="/outbox" label="Outbox" />}
           {isConnected && <NavItem href="/inbox" label="Inbox" />}
         </nav>
@@ -86,10 +85,10 @@ export function Navbar() {
           )}
           <Link
             href="/docs"
-            aria-label="How it works"
+            aria-label="Docs"
             className="button square accent"
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-            title="How it works"
+            title="Docs"
           >
             <svg
               viewBox="0 0 24 24"

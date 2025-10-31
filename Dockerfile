@@ -17,7 +17,7 @@ RUN npm run build
 
 FROM base AS prod-deps
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 FROM base AS runner
 ENV PORT=3000

@@ -32,14 +32,22 @@ export function Navbar() {
         <div className="navbarBrand">
           <Link
             href="/"
-            className="brand"
+            className="brand group"
             style={{
               textDecoration: 'none',
               display: 'flex',
               alignItems: 'center',
             }}
+            aria-label="3send home"
           >
-            3send
+            {/* Default logo */}
+            <img src="/3send.svg" alt="3send logo" className="h-5 block group-hover:hidden" />
+            {/* Hover logo */}
+            <img
+              src="/3sendClear.svg"
+              alt="3send logo hover"
+              className="h-5 hidden group-hover:block"
+            />
           </Link>
         </div>
         <nav className="navlinks">
@@ -55,7 +63,7 @@ export function Navbar() {
             <Link
               href="/profile"
               aria-label="Open profile"
-              className="button"
+              className="button square"
               style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
               title="Profile"
             >
@@ -67,8 +75,8 @@ export function Navbar() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
-                width="16"
-                height="16"
+                width="18"
+                height="18"
                 style={{ display: 'block' }}
               >
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -76,6 +84,29 @@ export function Navbar() {
               </svg>
             </Link>
           )}
+          <Link
+            href="/docs"
+            aria-label="How it works"
+            className="button square accent"
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            title="How it works"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              width="18"
+              height="18"
+              style={{ display: 'block' }}
+            >
+              <path d="M9 9a3 3 0 1 1 6 0c0 2-3 2-3 4" />
+              <path d="M12 17h.01" />
+            </svg>
+          </Link>
         </div>
       </div>
     </div>

@@ -3,7 +3,6 @@
 import EncryptionModesSection, {
   type PasskeyRegistrationStep,
 } from '@/components/profile/EncryptionModesSection';
-import HandleSection from '@/components/profile/HandleSection';
 import { encodeBase64 } from '@/lib/encryption';
 import { shortAddress } from '@/lib/format';
 import { buildRegisteredKeyMessage } from '@/lib/keyAccess';
@@ -23,7 +22,7 @@ import type {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { useAccount, useSignMessage } from 'wagmi';
-import { loadProfile, normalizeHandle, saveProfile } from './storage';
+import { loadProfile, saveProfile } from './storage';
 import { useRegisteredKeyFingerprint } from './useRegisteredKeyFingerprint';
 
 type AttestationResponseWithPublicKey = AuthenticatorAttestationResponse & {
@@ -39,7 +38,6 @@ export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const [profile, setProfile] = useState<UserProfile>({});
-  const [handleInput, setHandleInput] = useState('');
   const [keyLabelInput, setKeyLabelInput] = useState('');
   const [privKeyOnce, setPrivKeyOnce] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,7 +80,7 @@ export default function ProfilePage() {
     if (!address) return;
     const p = loadProfile(address);
     setProfile(p);
-    setHandleInput(p.handle ?? '');
+    // no handle UI for now
     setKeyLabelInput('');
   }, [address]);
 
@@ -129,21 +127,7 @@ export default function ProfilePage() {
     };
   }, [address]);
 
-  const handleValid = useMemo(() => {
-    const normalized = normalizeHandle(handleInput);
-    if (!normalized) return false;
-    // basic validation: letters, digits, dashes and dots; start with letter/digit
-    const left = normalized.replace(/\.3send$/, '');
-    return /^[a-z0-9](?:[a-z0-9-_.]{1,30})?$/.test(left);
-  }, [handleInput]);
-
-  const onSaveHandle = useCallback(() => {
-    if (!address || !handleValid) return;
-    const next: UserProfile = { ...profile, handle: normalizeHandle(handleInput) };
-    saveProfile(address, next);
-    setProfile(next);
-    toast.success('Handle saved.');
-  }, [address, handleValid, handleInput, profile]);
+  // handle management temporarily removed
 
   // Key label is captured when generating or regenerating the pair
 
@@ -503,7 +487,7 @@ export default function ProfilePage() {
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">My Profile</div>
-          <div className="subhead">Connect your wallet to manage your handle and keys.</div>
+          <div className="subhead">Connect your wallet to manage your keys.</div>
         </div>
       </main>
     );
@@ -524,13 +508,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <HandleSection
-        handleInput={handleInput}
-        onHandleChange={setHandleInput}
-        onSaveHandle={onSaveHandle}
-        handleValid={handleValid}
-        currentHandle={profile.handle}
-      />
+      {/* Handle settings removed for now */}
 
       <EncryptionModesSection
         activeMode={registeredKeyRecord ? 'pro' : 'light'}

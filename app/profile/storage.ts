@@ -16,9 +16,3 @@ export function saveProfile(addr: string, data: UserProfile) {
     // no-op: best effort persistence in localStorage
   }
 }
-
-export function normalizeHandle(input: string): string {
-  const trimmed = input.trim().toLowerCase();
-  if (!trimmed) return '';
-  return trimmed.endsWith('.3send') ? trimmed : `${trimmed}.3send`;
-}

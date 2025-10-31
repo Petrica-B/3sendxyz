@@ -151,17 +151,16 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
   const userBytesReceived = userStats.receivedBytes;
   const userR1 = useMemo(() => formatR1Amount(userStats.totalR1Burned), [userStats.totalR1Burned]);
   const userShareUrl = useMemo(() => {
-    const parts = [
-      `My 3send stats`,
-      `Sent ${userSentCount} file${userSentCount === 1 ? '' : 's'} (${formatBytes(userBytesSent)})`,
-      `Received ${userInboxCount} file${userInboxCount === 1 ? '' : 's'} (${formatBytes(userBytesReceived)})`,
-      `Burned ${userR1.display} R1`,
-      `Decentralized, end-to-end encrypted on Base`,
-      `https://3send.xyz`,
+    const lines = [
+      `I am sharing files the trustless way ⚡️`,
+      `${userSentCount} file${userSentCount === 1 ? '' : 's'} (${formatBytes(userBytesSent)}) delivered via @ratio1ai.`,
+      `Burned ${userR1.display} $R1 on @base 🔥 for true privacy & decentralization.`,
+      ``,
+      `Join 3send.xyz - reclaim your digital freedom.`,
     ];
-    const text = parts.join('\n');
+    const text = lines.join('\n');
     return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-  }, [userSentCount, userInboxCount, userBytesSent, userBytesReceived, userR1.display]);
+  }, [userSentCount, userBytesSent, userR1.display]);
 
   return (
     <div className="col" style={{ gap: 12 }}>
@@ -186,15 +185,17 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: 700 }}>Your Stats</div>
-            <a
-              className="button"
-              href={userShareUrl}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Share your stats on X"
-            >
-              Share on 𝕏
-            </a>
+            {userStats.sentFiles > 0 && (
+              <a
+                className="button"
+                href={userShareUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Share your stats on X"
+              >
+                Share on 𝕏
+              </a>
+            )}
           </div>
           {userLoading && (
             <div className="muted" style={{ fontSize: 12 }}>

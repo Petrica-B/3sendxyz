@@ -9,6 +9,7 @@ export const VAULT_PRIVATE_KEY_MIN_SECRET_LENGTH = 32;
 
 export const RECEIVED_FILES_CSTORE_HKEY = '3sendxyz_received_files';
 export const SENT_FILES_CSTORE_HKEY = '3sendxyz_sent_files';
+export const USED_PAYMENT_TXS_CSTORE_HKEY = '3sendxyz_payment_txhashes';
 export const VAULT_CSTORE_HKEY = '3sendxyz_vault';
 export const REGISTERED_KEYS_CSTORE_HKEY = '3sendxyz_register_keys';
 export const STATS_CSTORE_HKEY = '3sendxyz_stats';

@@ -1,6 +1,7 @@
 import {
   RECEIVED_FILES_CSTORE_HKEY,
   SENT_FILES_CSTORE_HKEY,
+  USED_PAYMENT_TXS_CSTORE_HKEY,
   resolveTierBySize,
 } from '@/lib/constants';
 import {
@@ -64,7 +65,10 @@ export async function POST(request: Request) {
 
     const recipientAddress = recipient.trim();
     if (!isAddress(recipientAddress)) {
-      return NextResponse.json({ success: false, error: 'Invalid recipient address' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Invalid recipient address' },
+        { status: 400 }
+      );
     }
 
     if (typeof initiator !== 'string' || initiator.trim().length === 0) {
@@ -73,7 +77,10 @@ export async function POST(request: Request) {
 
     const initiatorAddress = initiator.trim();
     if (!isAddress(initiatorAddress)) {
-      return NextResponse.json({ success: false, error: 'Invalid initiator address' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Invalid initiator address' },
+        { status: 400 }
+      );
     }
 
     if (typeof handshakeMessageRaw !== 'string' || handshakeMessageRaw.trim().length === 0) {
@@ -340,6 +347,11 @@ export async function POST(request: Request) {
       throw new Error('Payment transaction not confirmed');
     }
 
+    const receiptInitiator = receipt.from?.toLowerCase();
+    if (!receiptInitiator || receiptInitiator !== initiatorAddr) {
+      throw new Error('Payment transaction initiator does not match sender');
+    }
+
     const paymentLog = receipt.logs
       .map((log) => {
         try {
@@ -372,6 +384,21 @@ export async function POST(request: Request) {
     const eventR1Amount = (paymentLog.args.r1Amount ?? 0n) as bigint;
 
     const ratio1 = createEdgeSdk();
+    try {
+      const existingPaymentUsage = await ratio1.cstore.hget({
+        hkey: USED_PAYMENT_TXS_CSTORE_HKEY,
+        key: paymentTxHash,
+      });
+      if (existingPaymentUsage) {
+        return NextResponse.json(
+          { success: false, error: 'Payment transaction hash already used for upload' },
+          { status: 400 }
+        );
+      }
+    } catch (err) {
+      console.error('[upload] Failed to check payment hash reuse', err);
+      throw new Error('Failed to verify payment transaction hash status');
+    }
     const fileBase64 = await file.arrayBuffer();
     const file_base64_str = Buffer.from(fileBase64).toString('base64');
     const uploadResult = await ratio1.r1fs.addFileBase64({
@@ -411,15 +438,21 @@ export async function POST(request: Request) {
       encryption: encryptionMetadata,
     };
 
+    const recordJson = JSON.stringify(record);
     await ratio1.cstore.hset({
       hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${recipientKey}`,
       key: paymentTxHash,
-      value: JSON.stringify(record),
+      value: recordJson,
     });
     await ratio1.cstore.hset({
       hkey: `${SENT_FILES_CSTORE_HKEY}_${initiatorAddr}`,
       key: paymentTxHash,
-      value: JSON.stringify(record),
+      value: recordJson,
+    });
+    await ratio1.cstore.hset({
+      hkey: USED_PAYMENT_TXS_CSTORE_HKEY,
+      key: paymentTxHash,
+      value: true,
     });
 
     try {

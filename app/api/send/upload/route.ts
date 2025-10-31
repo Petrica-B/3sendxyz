@@ -1,4 +1,5 @@
 import {
+  FILE_CLEANUP_INDEX_CSTORE_HKEY,
   RECEIVED_FILES_CSTORE_HKEY,
   SENT_FILES_CSTORE_HKEY,
   USED_PAYMENT_TXS_CSTORE_HKEY,
@@ -11,7 +12,7 @@ import {
 } from '@/lib/handshake';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
 import { PLATFORM_STATS_CACHE_TAG, updateStatsAfterUpload } from '@/lib/stats';
-import type { EncryptionMetadata, StoredUploadRecord } from '@/lib/types';
+import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
@@ -466,6 +467,20 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error('[upload] Failed to update stats store', err);
     }
+
+    const cleanupIndexEntry: FileCleanupIndexEntry = {
+      txHash: paymentTxHash,
+      cid,
+      recipient: recipientKey,
+      initiator: initiatorAddr,
+      sentAt: sentTimestamp,
+      state: 'active',
+    };
+    await ratio1.cstore.hset({
+      hkey: FILE_CLEANUP_INDEX_CSTORE_HKEY,
+      key: paymentTxHash,
+      value: JSON.stringify(cleanupIndexEntry),
+    });
 
     return NextResponse.json({
       success: true,

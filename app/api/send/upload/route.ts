@@ -1,4 +1,5 @@
 import {
+  FILE_CLEANUP_INDEX_CSTORE_HKEY,
   RECEIVED_FILES_CSTORE_HKEY,
   SENT_FILES_CSTORE_HKEY,
   resolveTierBySize,
@@ -9,7 +10,7 @@ import {
   parseSendHandshakeMessage,
 } from '@/lib/handshake';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
-import type { EncryptionMetadata, StoredUploadRecord } from '@/lib/types';
+import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 import { Buffer } from 'node:buffer';
@@ -418,6 +419,19 @@ export async function POST(request: Request) {
       hkey: `${SENT_FILES_CSTORE_HKEY}_${initiatorAddr}`,
       key: paymentTxHash,
       value: JSON.stringify(record),
+    });
+    const cleanupIndexEntry: FileCleanupIndexEntry = {
+      txHash: paymentTxHash,
+      cid,
+      recipient: recipientKey,
+      initiator: initiatorAddr,
+      sentAt: sentTimestamp,
+      state: 'active',
+    };
+    await ratio1.cstore.hset({
+      hkey: FILE_CLEANUP_INDEX_CSTORE_HKEY,
+      key: paymentTxHash,
+      value: JSON.stringify(cleanupIndexEntry),
     });
 
     return NextResponse.json({

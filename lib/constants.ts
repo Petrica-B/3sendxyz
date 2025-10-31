@@ -8,6 +8,7 @@ export const RECEIVED_FILES_CSTORE_HKEY = '3sendxyz_received_files';
 export const SENT_FILES_CSTORE_HKEY = '3sendxyz_sent_files';
 export const VAULT_CSTORE_HKEY = '3sendxyz_vault';
 export const REGISTERED_KEYS_CSTORE_HKEY = '3sendxyz_register_keys';
+export const FILE_CLEANUP_INDEX_CSTORE_HKEY = '3sendxyz_file_cleanup_index';
 
 export const MANAGER_CONTRACT_ADDRESS = '0xbFB3524A5F441716C50d5D167B37b1e898abae89' as const;
 export const R1_CONTRACT_ADDRESS = '0x277CbD0Cf25F4789Bc04035eCd03d811FAf73691' as const;

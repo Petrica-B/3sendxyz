@@ -34,6 +34,16 @@ export type StoredUploadRecord = {
   encryption?: EncryptionMetadata;
 };
 
+export type FileCleanupIndexEntry = {
+  txHash: string;
+  cid: string;
+  recipient: string;
+  initiator: string;
+  sentAt: number;
+  state: 'active' | 'deleted';
+  markedDeletedAt?: number;
+};
+
 export type TierConfig = {
   id: number;
   label: string;

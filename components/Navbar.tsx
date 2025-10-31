@@ -1,6 +1,7 @@
 'use client';
 
 import { MinimalConnect } from '@/components/MinimalConnect';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAccount } from 'wagmi';
@@ -41,9 +42,24 @@ export function Navbar() {
             aria-label="3send home"
           >
             {/* Default logo (clear) */}
-            <img src="/3sendClear.svg" alt="3send logo" className="h-5 block group-hover:hidden" />
+            <Image
+              src="/3sendClear.svg"
+              alt="3send logo"
+              width={150}
+              height={40}
+              priority
+              sizes="150px"
+              className="h-5 w-auto block group-hover:hidden"
+            />
             {/* Hover logo (solid) */}
-            <img src="/3send.svg" alt="3send logo hover" className="h-5 hidden group-hover:block" />
+            <Image
+              src="/3send.svg"
+              alt="3send logo hover"
+              width={150}
+              height={40}
+              sizes="150px"
+              className="h-5 w-auto hidden group-hover:block"
+            />
           </Link>
         </div>
         <nav className="navlinks">

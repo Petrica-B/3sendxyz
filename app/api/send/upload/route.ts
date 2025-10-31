@@ -341,7 +341,6 @@ export async function POST(request: Request) {
     } catch {
       throw new Error('Payment transaction not found or not yet indexed');
     }
-    console.log('Transaction receipt:', receipt);
 
     if (!receipt || receipt.status !== 'success') {
       throw new Error('Payment transaction not confirmed');
@@ -463,7 +462,7 @@ export async function POST(request: Request) {
         filesize: effectiveFileSize,
         r1Burn: eventR1Amount,
       });
-      revalidateTag(PLATFORM_STATS_CACHE_TAG);
+      revalidateTag(PLATFORM_STATS_CACHE_TAG, 'default');
     } catch (err) {
       console.error('[upload] Failed to update stats store', err);
     }

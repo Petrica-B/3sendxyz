@@ -1,137 +1,138 @@
 'use client';
 
 import { formatBytes } from '@/lib/format';
+import type { AddressStatsRecord, PlatformStatsRecord } from '@/lib/types';
 import { useEffect, useMemo, useState } from 'react';
+import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 
-type Stats = {
-  totalSentFiles: number;
-  uniqueSenders: number;
-  uniqueReceivers: number;
-  totalBytesSent: number;
+const BYTES_IN_GB = 1024 * 1024 * 1024;
+
+function createEmptyPlatformStats(): PlatformStatsRecord {
+  return {
+    totalSentFiles: 0,
+    uniqueUsers: 0,
+    totalBytesSent: 0,
+    totalR1Burned: '0',
+    updatedAt: 0,
+  };
+}
+
+function createEmptyAddressStats(address = ''): AddressStatsRecord {
+  return {
+    address,
+    sentFiles: 0,
+    sentBytes: 0,
+    receivedFiles: 0,
+    receivedBytes: 0,
+    totalR1Burned: '0',
+    updatedAt: 0,
+  };
+}
+
+function formatR1Amount(value: string): { display: string; precise: string } {
+  try {
+    const precise = formatUnits(BigInt(value ?? '0'), 18);
+    const asNumber = Number(precise);
+    const display = Number.isFinite(asNumber)
+      ? asNumber.toLocaleString(undefined, { maximumFractionDigits: 4 })
+      : precise;
+    return { display, precise };
+  } catch {
+    return { display: '0', precise: '0' };
+  }
+}
+
+function formatGb(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0.00';
+  }
+  const gb = bytes / BYTES_IN_GB;
+  if (!Number.isFinite(gb) || gb <= 0) {
+    return '0.00';
+  }
+  const precision = gb >= 10 ? 1 : 2;
+  return gb.toFixed(precision);
+}
+
+type DashboardProps = {
+  initialPlatformStats?: PlatformStatsRecord | null;
 };
 
-export default function Dashboard() {
-  // Aggregated local (platform sample) stats
-  const [stats, setStats] = useState<Stats>({
-    totalSentFiles: 0,
-    uniqueSenders: 0,
-    uniqueReceivers: 0,
-    totalBytesSent: 0,
-  });
-  // Connected user stats
-  const { address, isConnected } = useAccount();
-  const [userSentCount, setUserSentCount] = useState<number>(0);
-  const [userInboxCount, setUserInboxCount] = useState<number>(0);
-  const [userBytesSent, setUserBytesSent] = useState<number>(0);
-  const [userBytesReceived, setUserBytesReceived] = useState<number>(0);
+export default function Dashboard({ initialPlatformStats }: DashboardProps) {
+  const [platformStats, setPlatformStats] = useState<PlatformStatsRecord>(() =>
+    initialPlatformStats ? { ...initialPlatformStats } : createEmptyPlatformStats()
+  );
+  const [userStats, setUserStats] = useState<AddressStatsRecord>(() => createEmptyAddressStats());
   const [userLoading, setUserLoading] = useState<boolean>(false);
 
-  useEffect(() => {
-    try {
-      const senders = new Set<string>();
-      const receivers = new Set<string>();
-      let sentCount = 0;
-      let sentBytes = 0;
+  const { address, isConnected } = useAccount();
 
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key) continue;
-
-        if (key.startsWith('outbox:')) {
-          try {
-            const raw = localStorage.getItem(key);
-            if (!raw) continue;
-            const arr = JSON.parse(raw) as any[];
-            if (!Array.isArray(arr)) continue;
-            for (const item of arr) {
-              // Count only successfully sent items
-              if (item && item.status === 'sent') {
-                sentCount += 1;
-                if (typeof item.size === 'number' && !isNaN(item.size)) {
-                  sentBytes += item.size;
-                }
-                if (typeof item.to === 'string' && item.to) {
-                  receivers.add(item.to.toLowerCase());
-                }
-              }
-            }
-          } catch {}
-        } else if (key.startsWith('inbox:')) {
-          try {
-            const raw = localStorage.getItem(key);
-            if (!raw) continue;
-            const arr = JSON.parse(raw) as any[];
-            if (!Array.isArray(arr)) continue;
-            for (const item of arr) {
-              if (item && typeof item.from === 'string' && item.from) {
-                senders.add(item.from.toLowerCase());
-              }
-            }
-          } catch {}
-        }
-      }
-
-      setStats({
-        totalSentFiles: sentCount,
-        uniqueSenders: senders.size,
-        uniqueReceivers: receivers.size,
-        totalBytesSent: sentBytes,
-      });
-    } catch {
-      // ignore errors, keep defaults
-    }
-  }, []);
-
-  // Fetch connected user's stats from API (mock storage)
   useEffect(() => {
     let aborted = false;
-    async function run() {
-      if (!isConnected || !address) {
-        setUserSentCount(0);
-        setUserInboxCount(0);
-        setUserBytesSent(0);
-        setUserBytesReceived(0);
-        setUserLoading(false);
+    async function refreshTotals() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json().catch(() => null);
+        if (!aborted && res.ok && data?.success && data.totals) {
+          setPlatformStats(data.totals as PlatformStatsRecord);
+        }
+      } catch {
+        // ignore, rely on previous totals
+      }
+    }
+    refreshTotals();
+    const onCompleted = () => refreshTotals();
+    window.addEventListener('ratio1:upload-completed', onCompleted);
+    return () => {
+      aborted = true;
+      window.removeEventListener('ratio1:upload-completed', onCompleted);
+    };
+  }, []);
+
+  useEffect(() => {
+    let aborted = false;
+    async function refreshUserStats() {
+      const normalized = address?.toLowerCase() ?? '';
+      if (!isConnected || !normalized) {
+        if (!aborted) {
+          setUserStats(createEmptyAddressStats());
+          setUserLoading(false);
+        }
         return;
       }
       setUserLoading(true);
       try {
-        const s = new URLSearchParams({ initiator: address });
-        const r = new URLSearchParams({ recipient: address });
-        const [rs, rr] = await Promise.all([
-          fetch(`/api/sent?${s.toString()}`),
-          fetch(`/api/inbox?${r.toString()}`),
-        ]);
-        const [ps, pr] = await Promise.all([
-          rs.json().catch(() => null),
-          rr.json().catch(() => null),
-        ]);
+        const params = new URLSearchParams({ address: normalized });
+        const res = await fetch(`/api/stats?${params.toString()}`);
+        const payload = await res.json().catch(() => null);
         if (!aborted) {
-          const sentRecords = rs.ok && ps?.success && Array.isArray(ps.records) ? ps.records : [];
-          const inboxRecords = rr.ok && pr?.success && Array.isArray(pr.records) ? pr.records : [];
-          setUserSentCount(sentRecords.length);
-          setUserInboxCount(inboxRecords.length);
-          setUserBytesSent(
-            sentRecords.reduce((acc: number, it: any) => (acc += Number(it?.filesize || 0)), 0)
-          );
-          setUserBytesReceived(
-            inboxRecords.reduce((acc: number, it: any) => (acc += Number(it?.filesize || 0)), 0)
-          );
+          if (res.ok && payload?.success) {
+            const nextStats =
+              payload.address && typeof payload.address === 'object'
+                ? {
+                    ...payload.address,
+                    address: (payload.address.address ?? normalized).toLowerCase(),
+                  }
+                : createEmptyAddressStats(normalized);
+            setUserStats(nextStats as AddressStatsRecord);
+            if (payload.totals) {
+              setPlatformStats(payload.totals as PlatformStatsRecord);
+            }
+          } else {
+            setUserStats(createEmptyAddressStats(normalized));
+          }
         }
       } catch {
         if (!aborted) {
-          setUserSentCount(0);
-          setUserInboxCount(0);
-          setUserBytesSent(0);
-          setUserBytesReceived(0);
+          setUserStats(createEmptyAddressStats(normalized));
         }
       } finally {
         if (!aborted) setUserLoading(false);
       }
     }
-    run();
-    const onCompleted = () => run();
+    refreshUserStats();
+    const onCompleted = () => refreshUserStats();
     window.addEventListener('ratio1:upload-completed', onCompleted);
     return () => {
       aborted = true;
@@ -139,18 +140,28 @@ export default function Dashboard() {
     };
   }, [isConnected, address]);
 
-  const gb = stats.totalBytesSent / (1024 * 1024 * 1024);
+  const totalGbSent = formatGb(platformStats.totalBytesSent);
+  const platformR1 = useMemo(
+    () => formatR1Amount(platformStats.totalR1Burned),
+    [platformStats.totalR1Burned]
+  );
+  const userSentCount = userStats.sentFiles;
+  const userInboxCount = userStats.receivedFiles;
+  const userBytesSent = userStats.sentBytes;
+  const userBytesReceived = userStats.receivedBytes;
+  const userR1 = useMemo(() => formatR1Amount(userStats.totalR1Burned), [userStats.totalR1Burned]);
   const userShareUrl = useMemo(() => {
     const parts = [
       `My 3send stats`,
       `Sent ${userSentCount} file${userSentCount === 1 ? '' : 's'} (${formatBytes(userBytesSent)})`,
       `Received ${userInboxCount} file${userInboxCount === 1 ? '' : 's'} (${formatBytes(userBytesReceived)})`,
-      `Decentralized, end‑to‑end encrypted on Base`,
+      `Burned ${userR1.display} R1`,
+      `Decentralized, end-to-end encrypted on Base`,
       `https://3send.xyz`,
     ];
-    const text = parts.join(' — ');
+    const text = parts.join('\n');
     return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-  }, [userSentCount, userInboxCount, userBytesSent, userBytesReceived]);
+  }, [userSentCount, userInboxCount, userBytesSent, userBytesReceived, userR1.display]);
 
   return (
     <div className="col" style={{ gap: 12 }}>
@@ -164,14 +175,10 @@ export default function Dashboard() {
             marginTop: 6,
           }}
         >
-          <StatCard label="Total files sent" value={String(stats.totalSentFiles)} />
-          <StatCard label="Unique senders" value={String(stats.uniqueSenders)} />
-          <StatCard label="Unique receivers" value={String(stats.uniqueReceivers)} />
-          <StatCard
-            label="GB sent"
-            value={`${gb.toFixed(2)} GB`}
-            hint={formatBytes(stats.totalBytesSent)}
-          />
+          <StatCard label="Total files sent" value={String(platformStats.totalSentFiles)} />
+          <StatCard label="Unique users" value={String(platformStats.uniqueUsers)} />
+          <StatCard label="Size sent" value={formatBytes(platformStats.totalBytesSent)} />
+          <StatCard label="Total R1 burned" value={`${platformR1.display} R1`} />
         </div>
       </div>
 
@@ -186,7 +193,7 @@ export default function Dashboard() {
               rel="noreferrer"
               aria-label="Share your stats on X"
             >
-              Share on X
+              Share on 𝕏
             </a>
           </div>
           {userLoading && (
@@ -204,8 +211,11 @@ export default function Dashboard() {
           >
             <StatCard label="Files sent" value={String(userSentCount)} />
             <StatCard label="Files received" value={String(userInboxCount)} />
-            <StatCard label="Bytes sent" value={formatBytes(userBytesSent)} />
-            <StatCard label="Bytes received" value={formatBytes(userBytesReceived)} />
+            <StatCard
+              label="Size sent / received"
+              value={`${formatBytes(userBytesSent)} / ${formatBytes(userBytesReceived)}`}
+            />
+            <StatCard label="R1 burned" value={`${userR1.display} R1`} />
           </div>
         </div>
       )}

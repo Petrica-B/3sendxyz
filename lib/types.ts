@@ -34,6 +34,24 @@ export type StoredUploadRecord = {
   encryption?: EncryptionMetadata;
 };
 
+export type AddressStatsRecord = {
+  address: string;
+  sentFiles: number;
+  sentBytes: number;
+  receivedFiles: number;
+  receivedBytes: number;
+  totalR1Burned: string;
+  updatedAt: number;
+};
+
+export type PlatformStatsRecord = {
+  totalSentFiles: number;
+  totalBytesSent: number;
+  uniqueUsers: number;
+  totalR1Burned: string;
+  updatedAt: number;
+};
+
 export type TierConfig = {
   id: number;
   label: string;

@@ -11,6 +11,7 @@ export const RECEIVED_FILES_CSTORE_HKEY = '3sendxyz_received_files';
 export const SENT_FILES_CSTORE_HKEY = '3sendxyz_sent_files';
 export const VAULT_CSTORE_HKEY = '3sendxyz_vault';
 export const REGISTERED_KEYS_CSTORE_HKEY = '3sendxyz_register_keys';
+export const STATS_CSTORE_HKEY = '3sendxyz_stats';
 
 export const SUPPORTED_CHAINS = [baseSepolia] as const satisfies readonly Chain[];
 export const REQUIRED_CHAIN = SUPPORTED_CHAINS[0];

@@ -9,8 +9,10 @@ import {
   parseSendHandshakeMessage,
 } from '@/lib/handshake';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
+import { PLATFORM_STATS_CACHE_TAG, updateStatsAfterUpload } from '@/lib/stats';
 import type { EncryptionMetadata, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
+import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { Buffer } from 'node:buffer';
 import { createPublicClient, decodeEventLog, http, isAddress, verifyMessage } from 'viem';
@@ -419,6 +421,19 @@ export async function POST(request: Request) {
       key: paymentTxHash,
       value: JSON.stringify(record),
     });
+
+    try {
+      await updateStatsAfterUpload({
+        ratio1,
+        sender: initiatorAddr,
+        recipient: recipientKey,
+        filesize: effectiveFileSize,
+        r1Burn: eventR1Amount,
+      });
+      revalidateTag(PLATFORM_STATS_CACHE_TAG);
+    } catch (err) {
+      console.error('[upload] Failed to update stats store', err);
+    }
 
     return NextResponse.json({
       success: true,

@@ -851,20 +851,59 @@ export function SendFileCard() {
         <span className="muted mono" style={{ fontSize: 12 }}>
           Select file
         </span>
-        <div className="dropzone">
+        <div
+          className="dropzone"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}
+        >
+          {/* Hidden native input; triggered by the styled button */}
           <input
+            id="sendfile-input"
             type="file"
             ref={fileInputRef}
             onChange={(e) => {
               setFile(e.target.files?.[0] || null);
             }}
-            style={{ width: '100%' }}
+            style={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: 'hidden',
+              clip: 'rect(0, 0, 0, 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
           />
-          <div className="muted mono" style={{ fontSize: 12, marginTop: 8 }}>
-            Max file size 5 GB.
+          <div className="row" style={{ gap: 10, alignItems: 'center' }}>
+            <button
+              type="button"
+              className="button accent"
+              onClick={() => fileInputRef.current?.click()}
+              aria-controls="sendfile-input"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="M7 10l5-5 5 5" />
+                <path d="M12 5v12" />
+              </svg>
+              {file ? 'Change file' : 'Choose file'}
+            </button>
+            <span className="muted mono" style={{ fontSize: 12 }}>Max file size 5 GB.</span>
           </div>
           {file && (
-            <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 8, alignSelf: 'center', textAlign: 'center' }}>
               <div>
                 <strong>{file.name}</strong>
               </div>
@@ -898,7 +937,7 @@ export function SendFileCard() {
                   <span className="muted mono" style={{ fontSize: 12, color: '#334155' }}>
                     Payment asset
                   </span>
-                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                  <div className="paymentOptions">
                     {PAYMENT_OPTIONS.map((option) => {
                       const isActive = paymentAsset === option.id;
                       const isDisabled =
@@ -911,22 +950,20 @@ export function SendFileCard() {
                         <button
                           key={option.id}
                           type="button"
-                          className="button"
+                          className="button paymentOption"
                           disabled={isDisabled}
                           onClick={() => {
                             if (isDisabled) return;
                             setPaymentAsset(option.id);
                           }}
                           style={{
-                            flex: '1 0 120px',
-                            minWidth: 0,
                             padding: '12px 16px',
                             textAlign: 'left' as const,
                             borderRadius: 12,
                             border: isActive
-                              ? '1px solid rgba(15, 23, 42, 0.4)'
+                              ? '1px solid var(--accent)'
                               : '1px solid rgba(148, 163, 184, 0.45)',
-                            background: isActive ? '#f1f5f9' : '#ffffff',
+                            background: isActive ? '#fefce8' : '#ffffff',
                             color: '#0f172a',
                             opacity: isDisabled ? 0.5 : 1,
                             cursor: isDisabled ? 'not-allowed' : 'pointer',
@@ -935,7 +972,7 @@ export function SendFileCard() {
                             gap: 6,
                             transition: 'background 0.2s ease, border 0.2s ease, color 0.2s ease',
                             boxShadow: isActive
-                              ? '0 8px 20px rgba(15, 23, 42, 0.08)'
+                              ? '0 6px 18px rgba(247, 147, 26, 0.15)'
                               : '0 4px 14px rgba(15, 23, 42, 0.05)',
                           }}
                         >

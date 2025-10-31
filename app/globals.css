@@ -42,6 +42,21 @@ a {
   text-decoration: none;
 }
 
+/* Links that turn accent on hover */
+.linkHoverAccent:hover {
+  color: var(--accent);
+}
+
+/* Footer repo links as labeled pills */
+.labelLink {
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+.labelLink:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: #fff;
+}
+
 .accentLink {
   color: var(--accent);
   text-decoration: none;

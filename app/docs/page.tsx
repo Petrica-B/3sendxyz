@@ -7,7 +7,10 @@ export default function DocsPage() {
           Send files wallet-to-wallet on Base via Ratio1 End-to-end encrypted, decentralized file
           transfer. Hold the keys, hold the data.
         </div>
-        <div className="muted" style={{ fontSize: 12, lineHeight: 1.5, maxWidth: 640 }}>
+        <div
+          className="muted"
+          style={{ fontSize: 12, lineHeight: 1.5, maxWidth: 640, color: 'var(--accent)', marginTop: 8 }}
+        >
           3send exists for the moments when speed and privacy both matter: shipping production
           secrets to a distributed team, delivering legal evidence to counsel, or dropping a stealth
           launch asset to investors. Ratio1 provides the neutral rails; 3send wraps them in an

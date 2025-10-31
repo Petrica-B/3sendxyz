@@ -8,8 +8,22 @@ export function Footer() {
           <ServedByComponent />
         </div>
         <div className="row" style={{ gap: 12 }}>
-          <a href="https://github.com/Petrica-B/3sendxyz" target="_blank" rel="noreferrer">
-            3sendxyz Git Repo
+          <span>3sendxyz Git Repos:</span>
+          <a
+            href="https://github.com/Petrica-B/3sendxyz"
+            target="_blank"
+            rel="noreferrer"
+            className="pill labelLink"
+          >
+            dApp
+          </a>
+          <a
+            href="https://github.com/Petrica-B/3sendxyz-sc"
+            target="_blank"
+            rel="noreferrer"
+            className="pill labelLink"
+          >
+            Smart Contract
           </a>
         </div>
       </div>

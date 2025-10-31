@@ -915,11 +915,16 @@ function ClipboardIcon() {
 function PasskeyIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 2a5 5 0 0 0-5 5v3H6a1 1 0 0 0-1 1v8a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-8a1 1 0 0 0-1-1h-1V7a5 5 0 0 0-5-5Zm-3 5a3 3 0 1 1 6 0v3H9V7Zm8 5v7a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-7h10Z"
-        fill="#0f172a"
-        fillOpacity="0.75"
-      />
+      {/* Modern vertical key (thicker) */}
+      {/* Bow */}
+      <circle cx="12" cy="7" r="3.2" stroke="#0f172a" strokeOpacity="0.85" strokeWidth="2" />
+      {/* Bow hole */}
+      <circle cx="12" cy="7" r="1.2" fill="#0f172a" fillOpacity="0.85" />
+      {/* Shaft */}
+      <path d="M12 10.5V18.5" stroke="#0f172a" strokeOpacity="0.85" strokeWidth="2" strokeLinecap="round" />
+      {/* Teeth */}
+      <path d="M12 15h3" stroke="#0f172a" strokeOpacity="0.85" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 17h2.2" stroke="#0f172a" strokeOpacity="0.85" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -928,7 +933,7 @@ function SeedIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
-        d="M15.75 5.25a3.75 3.75 0 1 0-5.625 3.231v8.269a1.5 1.5 0 0 0 3 0V15h2.25a1.5 1.5 0 0 0 0-3H13.125V8.481A3.751 3.751 0 0 0 15.75 5.25Z"
+        d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"
         stroke="#0f172a"
         strokeOpacity="0.75"
         strokeWidth="1.5"
@@ -936,14 +941,27 @@ function SeedIcon() {
         strokeLinejoin="round"
       />
       <path
-        d="m9 16.5 2.625 2.625"
+        d="M15 3v5h5"
         stroke="#0f172a"
         strokeOpacity="0.75"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="12" cy="5.25" r="0.75" fill="#0f172a" fillOpacity="0.75" />
+      <path
+        d="M9 12h6"
+        stroke="#0f172a"
+        strokeOpacity="0.75"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9 16h6"
+        stroke="#0f172a"
+        strokeOpacity="0.75"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

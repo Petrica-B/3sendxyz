@@ -40,14 +40,10 @@ export function Navbar() {
             }}
             aria-label="3send home"
           >
-            {/* Default logo */}
-            <img src="/3send.svg" alt="3send logo" className="h-5 block group-hover:hidden" />
-            {/* Hover logo */}
-            <img
-              src="/3sendClear.svg"
-              alt="3send logo hover"
-              className="h-5 hidden group-hover:block"
-            />
+            {/* Default logo (clear) */}
+            <img src="/3sendClear.svg" alt="3send logo" className="h-5 block group-hover:hidden" />
+            {/* Hover logo (solid) */}
+            <img src="/3send.svg" alt="3send logo hover" className="h-5 hidden group-hover:block" />
           </Link>
         </div>
         <nav className="navlinks">

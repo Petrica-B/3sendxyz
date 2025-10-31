@@ -152,7 +152,7 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
   const userR1 = useMemo(() => formatR1Amount(userStats.totalR1Burned), [userStats.totalR1Burned]);
   const userShareUrl = useMemo(() => {
     const lines = [
-      `I am sharing files the trustless way ⚡️`,
+      `I am sharing files the trustless way using @3sendxyz ⚡️`,
       `${userSentCount} file${userSentCount === 1 ? '' : 's'} (${formatBytes(userBytesSent)}) delivered via @ratio1ai.`,
       `Burned ${userR1.display} $R1 on @base 🔥 for true privacy & decentralization.`,
       ``,

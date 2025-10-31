@@ -35,6 +35,8 @@ export default function InboxPage() {
   const [registeredKeyLoading, setRegisteredKeyLoading] = useState(false);
   const [registeredKeyError, setRegisteredKeyError] = useState<string | null>(null);
   const [noteStates, setNoteStates] = useState<Record<string, NoteState>>({});
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const passkeyRecord = useMemo<RegisteredPasskeyRecord | null>(() => {
     return registeredKeyRecord?.type === 'passkey' ? registeredKeyRecord : null;
   }, [registeredKeyRecord]);
@@ -104,6 +106,8 @@ export default function InboxPage() {
       }
       return next;
     });
+    // Reset to first page when records change
+    setPage(1);
   }, [records]);
 
   const fetchPasskeyStatus = useCallback(async () => {
@@ -471,7 +475,9 @@ export default function InboxPage() {
         )}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
-            {records.map((item) => {
+            {records
+              .slice((page - 1) * pageSize, page * pageSize)
+              .map((item) => {
               const tier = getTierById(item.tierId);
               let r1Burn: string | null = null;
               let usdBurn: string | null = null;
@@ -623,6 +629,46 @@ export default function InboxPage() {
                 </div>
               );
             })}
+            {/* Pagination controls */}
+            <div className="pagination">
+              {(() => {
+                const total = Math.max(1, Math.ceil(records.length / pageSize));
+                const nums = Array.from({ length: total }, (_, i) => i + 1);
+                return (
+                  <>
+                    <button
+                      className="pageBtn pageArrow"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      aria-label="Previous page"
+                      title="Previous page"
+                    >
+                      ‹
+                    </button>
+                    {nums.map((n) => (
+                      <button
+                        key={n}
+                        className={`pageBtn${page === n ? ' active' : ''}`}
+                        onClick={() => setPage(n)}
+                        aria-current={page === n ? 'page' : undefined}
+                        title={`Page ${n}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                    <button
+                      className="pageBtn pageArrow"
+                      onClick={() => setPage((p) => Math.min(total, p + 1))}
+                      disabled={page >= total}
+                      aria-label="Next page"
+                      title="Next page"
+                    >
+                      ›
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
           </div>
         )}
       </section>

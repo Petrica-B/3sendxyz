@@ -274,6 +274,41 @@ a {
   color: var(--muted);
 }
 
+/* Pagination controls */
+.pagination {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.pageBtn {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+.pageBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pageBtn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+.pageArrow {
+  color: var(--accent);
+  background: #fff;
+}
+.pageArrow[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* (Reverted) ServedBy footer wrapper styles removed */
 /* ServedBy footer styling wrapper (design only; no logic changes) */
 .servedBy {

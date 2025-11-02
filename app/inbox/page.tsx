@@ -1,5 +1,4 @@
 'use client';
-import type { Metadata } from 'next';
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { getTierById } from '@/lib/constants';
@@ -682,22 +681,3 @@ export default function InboxPage() {
     </main>
   );
 }
-export const metadata: Metadata = {
-  title: 'Inbox - 3send.xyz',
-  description:
-    'View and decrypt files sent to your wallet. Protect access with passkeys or a 24‑word recovery phrase.',
-  openGraph: {
-    title: 'Inbox - 3send.xyz',
-    description:
-      'View and decrypt files sent to your wallet. Protect access with passkeys or a 24‑word recovery phrase.',
-    images: [{ url: '/Inbox.png', alt: '3send - inbox preview' }],
-    siteName: '3send.xyz',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Inbox - 3send.xyz',
-    description:
-      'View and decrypt files sent to your wallet. Protect access with passkeys or a 24‑word recovery phrase.',
-    images: ['/Inbox.png'],
-  },
-};

@@ -1,5 +1,4 @@
 'use client';
-import type { Metadata } from 'next';
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { SendFileCard } from '@/components/SendFileCard';
@@ -224,22 +223,3 @@ export default function OutboxPage() {
     </main>
   );
 }
-export const metadata: Metadata = {
-  title: 'Outbox - 3send.xyz',
-  description:
-    'Send encrypted files to any wallet and track your sent items. Pay in R1, ETH, or USDC with automatic on‑chain settlement.',
-  openGraph: {
-    title: 'Outbox - 3send.xyz',
-    description:
-      'Send encrypted files to any wallet and track your sent items. Pay in R1, ETH, or USDC with automatic on‑chain settlement.',
-    images: [{ url: '/Outbox.png', alt: '3send - outbox preview' }],
-    siteName: '3send.xyz',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Outbox - 3send.xyz',
-    description:
-      'Send encrypted files to any wallet and track your sent items. Pay in R1, ETH, or USDC with automatic on‑chain settlement.',
-    images: ['/Outbox.png'],
-  },
-};

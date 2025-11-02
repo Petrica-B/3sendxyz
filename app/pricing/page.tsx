@@ -1,9 +1,10 @@
 import PricingCta from '@/components/PricingCta';
 import { TIER_CONFIG } from '@/lib/constants';
 import type { TierConfig } from '@/lib/types';
+import type { Metadata } from 'next';
 
 function extractName(label: string): string {
-  return label.split('—')[0]?.trim() ?? label;
+  return label.split('-')[0]?.trim() ?? label;
 }
 
 const MB = 1024 * 1024;
@@ -33,6 +34,26 @@ function formatRange(t: TierConfig): string {
     return `${lower.value} ${lower.unit} – ${upper.value} ${upper.unit}`;
   return `${lower.value} ${lower.unit} – ${upper.value} ${upper.unit}`;
 }
+
+export const metadata: Metadata = {
+  title: 'Pricing - 3send.xyz',
+  description:
+    'Simple, pay‑as‑you‑send pricing tiers by file size. Pay in R1, ETH, or USDC - R1 is auto‑burned on Ratio1.',
+  openGraph: {
+    title: 'Pricing - 3send.xyz',
+    description:
+      'Simple, pay‑as‑you‑send pricing tiers by file size. Pay in R1, ETH, or USDC - R1 is auto‑burned on Ratio1.',
+    images: [{ url: '/Pricing.png', alt: '3send - pricing preview' }],
+    siteName: '3send.xyz',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Pricing - 3send.xyz',
+    description:
+      'Simple, pay‑as‑you‑send pricing tiers by file size. Pay in R1, ETH, or USDC - R1 is auto‑burned on Ratio1.',
+    images: ['/Pricing.png'],
+  },
+};
 
 export default function PricingPage() {
   return (

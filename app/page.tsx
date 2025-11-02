@@ -2,6 +2,27 @@ import Dashboard from '@/components/Dashboard';
 import HomeCta from '@/components/HomeCta';
 import LogoPixelAnimation from '@/components/LogoPixelAnimation';
 import { getCachedPlatformStats } from '@/lib/stats';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
+  description:
+    'Send encrypted files wallet‑to‑wallet on Base via Ratio1. End‑to‑end encryption, no accounts, pay with R1, ETH, or USDC.',
+  openGraph: {
+    title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
+    description:
+      'Send encrypted files wallet‑to‑wallet on Base via Ratio1. End‑to‑end encryption, no accounts, pay with R1, ETH, or USDC.',
+    images: [{ url: '/Home.png', alt: '3send - home preview' }],
+    siteName: '3send.xyz',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
+    description:
+      'Send encrypted files wallet‑to‑wallet on Base via Ratio1. End‑to‑end encryption, no accounts, pay with R1, ETH, or USDC.',
+    images: ['/Home.png'],
+  },
+};
 
 export default async function Home() {
   const platformStats = await getCachedPlatformStats();
@@ -9,11 +30,11 @@ export default async function Home() {
     <main className="col" style={{ gap: 24 }}>
       <section className="hero">
         <div className="headline">
-            Send files wallet-to-wallet
-            <span> </span>
-            <span className="gradientText">on Base</span>
-            <span> via </span>
-            <span className="gradientText">Ratio1</span>
+          Send files wallet-to-wallet
+          <span> </span>
+          <span className="gradientText">on Base</span>
+          <span> via </span>
+          <span className="gradientText">Ratio1</span>
         </div>
         <div className="subhead">
           End-to-end encrypted, decentralized file transfer. Hold the keys, hold the data.

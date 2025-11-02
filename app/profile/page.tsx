@@ -1,4 +1,5 @@
 'use client';
+import type { Metadata } from 'next';
 
 import EncryptionModesSection, {
   type PasskeyRegistrationStep,
@@ -175,10 +176,9 @@ export default function ProfilePage() {
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to register seed key';
         setRegisteredKeyError(message);
-        toast.error(
-          message?.trim().length ? message : 'Failed to register seed key.',
-          { toastId: 'profile-seed-error' }
-        );
+        toast.error(message?.trim().length ? message : 'Failed to register seed key.', {
+          toastId: 'profile-seed-error',
+        });
         throw err instanceof Error ? err : new Error(message);
       } finally {
         setRegisteredKeyBusy(false);
@@ -210,8 +210,7 @@ export default function ProfilePage() {
       setPrivKeyOnce(gen.mnemonic);
       await registerSeedKey({ mnemonic: gen.mnemonic, fingerprint: gen.fingerprintHex, label });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to generate key pair';
+      const message = err instanceof Error ? err.message : 'Failed to generate key pair';
       toast.error(message, { toastId: 'profile-seed-error' });
     } finally {
       setBusy(false);
@@ -240,8 +239,7 @@ export default function ProfilePage() {
       setPrivKeyOnce(gen.mnemonic);
       await registerSeedKey({ mnemonic: gen.mnemonic, fingerprint: gen.fingerprintHex, label });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to regenerate key pair';
+      const message = err instanceof Error ? err.message : 'Failed to regenerate key pair';
       toast.error(message, { toastId: 'profile-seed-error' });
     } finally {
       setBusy(false);
@@ -346,7 +344,9 @@ export default function ProfilePage() {
       saveProfile(address, nextProfile);
       setProfile(nextProfile);
       hidePrivKeyOnce();
-      toast.success('Recovery phrase saved on this device. Reveal it from this profile when needed.');
+      toast.success(
+        'Recovery phrase saved on this device. Reveal it from this profile when needed.'
+      );
     },
     [address, hidePrivKeyOnce, profile, registeredKeyRecord, seedKeyRecord]
   );
@@ -541,3 +541,22 @@ export default function ProfilePage() {
     </main>
   );
 }
+export const metadata: Metadata = {
+  title: 'Profile - 3send.xyz',
+  description:
+    'Manage your encryption keys and settings. Register a passkey or a 24‑word recovery phrase to unlock your inbox securely.',
+  openGraph: {
+    title: 'Profile - 3send.xyz',
+    description:
+      'Manage your encryption keys and settings. Register a passkey or a 24‑word recovery phrase to unlock your inbox securely.',
+    images: [{ url: '/Profile.png', alt: '3send - profile preview' }],
+    siteName: '3send.xyz',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Profile - 3send.xyz',
+    description:
+      'Manage your encryption keys and settings. Register a passkey or a 24‑word recovery phrase to unlock your inbox securely.',
+    images: ['/Profile.png'],
+  },
+};

@@ -1,3 +1,25 @@
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Docs - 3send.xyz',
+  description:
+    'Learn how 3send encrypts files, manages keys with passkeys or recovery phrases, and settles payments on Ratio1.',
+  openGraph: {
+    title: 'Docs - 3send.xyz',
+    description:
+      'Learn how 3send encrypts files, manages keys with passkeys or recovery phrases, and settles payments on Ratio1.',
+    images: [{ url: '/Docs.png', alt: '3send - docs preview' }],
+    siteName: '3send.xyz',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Docs - 3send.xyz',
+    description:
+      'Learn how 3send encrypts files, manages keys with passkeys or recovery phrases, and settles payments on Ratio1.',
+    images: ['/Docs.png'],
+  },
+};
+
 export default function DocsPage() {
   return (
     <main className="col" style={{ gap: 24 }}>
@@ -9,7 +31,13 @@ export default function DocsPage() {
         </div>
         <div
           className="muted"
-          style={{ fontSize: 12, lineHeight: 1.5, maxWidth: 640, color: 'var(--accent)', marginTop: 8 }}
+          style={{
+            fontSize: 12,
+            lineHeight: 1.5,
+            maxWidth: 640,
+            color: 'var(--accent)',
+            marginTop: 8,
+          }}
         >
           3send exists for the moments when speed and privacy both matter: shipping production
           secrets to a distributed team, delivering legal evidence to counsel, or dropping a stealth

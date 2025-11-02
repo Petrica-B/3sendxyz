@@ -1,4 +1,5 @@
 'use client';
+import type { Metadata } from 'next';
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { getTierById } from '@/lib/constants';
@@ -475,9 +476,7 @@ export default function InboxPage() {
         )}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
-            {records
-              .slice((page - 1) * pageSize, page * pageSize)
-              .map((item) => {
+            {records.slice((page - 1) * pageSize, page * pageSize).map((item) => {
               const tier = getTierById(item.tierId);
               let r1Burn: string | null = null;
               let usdBurn: string | null = null;
@@ -558,7 +557,7 @@ export default function InboxPage() {
                         </div>
                         <div>tier: {tier ? tier.label : `Tier ${item.tierId}`}</div>
                         <div>
-                          burned: {r1Display ?? '—'} R1 {usdDisplay ? `(≈ ${usdDisplay} $)` : ''}
+                          burned: {r1Display ?? '-'} R1 {usdDisplay ? `(≈ ${usdDisplay} $)` : ''}
                         </div>
                         <div>
                           note:{' '}
@@ -569,7 +568,7 @@ export default function InboxPage() {
                               noteState.value && noteState.value.length > 0 ? (
                                 noteState.value
                               ) : (
-                                '—'
+                                '-'
                               )
                             ) : (
                               <>
@@ -598,7 +597,7 @@ export default function InboxPage() {
                               </>
                             )
                           ) : (
-                            '—'
+                            '-'
                           )}
                         </div>
                         <div>received: {formatDateShort(item.sentAt)}</div>
@@ -683,3 +682,22 @@ export default function InboxPage() {
     </main>
   );
 }
+export const metadata: Metadata = {
+  title: 'Inbox - 3send.xyz',
+  description:
+    'View and decrypt files sent to your wallet. Protect access with passkeys or a 24‑word recovery phrase.',
+  openGraph: {
+    title: 'Inbox - 3send.xyz',
+    description:
+      'View and decrypt files sent to your wallet. Protect access with passkeys or a 24‑word recovery phrase.',
+    images: [{ url: '/Inbox.png', alt: '3send - inbox preview' }],
+    siteName: '3send.xyz',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Inbox - 3send.xyz',
+    description:
+      'View and decrypt files sent to your wallet. Protect access with passkeys or a 24‑word recovery phrase.',
+    images: ['/Inbox.png'],
+  },
+};

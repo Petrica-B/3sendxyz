@@ -1,4 +1,5 @@
 'use client';
+import type { Metadata } from 'next';
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { SendFileCard } from '@/components/SendFileCard';
@@ -47,9 +48,7 @@ export default function OutboxPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       const friendly =
-        message === 'Unknown error'
-          ? 'Unable to load your sent files. Please try again.'
-          : message;
+        message === 'Unknown error' ? 'Unable to load your sent files. Please try again.' : message;
       toast.error(friendly, { toastId: 'outbox-load-error' });
       setError(friendly);
     } finally {
@@ -111,9 +110,7 @@ export default function OutboxPage() {
         )}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
-            {records
-              .slice((page - 1) * pageSize, page * pageSize)
-              .map((item) => {
+            {records.slice((page - 1) * pageSize, page * pageSize).map((item) => {
               const tier = getTierById(item.tierId);
               let r1Burn: string | null = null;
               let usdBurn: string | null = null;
@@ -151,10 +148,10 @@ export default function OutboxPage() {
                         </div>
                         <div>tier: {tier ? tier.label : `Tier ${item.tierId}`}</div>
                         <div>
-                          burned: {r1Display ?? '—'} R1 {usdDisplay ? `(≈ ${usdDisplay} $)` : ''}
+                          burned: {r1Display ?? '-'} R1 {usdDisplay ? `(≈ ${usdDisplay} $)` : ''}
                         </div>
                         <div>
-                          note: {hasPlainNote ? item.note : hasEncryptedNote ? '(encrypted)' : '—'}
+                          note: {hasPlainNote ? item.note : hasEncryptedNote ? '(encrypted)' : '-'}
                         </div>
                         <div>sent at: {formatDateShort(item.sentAt)}</div>
                       </div>
@@ -227,3 +224,22 @@ export default function OutboxPage() {
     </main>
   );
 }
+export const metadata: Metadata = {
+  title: 'Outbox - 3send.xyz',
+  description:
+    'Send encrypted files to any wallet and track your sent items. Pay in R1, ETH, or USDC with automatic on‑chain settlement.',
+  openGraph: {
+    title: 'Outbox - 3send.xyz',
+    description:
+      'Send encrypted files to any wallet and track your sent items. Pay in R1, ETH, or USDC with automatic on‑chain settlement.',
+    images: [{ url: '/Outbox.png', alt: '3send - outbox preview' }],
+    siteName: '3send.xyz',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Outbox - 3send.xyz',
+    description:
+      'Send encrypted files to any wallet and track your sent items. Pay in R1, ETH, or USDC with automatic on‑chain settlement.',
+    images: ['/Outbox.png'],
+  },
+};

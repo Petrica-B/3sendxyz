@@ -1,5 +1,5 @@
 import type { Chain } from 'viem/chains';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 
 import { TierConfig } from './types';
 
@@ -16,7 +16,7 @@ export const STATS_CSTORE_HKEY = '3sendxyz_stats';
 export const FILE_CLEANUP_INDEX_CSTORE_HKEY = '3sendxyz_file_cleanup_index';
 export const FILE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
-export const SUPPORTED_CHAINS = [baseSepolia] as const satisfies readonly Chain[];
+export const SUPPORTED_CHAINS = [base] as const satisfies readonly Chain[];
 export const REQUIRED_CHAIN = SUPPORTED_CHAINS[0];
 export const REQUIRED_CHAIN_ID = REQUIRED_CHAIN.id;
 export const REQUIRED_CHAIN_NAME = REQUIRED_CHAIN.name;
@@ -29,10 +29,10 @@ export const isSupportedChainId = (
   return SUPPORTED_CHAIN_IDS.includes(chainId);
 };
 
-export const MANAGER_CONTRACT_ADDRESS = '0xbFB3524A5F441716C50d5D167B37b1e898abae89' as const;
-export const R1_CONTRACT_ADDRESS = '0x277CbD0Cf25F4789Bc04035eCd03d811FAf73691' as const;
-export const USDC_CONTRACT_ADDRESS = '0xfD9A4a17D76087f7c94950b67c3A5b7638427ECF' as const;
-export const WETH_CONTRACT_ADDRESS = '0x24fe7807089e321395172633aA9c4bBa4Ac4a357' as const;
+export const MANAGER_CONTRACT_ADDRESS = '0x6660d6b8eB523cEC00ecc4091174d006De5F7D3B' as const;
+export const R1_CONTRACT_ADDRESS = '0x6444C6c2D527D85EA97032da9A7504d6d1448ecF' as const;
+export const USDC_CONTRACT_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const;
+export const WETH_CONTRACT_ADDRESS = '0x4200000000000000000000000000000000000006' as const;
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;

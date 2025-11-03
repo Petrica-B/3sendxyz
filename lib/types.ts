@@ -59,9 +59,6 @@ export type FileCleanupIndexEntry = {
   recipient: string;
   initiator: string;
   sentAt: number;
-  expiresAt?: number;
-  state: 'active' | 'deleted';
-  markedDeletedAt?: number;
 };
 
 export type TierConfig = {

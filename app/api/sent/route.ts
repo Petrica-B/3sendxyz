@@ -19,7 +19,6 @@ function parseRecord(raw: string): StoredUploadRecord | null {
     if (typeof parsed.tierId !== 'number') return null;
     if (typeof parsed.usdcAmount !== 'string') return null;
     if (typeof parsed.r1Amount !== 'string') return null;
-    if (parsed.expiresAt !== undefined && typeof parsed.expiresAt !== 'number') return null;
     return parsed;
   } catch {
     return null;

@@ -1,4 +1,9 @@
-import { FILE_CLEANUP_INDEX_CSTORE_HKEY, FILE_EXPIRATION_MS } from '@/lib/constants';
+import {
+  FILE_CLEANUP_INDEX_CSTORE_HKEY,
+  FILE_EXPIRATION_MS,
+  RECEIVED_FILES_CSTORE_HKEY,
+  SENT_FILES_CSTORE_HKEY,
+} from '@/lib/constants';
 import type { FileCleanupIndexEntry } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 
@@ -14,6 +19,8 @@ const defaultLogger: CleanupLogger = {
   error: (...args) => console.error(...args),
 };
 
+const CSTORE_NULL_VALUE = null as unknown as object;
+
 function parseEntry(raw: string): FileCleanupIndexEntry | null {
   try {
     const parsed = JSON.parse(raw) as FileCleanupIndexEntry;
@@ -23,29 +30,10 @@ function parseEntry(raw: string): FileCleanupIndexEntry | null {
     if (typeof parsed.recipient !== 'string') return null;
     if (typeof parsed.initiator !== 'string') return null;
     if (typeof parsed.sentAt !== 'number') return null;
-    if (parsed.expiresAt !== undefined && typeof parsed.expiresAt !== 'number') return null;
-    if (parsed.state !== 'active' && parsed.state !== 'deleted') return null;
     return parsed;
   } catch {
     return null;
   }
-}
-
-async function markEntryDeleted(
-  sdk: ReturnType<typeof createEdgeSdk>,
-  entry: FileCleanupIndexEntry,
-  now: number
-) {
-  const updated: FileCleanupIndexEntry = {
-    ...entry,
-    state: 'deleted',
-    markedDeletedAt: now,
-  };
-  await sdk.cstore.hset({
-    hkey: FILE_CLEANUP_INDEX_CSTORE_HKEY,
-    key: entry.txHash,
-    value: JSON.stringify(updated),
-  });
 }
 
 export async function runFileCleanup(options?: {
@@ -54,8 +42,9 @@ export async function runFileCleanup(options?: {
   const logger = options?.logger ?? defaultLogger;
   const now = Date.now();
   const threshold = now - FILE_EXPIRATION_MS;
+  const retentionDays = Math.max(1, Math.round(FILE_EXPIRATION_MS / (24 * 60 * 60 * 1000)));
   logger.info(
-    `[cleanup] Starting cleanup for uploads older than ${FILE_EXPIRATION_MS} ms (threshold=${new Date(
+    `[cleanup] Starting cleanup for uploads older than ${retentionDays} day(s) (threshold=${new Date(
       threshold
     ).toISOString()})`
   );
@@ -79,9 +68,7 @@ export async function runFileCleanup(options?: {
       logger.warn(`[cleanup] Skipping malformed cleanup entry ${key}`);
       continue;
     }
-    if (entry.state === 'deleted') continue;
-    const entryExpiresAt = entry.expiresAt ?? entry.sentAt + FILE_EXPIRATION_MS;
-    if (entryExpiresAt <= now) {
+    if (entry.sentAt <= threshold) {
       candidates.push(entry);
     }
   }
@@ -91,19 +78,71 @@ export async function runFileCleanup(options?: {
     return { processed: 0, deleted: 0 };
   }
 
-  const processedAt = Date.now();
+  let deletedCount = 0;
+  let processedCount = 0;
+
   for (const entry of candidates) {
+    processedCount += 1;
     logger.info(
-      `[cleanup] Marking upload ${entry.txHash} (cid=${entry.cid}) for deletion; sentAt=${new Date(
+      `[cleanup] Removing upload ${entry.txHash} (cid=${entry.cid}); sentAt=${new Date(
         entry.sentAt
       ).toISOString()}`
     );
 
-    // TODO: remove upload metadata from cstore and the associated file from r1fs once delete APIs are available.
+    let succeeded = true;
 
-    await markEntryDeleted(sdk, entry, processedAt);
+    try {
+      await sdk.r1fs.deleteFile({ cid: entry.cid });
+    } catch (err) {
+      succeeded = false;
+      logger.error(
+        `[cleanup] Failed to delete file from r1fs for tx=${entry.txHash} cid=${entry.cid}`,
+        err
+      );
+    }
+
+    if (succeeded) {
+      const operations: Array<{ hkey: string; key: string }> = [
+        { hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${entry.recipient}`, key: entry.txHash },
+        { hkey: `${SENT_FILES_CSTORE_HKEY}_${entry.initiator}`, key: entry.txHash },
+      ];
+
+      for (const op of operations) {
+        try {
+          await sdk.cstore.hset({
+            hkey: op.hkey,
+            key: op.key,
+            value: CSTORE_NULL_VALUE,
+          });
+        } catch (err) {
+          succeeded = false;
+          logger.error(
+            `[cleanup] Failed to remove cstore entry ${op.hkey}/${op.key} for tx=${entry.txHash}`,
+            err
+          );
+        }
+      }
+    }
+
+    if (succeeded) {
+      try {
+        await sdk.cstore.hset({
+          hkey: FILE_CLEANUP_INDEX_CSTORE_HKEY,
+          key: entry.txHash,
+          value: CSTORE_NULL_VALUE,
+        });
+        deletedCount += 1;
+      } catch (err) {
+        succeeded = false;
+        logger.error(`[cleanup] Failed to remove cleanup index entry for tx=${entry.txHash}`, err);
+      }
+    }
+
+    if (!succeeded) {
+      logger.warn(`[cleanup] Cleanup for tx=${entry.txHash} incomplete; leaving entry for retry`);
+    }
   }
 
-  logger.info(`[cleanup] Processed ${candidates.length} upload(s) for deletion`);
-  return { processed: candidates.length, deleted: candidates.length };
+  logger.info(`[cleanup] Processed ${processedCount} upload(s); deleted ${deletedCount}`);
+  return { processed: processedCount, deleted: deletedCount };
 }

@@ -1,5 +1,4 @@
 'use client';
-import type { Metadata } from 'next';
 
 import EncryptionModesSection, {
   type PasskeyRegistrationStep,
@@ -541,22 +540,3 @@ export default function ProfilePage() {
     </main>
   );
 }
-export const metadata: Metadata = {
-  title: 'Profile - 3send.xyz',
-  description:
-    'Manage your encryption keys and settings. Register a passkey or a 24‑word recovery phrase to unlock your inbox securely.',
-  openGraph: {
-    title: 'Profile - 3send.xyz',
-    description:
-      'Manage your encryption keys and settings. Register a passkey or a 24‑word recovery phrase to unlock your inbox securely.',
-    images: [{ url: '/Profile.png', alt: '3send - profile preview' }],
-    siteName: '3send.xyz',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Profile - 3send.xyz',
-    description:
-      'Manage your encryption keys and settings. Register a passkey or a 24‑word recovery phrase to unlock your inbox securely.',
-    images: ['/Profile.png'],
-  },
-};

@@ -44,7 +44,13 @@ export const metadata: Metadata = {
     description:
       'Simple, pay‑as‑you‑send pricing tiers by file size. Pay in R1, ETH, or USDC - R1 is auto‑burned on Ratio1.',
     images: [
-      { url: '/Pricing.png', width: 1200, height: 630, alt: '3send', type: 'image/png' },
+      {
+        url: 'https://3send.xyz/Pricing.png',
+        width: 1200,
+        height: 630,
+        alt: '3send',
+        type: 'image/png',
+      },
     ],
     siteName: '3send.xyz',
   },

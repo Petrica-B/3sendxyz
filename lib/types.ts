@@ -32,6 +32,7 @@ export type StoredUploadRecord = {
   originalFilesize?: number;
   encryptedFilesize?: number;
   encryption?: EncryptionMetadata;
+  expiresAt?: number;
 };
 
 export type AddressStatsRecord = {
@@ -58,6 +59,7 @@ export type FileCleanupIndexEntry = {
   recipient: string;
   initiator: string;
   sentAt: number;
+  expiresAt?: number;
   state: 'active' | 'deleted';
   markedDeletedAt?: number;
 };

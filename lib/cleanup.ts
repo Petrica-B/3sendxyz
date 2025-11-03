@@ -1,8 +1,6 @@
-import { FILE_CLEANUP_INDEX_CSTORE_HKEY } from '@/lib/constants';
+import { FILE_CLEANUP_INDEX_CSTORE_HKEY, FILE_EXPIRATION_MS } from '@/lib/constants';
 import type { FileCleanupIndexEntry } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-
-const MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 type CleanupLogger = {
   info: (...args: unknown[]) => void;
@@ -16,12 +14,6 @@ const defaultLogger: CleanupLogger = {
   error: (...args) => console.error(...args),
 };
 
-function parseNumberEnv(value: string | undefined): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
 function parseEntry(raw: string): FileCleanupIndexEntry | null {
   try {
     const parsed = JSON.parse(raw) as FileCleanupIndexEntry;
@@ -31,6 +23,7 @@ function parseEntry(raw: string): FileCleanupIndexEntry | null {
     if (typeof parsed.recipient !== 'string') return null;
     if (typeof parsed.initiator !== 'string') return null;
     if (typeof parsed.sentAt !== 'number') return null;
+    if (parsed.expiresAt !== undefined && typeof parsed.expiresAt !== 'number') return null;
     if (parsed.state !== 'active' && parsed.state !== 'deleted') return null;
     return parsed;
   } catch {
@@ -56,17 +49,13 @@ async function markEntryDeleted(
 }
 
 export async function runFileCleanup(options?: {
-  retentionDays?: number;
   logger?: CleanupLogger;
 }): Promise<{ processed: number; deleted: number }> {
-  console.log('[cleanup] runFileCleanup invoked');
   const logger = options?.logger ?? defaultLogger;
-  const retentionDays =
-    options?.retentionDays ?? parseNumberEnv(process.env.FILE_RETENTION_DAYS) ?? 7;
-
-  const threshold = Date.now() - retentionDays * MS_IN_DAY;
+  const now = Date.now();
+  const threshold = now - FILE_EXPIRATION_MS;
   logger.info(
-    `[cleanup] Starting cleanup for uploads older than ${retentionDays} day(s) (threshold=${new Date(
+    `[cleanup] Starting cleanup for uploads older than ${FILE_EXPIRATION_MS} ms (threshold=${new Date(
       threshold
     ).toISOString()})`
   );
@@ -91,7 +80,8 @@ export async function runFileCleanup(options?: {
       continue;
     }
     if (entry.state === 'deleted') continue;
-    if (entry.sentAt <= threshold) {
+    const entryExpiresAt = entry.expiresAt ?? entry.sentAt + FILE_EXPIRATION_MS;
+    if (entryExpiresAt <= now) {
       candidates.push(entry);
     }
   }
@@ -101,7 +91,7 @@ export async function runFileCleanup(options?: {
     return { processed: 0, deleted: 0 };
   }
 
-  const now = Date.now();
+  const processedAt = Date.now();
   for (const entry of candidates) {
     logger.info(
       `[cleanup] Marking upload ${entry.txHash} (cid=${entry.cid}) for deletion; sentAt=${new Date(
@@ -111,7 +101,7 @@ export async function runFileCleanup(options?: {
 
     // TODO: remove upload metadata from cstore and the associated file from r1fs once delete APIs are available.
 
-    await markEntryDeleted(sdk, entry, now);
+    await markEntryDeleted(sdk, entry, processedAt);
   }
 
   logger.info(`[cleanup] Processed ${candidates.length} upload(s) for deletion`);

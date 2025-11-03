@@ -14,6 +14,7 @@ export const VAULT_CSTORE_HKEY = '3sendxyz_vault';
 export const REGISTERED_KEYS_CSTORE_HKEY = '3sendxyz_register_keys';
 export const STATS_CSTORE_HKEY = '3sendxyz_stats';
 export const FILE_CLEANUP_INDEX_CSTORE_HKEY = '3sendxyz_file_cleanup_index';
+export const FILE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 export const SUPPORTED_CHAINS = [baseSepolia] as const satisfies readonly Chain[];
 export const REQUIRED_CHAIN = SUPPORTED_CHAINS[0];

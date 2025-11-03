@@ -1,5 +1,6 @@
 import {
   FILE_CLEANUP_INDEX_CSTORE_HKEY,
+  FILE_EXPIRATION_MS,
   RECEIVED_FILES_CSTORE_HKEY,
   SENT_FILES_CSTORE_HKEY,
   USED_PAYMENT_TXS_CSTORE_HKEY,
@@ -419,6 +420,8 @@ export async function POST(request: Request) {
 
     const noteValue = typeof note === 'string' && note.trim().length > 0 ? note : undefined;
 
+    const expiresAt = sentTimestamp + FILE_EXPIRATION_MS;
+
     const record: StoredUploadRecord = {
       cid,
       filename: originalFilename ?? file.name,
@@ -436,6 +439,7 @@ export async function POST(request: Request) {
       originalFilesize: parsedOriginalSize ?? undefined,
       encryptedFilesize: file.size,
       encryption: encryptionMetadata,
+      expiresAt,
     };
 
     const recordJson = JSON.stringify(record);
@@ -474,6 +478,7 @@ export async function POST(request: Request) {
       recipient: recipientKey,
       initiator: initiatorAddr,
       sentAt: sentTimestamp,
+      expiresAt,
       state: 'active',
     };
     await ratio1.cstore.hset({

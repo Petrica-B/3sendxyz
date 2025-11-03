@@ -32,6 +32,7 @@ export type StoredUploadRecord = {
   originalFilesize?: number;
   encryptedFilesize?: number;
   encryption?: EncryptionMetadata;
+  expiresAt?: number;
 };
 
 export type AddressStatsRecord = {
@@ -50,6 +51,14 @@ export type PlatformStatsRecord = {
   uniqueUsers: number;
   totalR1Burned: string;
   updatedAt: number;
+};
+
+export type FileCleanupIndexEntry = {
+  txHash: string;
+  cid: string;
+  recipient: string;
+  initiator: string;
+  sentAt: number;
 };
 
 export type TierConfig = {

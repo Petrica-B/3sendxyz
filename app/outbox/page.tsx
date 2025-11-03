@@ -2,7 +2,7 @@
 
 import { AddressLink, TxLink } from '@/components/Links';
 import { SendFileCard } from '@/components/SendFileCard';
-import { getTierById } from '@/lib/constants';
+import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
 import { useCallback, useEffect, useState } from 'react';
@@ -125,6 +125,7 @@ export default function OutboxPage() {
               const hasEncryptedNote =
                 !hasPlainNote &&
                 Boolean(item.encryption?.noteCiphertext && item.encryption?.noteIv);
+              const expiresAt = item.expiresAt ?? item.sentAt + FILE_EXPIRATION_MS;
               return (
                 <div key={item.id} className="transferItem">
                   <div style={{ flex: 1 }}>
@@ -132,7 +133,8 @@ export default function OutboxPage() {
                       {item.filename}
                     </div>
                     <div className="muted mono" style={{ fontSize: 12 }}>
-                      {formatBytes(item.filesize)} · sent {formatDate(item.sentAt)}
+                      {formatBytes(item.filesize)} · sent {formatDate(item.sentAt)} · expires{' '}
+                      {formatDate(expiresAt)}
                     </div>
                     {expanded[item.id] && (
                       <div className="details mono" style={{ fontSize: 12 }}>
@@ -153,6 +155,7 @@ export default function OutboxPage() {
                           note: {hasPlainNote ? item.note : hasEncryptedNote ? '(encrypted)' : '-'}
                         </div>
                         <div>sent at: {formatDateShort(item.sentAt)}</div>
+                        <div>expires: {formatDateShort(expiresAt)}</div>
                       </div>
                     )}
                   </div>

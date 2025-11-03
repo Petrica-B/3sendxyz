@@ -1,7 +1,7 @@
 'use client';
 
 import { AddressLink, TxLink } from '@/components/Links';
-import { getTierById } from '@/lib/constants';
+import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
 import { decodeBase64, decryptFileFromEnvelope, decryptNoteFromEnvelope } from '@/lib/encryption';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import { deriveSeedKeyPair } from '@/lib/keys';
@@ -524,6 +524,7 @@ export default function InboxPage() {
               const rotationDisabledStyles = keyRotationLocked
                 ? { opacity: 0.55, cursor: 'not-allowed' as const }
                 : null;
+              const expiresAt = item.expiresAt ?? item.sentAt + FILE_EXPIRATION_MS;
               return (
                 <div key={item.id} className="transferItem">
                   <div style={{ flex: 1 }}>
@@ -531,7 +532,8 @@ export default function InboxPage() {
                       {item.filename}
                     </div>
                     <div className="muted mono" style={{ fontSize: 12 }}>
-                      {formatBytes(item.filesize)} · received {formatDate(item.sentAt)}
+                      {formatBytes(item.filesize)} · received {formatDate(item.sentAt)} · expires{' '}
+                      {formatDate(expiresAt)}
                     </div>
                     {keyRotationWarning && (
                       <div
@@ -600,6 +602,7 @@ export default function InboxPage() {
                           )}
                         </div>
                         <div>received: {formatDateShort(item.sentAt)}</div>
+                        <div>expires: {formatDateShort(expiresAt)}</div>
                       </div>
                     )}
                   </div>

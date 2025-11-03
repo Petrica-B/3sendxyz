@@ -1,0 +1,59 @@
+name: Trigger File Cleanup
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  invoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cleanup endpoint
+        env:
+          CLEANUP_ENDPOINT: ${{ secrets.FILE_CLEANUP_ENDPOINT }}
+          CLEANUP_TOKEN: ${{ secrets.FILE_CLEANUP_TOKEN }}
+          RESPONSE_FILE: response.json
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CLEANUP_ENDPOINT:-}" ]; then
+            echo "::error::Missing CLEANUP_ENDPOINT secret"
+            exit 1
+          fi
+
+          headers=(-H "Content-Type: application/json")
+          if [ -n "${CLEANUP_TOKEN:-}" ]; then
+            headers+=(-H "Authorization: Bearer ${CLEANUP_TOKEN}")
+          fi
+
+          echo "Calling ${CLEANUP_ENDPOINT}"
+          http_code="$(
+            curl -sS -X POST "${CLEANUP_ENDPOINT}" \
+              "${headers[@]}" \
+              -o "${RESPONSE_FILE}" \
+              -w "%{http_code}"
+          )"
+
+          echo "Status: ${http_code}"
+          echo "Response:"
+          cat "${RESPONSE_FILE}"
+
+          if [ "${http_code}" -lt 200 ] || [ "${http_code}" -ge 300 ]; then
+            echo "::error::Cleanup endpoint returned ${http_code}"
+            exit 1
+          fi
+
+      - name: Print deleted count
+        env:
+          RESPONSE_FILE: response.json
+        run: |
+          set -euo pipefail
+
+          deleted="$(jq -r '.deleted // empty' "${RESPONSE_FILE}")"
+
+          if [ -z "${deleted}" ]; then
+            echo "::warning::Cleanup response did not include a deleted count"
+          else
+            echo "Deleted files: ${deleted}"
+          fi

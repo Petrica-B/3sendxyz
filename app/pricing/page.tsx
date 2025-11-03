@@ -43,7 +43,9 @@ export const metadata: Metadata = {
     title: 'Pricing - 3send.xyz',
     description:
       'Simple, pay‑as‑you‑send pricing tiers by file size. Pay in R1, ETH, or USDC - R1 is auto‑burned on Ratio1.',
-    images: [{ url: '/Pricing.png', alt: '3send - pricing preview' }],
+    images: [
+      { url: '/Pricing.png', width: 1200, height: 630, alt: '3send', type: 'image/png' },
+    ],
     siteName: '3send.xyz',
   },
   twitter: {
@@ -51,7 +53,7 @@ export const metadata: Metadata = {
     title: 'Pricing - 3send.xyz',
     description:
       'Simple, pay‑as‑you‑send pricing tiers by file size. Pay in R1, ETH, or USDC - R1 is auto‑burned on Ratio1.',
-    images: ['/Pricing.png'],
+    images: [{ url: '/Pricing.png', alt: '3send' }],
   },
 };
 

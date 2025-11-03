@@ -12,7 +12,9 @@ export const metadata: Metadata = {
     title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
     description:
       'Send encrypted files wallet‑to‑wallet on Base via Ratio1. End‑to‑end encryption, no accounts, pay with R1, ETH, or USDC.',
-    images: [{ url: '/Home.png', alt: '3send - home preview' }],
+    images: [
+      { url: '/Home.png', width: 1200, height: 630, alt: '3send', type: 'image/png' },
+    ],
     siteName: '3send.xyz',
   },
   twitter: {
@@ -20,7 +22,7 @@ export const metadata: Metadata = {
     title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
     description:
       'Send encrypted files wallet‑to‑wallet on Base via Ratio1. End‑to‑end encryption, no accounts, pay with R1, ETH, or USDC.',
-    images: ['/Home.png'],
+    images: [{ url: '/Home.png', alt: '3send' }],
   },
 };
 

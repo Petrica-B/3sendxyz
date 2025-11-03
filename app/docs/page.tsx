@@ -8,7 +8,9 @@ export const metadata: Metadata = {
     title: 'Docs - 3send.xyz',
     description:
       'Learn how 3send encrypts files, manages keys with passkeys or recovery phrases, and settles payments on Ratio1.',
-    images: [{ url: '/Docs.png', alt: '3send - docs preview' }],
+    images: [
+      { url: '/Docs.png', width: 1200, height: 630, alt: '3send', type: 'image/png' },
+    ],
     siteName: '3send.xyz',
   },
   twitter: {
@@ -16,7 +18,7 @@ export const metadata: Metadata = {
     title: 'Docs - 3send.xyz',
     description:
       'Learn how 3send encrypts files, manages keys with passkeys or recovery phrases, and settles payments on Ratio1.',
-    images: ['/Docs.png'],
+    images: [{ url: '/Docs.png', alt: '3send' }],
   },
 };
 

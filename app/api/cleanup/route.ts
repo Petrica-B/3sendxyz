@@ -23,7 +23,11 @@ export async function POST(request: Request) {
 
   try {
     const result = await runFileCleanup();
-    return NextResponse.json({ success: true, processed: result.processed });
+    return NextResponse.json({
+      success: true,
+      processed: result.processed,
+      deleted: result.deleted,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[cleanup] API-triggered run failed', error);

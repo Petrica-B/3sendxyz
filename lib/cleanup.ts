@@ -58,7 +58,7 @@ async function markEntryDeleted(
 export async function runFileCleanup(options?: {
   retentionDays?: number;
   logger?: CleanupLogger;
-}): Promise<{ processed: number }> {
+}): Promise<{ processed: number; deleted: number }> {
   console.log('[cleanup] runFileCleanup invoked');
   const logger = options?.logger ?? defaultLogger;
   const retentionDays =
@@ -98,7 +98,7 @@ export async function runFileCleanup(options?: {
 
   if (candidates.length === 0) {
     logger.info('[cleanup] No uploads eligible for deletion');
-    return { processed: 0 };
+    return { processed: 0, deleted: 0 };
   }
 
   const now = Date.now();
@@ -115,5 +115,5 @@ export async function runFileCleanup(options?: {
   }
 
   logger.info(`[cleanup] Processed ${candidates.length} upload(s) for deletion`);
-  return { processed: candidates.length };
+  return { processed: candidates.length, deleted: candidates.length };
 }

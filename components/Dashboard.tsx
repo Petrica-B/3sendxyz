@@ -3,6 +3,7 @@
 import { formatBytes } from '@/lib/format';
 import type { AddressStatsRecord, PlatformStatsRecord } from '@/lib/types';
 import { useEffect, useMemo, useState } from 'react';
+import { RoundedLoaderList } from './RoundedLoader';
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 
@@ -197,11 +198,7 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
               </a>
             )}
           </div>
-          {userLoading && (
-            <div className="muted" style={{ fontSize: 12 }}>
-              Loading your stats…
-            </div>
-          )}
+          {userLoading && <RoundedLoaderList count={1} rows={2} blocks={24} />}
           <div
             style={{
               display: 'grid',

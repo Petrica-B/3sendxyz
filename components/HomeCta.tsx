@@ -10,6 +10,8 @@ export default function HomeCta() {
   const { isConnected, address } = useAccount();
   const [sentCount, setSentCount] = useState<number | null>(null);
   const [inboxCount, setInboxCount] = useState<number | null>(null);
+  const sentLoading = isConnected && Boolean(address) && sentCount === null;
+  const inboxLoading = isConnected && Boolean(address) && inboxCount === null;
 
   useEffect(() => {
     let aborted = false;
@@ -93,11 +95,9 @@ export default function HomeCta() {
             style={{ textDecoration: 'none', display: 'flex', gap: 8, alignItems: 'center' }}
           >
             <span>Open Outbox</span>
-            {typeof sentCount === 'number' && (
-              <span className="pill" aria-label="outbox-active-count">
-                {sentCount}
-              </span>
-            )}
+            <span className="pill" aria-label="outbox-active-count" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24 }}>
+              {sentLoading ? <span className="spinner" aria-hidden /> : typeof sentCount === 'number' ? sentCount : '—'}
+            </span>
           </Link>
           <Link
             href="/inbox"
@@ -105,11 +105,9 @@ export default function HomeCta() {
             style={{ textDecoration: 'none', display: 'flex', gap: 8, alignItems: 'center' }}
           >
             <span>Open Inbox</span>
-            {typeof inboxCount === 'number' && (
-              <span className="pill" aria-label="inbox-active-count">
-                {inboxCount}
-              </span>
-            )}
+            <span className="pill" aria-label="inbox-active-count" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24 }}>
+              {inboxLoading ? <span className="spinner" aria-hidden /> : typeof inboxCount === 'number' ? inboxCount : '—'}
+            </span>
           </Link>
         </div>
       </div>

@@ -42,4 +42,6 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64
+          build-args: |
+            NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=${{ secrets.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
           tags: ${{ secrets.DOCKERHUB_IMAGE_TAGS }}

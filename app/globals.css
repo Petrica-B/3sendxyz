@@ -69,7 +69,7 @@ a {
 
 .footerSep {
   color: var(--muted);
-  margin: 0 4px;
+  margin: 0 2px;
 }
 
 .accentLink {
@@ -531,6 +531,12 @@ select.input:focus-visible {
   .servedBy {
     justify-content: center;
     margin-bottom: 12px;
+  }
+  .servedBy .versionSuffix {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: 2px;
   }
 }
 @media (min-width: 768px) {

@@ -21,10 +21,11 @@ export default async function ServedBy() {
       </a>
       <span className="label">Node serving this dApp:</span>
       <span className={isUnknown ? 'unknown' : 'nodeName'}>{hostId}</span>
-      <span className="label">|</span>
-      <span className="label">v.</span>
-
-      <span className="versionValue">{versionHash}</span>
+      <span className="versionSuffix">
+        <span className="label">|</span>
+        <span className="label">v.</span>{' '}
+        <span className="versionValue">{versionHash}</span>
+      </span>
     </div>
   );
 }

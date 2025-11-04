@@ -16,27 +16,29 @@ export function Footer() {
           >
             dApp
           </a>
-          <a
-            href="https://github.com/Petrica-B/3sendxyz-sc"
-            target="_blank"
-            rel="noreferrer"
-            className="pill labelLink"
-          >
-            Smart Contract
-          </a>
-          <span className="footerSep">|</span>
-          <a
-            href="https://x.com/3sendxyz"
-            target="_blank"
-            rel="noreferrer"
-            className="pill labelLink"
-            aria-label="Open X (Twitter)"
-            title="X"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M4 4l16 16M20 4L4 20" />
-            </svg>
-          </a>
+          <div className="row footerTight" style={{ gap: 4, alignItems: 'center' }}>
+            <a
+              href="https://github.com/Petrica-B/3sendxyz-sc"
+              target="_blank"
+              rel="noreferrer"
+              className="pill labelLink"
+            >
+              Smart Contract
+            </a>
+            <span className="footerSep">|</span>
+            <a
+              href="https://x.com/3sendxyz"
+              target="_blank"
+              rel="noreferrer"
+              className="pill labelLink"
+              aria-label="Open X (Twitter)"
+              title="X"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 4l16 16M20 4L4 20" />
+              </svg>
+            </a>
+          </div>
           <a
             href="https://t.me/threesendxyz"
             target="_blank"

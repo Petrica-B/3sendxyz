@@ -183,7 +183,29 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
       </div>
 
       {isConnected && (
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          className="card"
+          style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'relative' }}
+        >
+          {userLoading && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(1px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                zIndex: 1,
+              }}
+            >
+              <div style={{ width: '100%', maxWidth: 720 }}>
+                <RoundedLoaderList count={1} rows={2} blocks={28} />
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: 700 }}>Your Stats</div>
             {userStats.sentFiles > 0 && (
@@ -198,7 +220,6 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
               </a>
             )}
           </div>
-          {userLoading && <RoundedLoaderList count={1} rows={2} blocks={24} />}
           <div
             style={{
               display: 'grid',

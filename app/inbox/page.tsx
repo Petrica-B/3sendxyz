@@ -469,7 +469,7 @@ export default function InboxPage() {
         <div className="subhead">Files sent to your wallet.</div>
       </div>
       <section className="col" style={{ gap: 12 }}>
-        {loading && <RoundedLoaderList count={5} />}
+        {loading && <RoundedLoaderList count={1} />}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
             {records.slice((page - 1) * pageSize, page * pageSize).map((item) => {

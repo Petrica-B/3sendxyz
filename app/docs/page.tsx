@@ -167,7 +167,7 @@ export default function DocsPage() {
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
           The result: every file you send tightens R1 scarcity while compensating edge nodes through
           protocol rewards. Power users can audit the burn trail directly on-chain via the manager
-          address: TODO add.
+          address: 0x6660d6b8eB523cEC00ecc4091174d006De5F7D3B.
         </div>
       </section>
 

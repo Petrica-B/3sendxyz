@@ -538,18 +538,20 @@ select.input:focus-visible {
   grid-template-columns: 1fr;
 }
 /* Keep pricing header row items on a single line */
-.pricingGrid .row {
+/* Keep the first header row (name + price pill) on one line without overflow */
+.pricingGrid .card > .row:first-child {
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
+  column-gap: 8px;
 }
-.pricingGrid .row > div:first-child {
-  flex: 1 1 auto;
+.pricingGrid .card > .row:first-child > div:first-child {
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.pricingGrid .row .pill {
-  flex: 0 0 auto;
+.pricingGrid .card > .row:first-child .pill {
   white-space: nowrap;
 }
 @media (min-width: 640px) {

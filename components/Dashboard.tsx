@@ -3,7 +3,7 @@
 import { formatBytes } from '@/lib/format';
 import type { AddressStatsRecord, PlatformStatsRecord } from '@/lib/types';
 import { useEffect, useMemo, useState } from 'react';
-import { RoundedLoader } from './RoundedLoader';
+// Removed full-card loader in favor of per-card skeletons
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 
@@ -183,29 +183,7 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
       </div>
 
       {isConnected && (
-        <div
-          className="card"
-          style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'relative' }}
-        >
-          {userLoading && (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'rgba(255, 255, 255, 0.7)',
-                backdropFilter: 'blur(1px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 8,
-                zIndex: 1,
-              }}
-            >
-              <div style={{ width: '100%', height: '100%' }}>
-                <RoundedLoader rows={3} blocks={36} full />
-              </div>
-            </div>
-          )}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: 700 }}>Your Stats</div>
             {userStats.sentFiles > 0 && (
@@ -228,13 +206,14 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
               marginTop: 6,
             }}
           >
-            <StatCard label="Files sent" value={String(userSentCount)} />
-            <StatCard label="Files received" value={String(userInboxCount)} />
+            <StatCard label="Files sent" value={String(userSentCount)} loading={userLoading} />
+            <StatCard label="Files received" value={String(userInboxCount)} loading={userLoading} />
             <StatCard
               label="Size sent / received"
               value={`${formatBytes(userBytesSent)} / ${formatBytes(userBytesReceived)}`}
+              loading={userLoading}
             />
-            <StatCard label="R1 burned" value={`${userR1.display} R1`} />
+            <StatCard label="R1 burned" value={`${userR1.display} R1`} loading={userLoading} />
           </div>
         </div>
       )}
@@ -242,13 +221,26 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
   );
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatCard({ label, value, hint, loading }: { label: string; value: string; hint?: string; loading?: boolean }) {
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }} aria-busy={loading || undefined}>
       <div className="muted" style={{ fontSize: 12 }}>
         {label}
       </div>
-      <div style={{ fontWeight: 800, fontSize: 22 }}>{value}</div>
+      <div
+        style={{
+          fontWeight: 800,
+          fontSize: 22,
+          minHeight: 22,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          lineHeight: 1,
+        }}
+      >
+        {loading ? <span className="spinner spinner-muted spinner-sm" aria-hidden /> : null}
+        {!loading ? value : null}
+      </div>
       {hint ? (
         <div className="muted" style={{ fontSize: 12 }}>
           {hint}

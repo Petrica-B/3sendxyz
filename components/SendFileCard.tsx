@@ -1,5 +1,6 @@
 'use client';
 
+import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import {
   MANAGER_CONTRACT_ADDRESS,
   MAX_FILE_BYTES,
@@ -12,7 +13,6 @@ import {
 } from '@/lib/constants';
 import { encryptFileForRecipient } from '@/lib/encryption';
 import { buildSendHandshakeMessage } from '@/lib/handshake';
-import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import { QuoteData } from '@/lib/types';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -273,10 +273,7 @@ export function SendFileCard() {
 
   const r1Display = useMemo(() => {
     if (!quoteDataForDisplay) return null;
-    const formatted = formatUnits(
-      quoteDataForDisplay.r1Amount,
-      quoteDataForDisplay.r1Decimals
-    );
+    const formatted = formatUnits(quoteDataForDisplay.r1Amount, quoteDataForDisplay.r1Decimals);
     return Number.parseFloat(formatted).toFixed(6);
   }, [quoteDataForDisplay]);
 
@@ -300,18 +297,12 @@ export function SendFileCard() {
 
   const ethDisplay = useMemo(() => {
     if (!quoteDataForDisplay?.wethAmount || quoteDataForDisplay.wethDecimals == null) return null;
-    const formatted = formatUnits(
-      quoteDataForDisplay.wethAmount,
-      quoteDataForDisplay.wethDecimals
-    );
+    const formatted = formatUnits(quoteDataForDisplay.wethAmount, quoteDataForDisplay.wethDecimals);
     return Number.parseFloat(formatted).toFixed(6);
   }, [quoteDataForDisplay]);
 
   const ethMaxDisplay = useMemo(() => {
-    if (
-      !quoteDataForDisplay?.maxWethWithSlippage ||
-      quoteDataForDisplay.wethDecimals == null
-    )
+    if (!quoteDataForDisplay?.maxWethWithSlippage || quoteDataForDisplay.wethDecimals == null)
       return null;
     const formatted = formatUnits(
       quoteDataForDisplay.maxWethWithSlippage,
@@ -397,10 +388,7 @@ export function SendFileCard() {
       quoteDataForDisplay.wethDecimals != null
     ) {
       const needed = Number.parseFloat(
-        formatUnits(
-          quoteDataForDisplay.maxWethWithSlippage,
-          quoteDataForDisplay.wethDecimals
-        )
+        formatUnits(quoteDataForDisplay.maxWethWithSlippage, quoteDataForDisplay.wethDecimals)
       ).toFixed(6);
       const available = Number.parseFloat(
         formatUnits(walletBalancesForDisplay.ethBalance, quoteDataForDisplay.wethDecimals)
@@ -474,9 +462,9 @@ export function SendFileCard() {
       ).toFixed(2)} USDC`;
     }
     const decimals = quoteDataForDisplay?.wethDecimals ?? 18;
-    return `${Number.parseFloat(
-      formatUnits(walletBalancesForDisplay.ethBalance, decimals)
-    ).toFixed(6)} ETH`;
+    return `${Number.parseFloat(formatUnits(walletBalancesForDisplay.ethBalance, decimals)).toFixed(
+      6
+    )} ETH`;
   }, [walletBalancesForDisplay, paymentAsset, quoteDataForDisplay]);
 
   const paymentAmountByAsset = useMemo<Record<PaymentAsset, string | null>>(() => {
@@ -900,7 +888,9 @@ export function SendFileCard() {
               </svg>
               {file ? 'Change file' : 'Choose file'}
             </button>
-            <span className="muted mono" style={{ fontSize: 12 }}>Max file size 5 GB.</span>
+            <span className="muted mono" style={{ fontSize: 12 }}>
+              Max file size 5 GB.
+            </span>
           </div>
           {file && (
             <div style={{ marginTop: 8, alignSelf: 'center', textAlign: 'center' }}>
@@ -937,8 +927,8 @@ export function SendFileCard() {
             {!quoteLoading && !quoteError && quoteData && (
               <div className="col" style={{ gap: 12 }}>
                 <div className="col" style={{ gap: 8 }}>
-                  <span className="muted mono" style={{ fontSize: 12, color: '#334155' }}>
-                    Payment asset
+                  <span className="muted mono" style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>
+                    Select your preferred payment asset.
                   </span>
                   <div className="paymentOptions">
                     {PAYMENT_OPTIONS.map((option) => {
@@ -965,18 +955,19 @@ export function SendFileCard() {
                             borderRadius: 12,
                             border: isActive
                               ? '1px solid var(--accent)'
-                              : '1px solid rgba(148, 163, 184, 0.45)',
-                            background: isActive ? '#fefce8' : '#ffffff',
+                              : '1px solid rgba(148, 163, 184, 0.6)',
+                            background: isActive ? '#fefce8' : '#f9fafb',
                             color: '#0f172a',
                             opacity: isDisabled ? 0.5 : 1,
                             cursor: isDisabled ? 'not-allowed' : 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: 6,
-                            transition: 'background 0.2s ease, border 0.2s ease, color 0.2s ease',
+                            transition:
+                              'background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease',
                             boxShadow: isActive
                               ? '0 6px 18px rgba(247, 147, 26, 0.15)'
-                              : '0 4px 14px rgba(15, 23, 42, 0.05)',
+                              : '0 4px 16px rgba(15, 23, 42, 0.07)',
                           }}
                         >
                           <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>

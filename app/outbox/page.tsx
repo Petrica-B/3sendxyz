@@ -156,7 +156,7 @@ export default function OutboxPage() {
                       </div>
                     )}
                   </div>
-                  <div className="col" style={{ alignItems: 'flex-end', gap: 8 }}>
+                  <div className="col transferActions" style={{ alignItems: 'flex-end', gap: 8 }}>
                     <button
                       className="button secondary"
                       onClick={() =>

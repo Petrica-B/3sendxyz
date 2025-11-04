@@ -603,7 +603,7 @@ export default function InboxPage() {
                       </div>
                     )}
                   </div>
-                  <div className="col" style={{ gap: 8, alignItems: 'flex-end' }}>
+                  <div className="col transferActions" style={{ gap: 8, alignItems: 'flex-end' }}>
                     <div className="row" style={{ gap: 8 }}>
                       <button
                         className="button"

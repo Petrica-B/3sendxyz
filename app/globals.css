@@ -355,6 +355,10 @@ select.input:focus-visible {
   width: 10px;
   height: 10px;
 }
+.spinner-stat {
+  width: 20px;
+  height: 20px;
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -485,6 +489,16 @@ select.input:focus-visible {
   body {
     padding-bottom: calc(56px + env(safe-area-inset-bottom));
   }
+  /* Stack transfer items on mobile and place actions at the end on the right */
+  .transferItem {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .transferActions {
+    align-self: flex-end;
+    margin-top: 8px;
+    width: 100%;
+  }
   /* Ensure spacing between brand and wallet button on mobile */
   .navbarInner {
     gap: 12px;
@@ -556,6 +570,17 @@ select.input:focus-visible {
 }
 .paymentOption {
   width: 100%;
+}
+/* Subtle emphasis and responsiveness for payment options */
+.paymentOption:hover {
+  border-color: rgba(247, 147, 26, 0.45);
+  background: #f3f4f6;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+.paymentOption:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.18);
 }
 @media (min-width: 1024px) {
   .paymentOptions {

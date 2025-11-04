@@ -238,7 +238,7 @@ function StatCard({ label, value, hint, loading }: { label: string; value: strin
           lineHeight: 1,
         }}
       >
-        {loading ? <span className="spinner spinner-muted spinner-sm" aria-hidden /> : null}
+        {loading ? <span className="spinner spinner-muted spinner-stat" aria-hidden /> : null}
         {!loading ? value : null}
       </div>
       {hint ? (

@@ -9,7 +9,7 @@ export default async function ServedBy() {
   const versionHash = process.env.NEXT_PUBLIC_VERSION_HASH ?? 'unknown';
 
   return (
-    <div className="servedBy" style={{ border: '1px solid var(--border)' }}>
+    <div className="servedBy">
       <a
         href="https://ratio1.ai"
         target="_blank"
@@ -22,9 +22,10 @@ export default async function ServedBy() {
       <span className="label">Node serving this dApp:</span>
       <span className={isUnknown ? 'unknown' : 'nodeName'}>{hostId}</span>
       <span className="versionSuffix">
-        <span className="label">|</span>
-        <span className="label">v.</span>{' '}
-        <span className="versionValue">{versionHash}</span>
+        <span className="label versionPill">
+          v.
+          <span className="versionValue">{versionHash}</span>
+        </span>{' '}
       </span>
     </div>
   );

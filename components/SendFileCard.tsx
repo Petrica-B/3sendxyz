@@ -913,6 +913,9 @@ export function SendFileCard() {
             </div>
           )}
         </div>
+        <div className="muted" style={{ fontSize: 12, marginTop: 6, color: 'var(--accent)' }}>
+          The file will be available for 7 days, after which it will be deleted from the protocol.
+        </div>
         {sizeExceedsLimit && (
           <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>
             Files above 5 GB are not supported yet.

@@ -13,6 +13,7 @@ import { toast } from 'react-toastify';
 import { formatUnits } from 'viem';
 import { useAccount, useSignMessage } from 'wagmi';
 import { loadProfile } from '../profile/storage';
+import { RoundedLoaderList } from '@/components/RoundedLoader';
 
 type ReceivedItem = StoredUploadRecord & { id: string };
 type NoteState = {
@@ -468,11 +469,7 @@ export default function InboxPage() {
         <div className="subhead">Files sent to your wallet.</div>
       </div>
       <section className="col" style={{ gap: 12 }}>
-        {loading && (
-          <div className="muted" style={{ fontSize: 12 }}>
-            Loading inbox…
-          </div>
-        )}
+        {loading && <RoundedLoaderList count={5} />}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
             {records.slice((page - 1) * pageSize, page * pageSize).map((item) => {

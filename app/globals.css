@@ -246,6 +246,41 @@ select.input:focus-visible {
   border-radius: 8px;
   background: #fff;
 }
+
+/* Retro rounded loader: bordered container with small blocks pulsing inside */
+.transferItem.retroLoader {
+  align-items: center;
+  background: #fff;
+  border-color: var(--border);
+  min-height: 60px;
+}
+.rl-rows {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+.rl-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 16px;
+  gap: 6px;
+  overflow: hidden;
+}
+.rl-block {
+  width: 16px;
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  animation: rlPulse 1.15s ease-in-out infinite;
+}
+.rl-row:nth-child(2) .rl-block { height: 8px; }
+.rl-row:nth-child(3) .rl-block { height: 10px; }
+
+@keyframes rlPulse {
+  0% { opacity: 0.25; transform: scale(0.98); }
+  50% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0.25; transform: scale(0.98); }
+}
 .status {
   font-weight: 600;
 }

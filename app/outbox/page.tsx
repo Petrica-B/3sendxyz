@@ -6,6 +6,7 @@ import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
 import { useCallback, useEffect, useState } from 'react';
+import { RoundedLoaderList } from '@/components/RoundedLoader';
 import { toast } from 'react-toastify';
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
@@ -102,11 +103,7 @@ export default function OutboxPage() {
 
       <section className="col" style={{ gap: 12 }}>
         <div style={{ fontWeight: 700 }}>Sent items</div>
-        {loading && (
-          <div className="muted" style={{ fontSize: 12 }}>
-            Loading sent files…
-          </div>
-        )}
+        {loading && <RoundedLoaderList count={5} />}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
             {records.slice((page - 1) * pageSize, page * pageSize).map((item) => {

@@ -3,7 +3,10 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 ARG NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+ARG VERSION_HASH=unknown
 ENV NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID}
+ENV VERSION_HASH=${VERSION_HASH}
+ENV NEXT_PUBLIC_VERSION_HASH=${VERSION_HASH}
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
@@ -21,8 +24,13 @@ RUN npm run build
 FROM node:22-slim AS runtime
 WORKDIR /app
 
+ARG VERSION_HASH=unknown
+
 ENV NODE_ENV=production \
     PORT=3000
+
+ENV VERSION_HASH=${VERSION_HASH} \
+    NEXT_PUBLIC_VERSION_HASH=${VERSION_HASH}
 
 COPY --from=builder /app/.next/standalone        ./
 COPY --from=builder /app/.next/static            ./.next/static

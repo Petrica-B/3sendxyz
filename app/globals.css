@@ -434,9 +434,13 @@ select.input:focus-visible {
   color: var(--accent);
   font-weight: 400;
 }
-.servedBy .sep {
+.servedBy .versionSuffix {
   color: var(--muted);
-  margin: 0 4px;
+  font-size: 11px;
+}
+.servedBy .versionSuffix .versionValue {
+  color: var(--accent);
+  font-family: monospace;
 }
 .kbd {
   font-size: 12px;

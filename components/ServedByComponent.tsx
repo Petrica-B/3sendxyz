@@ -6,6 +6,7 @@ export default async function ServedBy() {
   const h = await headers();
   const hostId = h?.get('x-vercel-id') ?? process.env.EE_HOST_ID ?? 'unknown';
   const isUnknown = hostId.toLowerCase() === 'unknown';
+  const versionHash = process.env.NEXT_PUBLIC_VERSION_HASH ?? 'unknown';
 
   return (
     <div className="servedBy" style={{ border: '1px solid var(--border)' }}>
@@ -20,6 +21,9 @@ export default async function ServedBy() {
       </a>
       <span className="label">Edge node proudly serving this site:</span>
       <span className={isUnknown ? 'unknown' : 'nodeName'}>{hostId}</span>
+      <span className="versionSuffix">
+        (<span className="versionValue">#{versionHash}</span>)
+      </span>
     </div>
   );
 }

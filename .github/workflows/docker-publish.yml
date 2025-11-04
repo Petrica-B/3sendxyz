@@ -23,6 +23,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Determine version hash
+        id: version
+        run: echo "hash=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -44,4 +49,5 @@ jobs:
           platforms: linux/amd64
           build-args: |
             NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=${{ secrets.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
+            VERSION_HASH=${{ steps.version.outputs.hash }}
           tags: ${{ secrets.DOCKERHUB_IMAGE_TAGS }}

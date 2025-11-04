@@ -3,7 +3,7 @@
 import { formatBytes } from '@/lib/format';
 import type { AddressStatsRecord, PlatformStatsRecord } from '@/lib/types';
 import { useEffect, useMemo, useState } from 'react';
-import { RoundedLoaderList } from './RoundedLoader';
+import { RoundedLoader } from './RoundedLoader';
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 
@@ -201,8 +201,8 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
                 zIndex: 1,
               }}
             >
-              <div style={{ width: '100%', maxWidth: 720 }}>
-                <RoundedLoaderList count={1} rows={2} blocks={28} />
+              <div style={{ width: '100%', height: '100%' }}>
+                <RoundedLoader rows={3} blocks={36} full />
               </div>
             </div>
           )}

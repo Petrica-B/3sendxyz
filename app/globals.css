@@ -253,6 +253,7 @@ select.input:focus-visible {
   background: #fff;
   border-color: var(--border);
   min-height: 60px;
+  width: 100%;
 }
 .rl-rows {
   display: grid;
@@ -261,10 +262,9 @@ select.input:focus-visible {
 }
 .rl-row {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 16px;
+  width: 100%;
   gap: 6px;
-  overflow: hidden;
+  grid-template-columns: repeat(var(--rl-cols, 28), minmax(10px, 1fr));
 }
 .rl-block {
   width: 16px;

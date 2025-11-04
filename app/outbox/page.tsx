@@ -103,7 +103,7 @@ export default function OutboxPage() {
 
       <section className="col" style={{ gap: 12 }}>
         <div style={{ fontWeight: 700 }}>Sent items</div>
-        {loading && <RoundedLoaderList count={1} />}
+        {loading && <RoundedLoaderList count={1} rows={3} blocks={36} />}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>
             {records.slice((page - 1) * pageSize, page * pageSize).map((item) => {

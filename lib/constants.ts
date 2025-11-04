@@ -40,35 +40,35 @@ const GB = 1024 * MB;
 export const TIER_CONFIG: TierConfig[] = [
   {
     id: 0,
-    label: '⚡ Micro Send — $0.10 burn',
+    label: '⚡ Micro Send — $0.05 burn',
     description: 'Best for quick transfers up to 50 MB.',
     minBytes: 0,
     maxBytes: 50 * MB - 1,
-    usd: 0.1,
+    usd: 0.05,
   },
   {
     id: 1,
-    label: '📁 Standard Send — $0.25 burn',
+    label: '📁 Standard Send — $0.10 burn',
     description: 'Recommended for documents and medium files.',
     minBytes: 50 * MB,
     maxBytes: 500 * MB - 1,
-    usd: 0.25,
+    usd: 0.1,
   },
   {
     id: 2,
-    label: '🎬 Big Send — $0.75 burn',
+    label: '🎬 Big Send — $0.40 burn',
     description: 'Great for large media or project bundles.',
     minBytes: 500 * MB,
     maxBytes: 2 * GB - 1,
-    usd: 0.75,
+    usd: 0.4,
   },
   {
     id: 3,
-    label: '🗄️ Archive Send — $2.00 burn',
+    label: '🗄️ Archive Send — $1.00 burn',
     description: 'For archives and heavy payloads up to 5 GB.',
     minBytes: 2 * GB,
     maxBytes: 5 * GB,
-    usd: 2,
+    usd: 1,
   },
 ];
 

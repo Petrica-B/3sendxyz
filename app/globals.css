@@ -438,6 +438,10 @@ select.input:focus-visible {
   color: var(--muted);
   font-size: 11px;
 }
+.servedBy .versionValue {
+  color: var(--accent);
+  font-family: monospace;
+}
 .servedBy .versionSuffix .versionValue {
   color: var(--accent);
   font-family: monospace;

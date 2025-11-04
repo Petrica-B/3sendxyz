@@ -19,11 +19,12 @@ export default async function ServedBy() {
       >
         Ratio1
       </a>
-      <span className="label">Edge node proudly serving this site:</span>
+      <span className="label">Node serving this dApp:</span>
       <span className={isUnknown ? 'unknown' : 'nodeName'}>{hostId}</span>
-      <span className="versionSuffix">
-        (<span className="versionValue">#{versionHash}</span>)
-      </span>
+      <span className="label">|</span>
+      <span className="label">v.</span>
+
+      <span className="versionValue">{versionHash}</span>
     </div>
   );
 }

@@ -537,6 +537,21 @@ select.input:focus-visible {
   gap: 12px;
   grid-template-columns: 1fr;
 }
+/* Keep pricing header row items on a single line */
+.pricingGrid .row {
+  align-items: center;
+}
+.pricingGrid .row > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pricingGrid .row .pill {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
 @media (min-width: 640px) {
   .pricingGrid {
     grid-template-columns: repeat(2, 1fr);

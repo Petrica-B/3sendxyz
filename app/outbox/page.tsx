@@ -1,7 +1,6 @@
 'use client';
 
 import { AddressLink, TxLink } from '@/components/Links';
-import { SendFileCard } from '@/components/SendFileCard';
 import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
 import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
@@ -87,7 +86,7 @@ export default function OutboxPage() {
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">Outbox</div>
-          <div className="subhead">Connect your wallet to send files.</div>
+          <div className="subhead">Connect your wallet to see sent files.</div>
         </div>
       </main>
     );
@@ -97,12 +96,10 @@ export default function OutboxPage() {
     <main className="col" style={{ gap: 24 }}>
       <div className="hero">
         <div className="headline">Outbox</div>
-        <div className="subhead">Send encrypted files to another wallet.</div>
+        <div className="subhead">Files sent from your wallet.</div>
       </div>
-      <SendFileCard />
 
       <section className="col" style={{ gap: 12 }}>
-        <div style={{ fontWeight: 700 }}>Sent items</div>
         {loading && <RoundedLoaderList count={1} rows={3} blocks={36} />}
         {!loading && !error && records.length > 0 && (
           <div className="col" style={{ gap: 10 }}>

@@ -75,23 +75,63 @@ function PricingIcon() {
   );
 }
 
+function PaperPlaneIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {/* paper plane */}
+      <path d="M22 2L11 13" />
+      <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+    </svg>
+  );
+}
+
 
 export function MobileTabBar() {
   const pathname = usePathname();
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 
-  // Order: Home · Pricing · Outbox · Inbox
-  const items = [
-    { href: '/', label: 'Home', Icon: HomeIcon },
-    { href: '/pricing', label: 'Pricing', Icon: PricingIcon },
-    { href: '/outbox', label: 'Outbox', Icon: OutboxIcon }, //TODO verify if these disappear when not connected
-    { href: '/inbox', label: 'Inbox', Icon: InboxIcon },
-  ];
-
   return (
     <nav className="mobileTabbar" role="navigation" aria-label="Primary">
-      <div className="mobileTabbarInner">
-        {items.map(({ href, label, Icon }) => {
+      <div className="mobileTabbarInner singleRow">
+        {/* Left two */}
+        {[
+          { href: '/', label: 'Home', Icon: HomeIcon },
+          { href: '/pricing', label: 'Pricing', Icon: PricingIcon },
+        ].map(({ href, label, Icon }) => {
+          const active = isActive(href);
+          return (
+            <Link key={href} href={href} className={`mobileTabItem${active ? ' active' : ''}`}>
+              <Icon />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+
+        {/* Gap */}
+        <span className="mobileGap" aria-hidden />
+
+        {/* Center send */}
+        <Link href="/send" className="mobileCenterBtn" aria-label="Send file" title="Send">
+          <PaperPlaneIcon />
+          <span>Send</span>
+        </Link>
+
+        {/* Gap */}
+        <span className="mobileGap" aria-hidden />
+
+        {/* Right two */}
+        {[
+          { href: '/outbox', label: 'Outbox', Icon: OutboxIcon },
+          { href: '/inbox', label: 'Inbox', Icon: InboxIcon },
+        ].map(({ href, label, Icon }) => {
           const active = isActive(href);
           return (
             <Link key={href} href={href} className={`mobileTabItem${active ? ' active' : ''}`}>

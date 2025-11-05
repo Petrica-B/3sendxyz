@@ -118,6 +118,30 @@ export function Navbar() {
               <path d="M12 17h.01" />
             </svg>
           </Link>
+          <Link
+            href="/send"
+            aria-label="Send file"
+            className="button accent sendButtonNav"
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, gap: 8 }}
+            title="Send file"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              width="18"
+              height="18"
+              style={{ display: 'block' }}
+            >
+              <path d="M22 2L11 13" />
+              <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+            </svg>
+            Send File
+          </Link>
         </div>
       </div>
     </div>

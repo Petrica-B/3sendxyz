@@ -480,9 +480,29 @@ select.input:focus-visible {
   max-width: 960px;
   margin: 0 auto;
   padding: 6px 24px;
+}
+.mobileTabbarInner.singleRow {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: 1fr 1fr 12px auto 12px 1fr 1fr; /* two items · gap · send · gap · two items */
+  align-items: center;
+}
+.mobileGap { display: block; }
+.mobileCenterBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  font-weight: 800;
+}
+.mobileCenterBtn svg {
+  width: 20px;
+  height: 20px;
 }
 .mobileTabItem {
   display: flex;
@@ -503,11 +523,19 @@ select.input:focus-visible {
   font-weight: 700;
 }
 
+/* Mobile central FAB (send) */
+/* legacy: no floating action button anymore */
+.mobileFab { display: none !important; }
+
 /* Reserve space for the tabbar on small screens */
 @media (max-width: 767px) {
   body {
     padding-bottom: calc(56px + env(safe-area-inset-bottom));
   }
+  .sendButtonNav {
+    display: none;
+  }
+  .mobileTabbar { position: fixed; }
   /* Stack transfer items on mobile and place actions at the end on the right */
   .transferItem {
     flex-direction: column;
@@ -552,6 +580,13 @@ select.input:focus-visible {
     width: 100%;
     text-align: center;
     margin-top: 2px;
+  }
+}
+
+/* Hide top navbar Send button on small tablets too */
+@media (max-width: 1024px) {
+  .sendButtonNav {
+    display: none !important;
   }
 }
 @media (min-width: 768px) {

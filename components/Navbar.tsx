@@ -120,7 +120,7 @@ export function Navbar() {
           </Link>
           <Link
             href="/send"
-            aria-label="Send file"
+            aria-label="Send"
             className="button accent sendButtonNav"
             style={{
               display: 'inline-flex',
@@ -129,7 +129,7 @@ export function Navbar() {
               fontWeight: 800,
               gap: 8,
             }}
-            title="Send file"
+            title="Send"
           >
             Send
           </Link>

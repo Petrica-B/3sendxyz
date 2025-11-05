@@ -1,6 +1,7 @@
 import Dashboard from '@/components/Dashboard';
 import HomeCta from '@/components/HomeCta';
 import LogoPixelAnimation from '@/components/LogoPixelAnimation';
+import WelcomeModal from '@/components/WelcomeModal';
 import { getCachedPlatformStats } from '@/lib/stats';
 import type { Metadata } from 'next';
 
@@ -28,6 +29,7 @@ export default async function Home() {
   const platformStats = await getCachedPlatformStats();
   return (
     <main className="col" style={{ gap: 24 }}>
+      <WelcomeModal />
       <section className="hero">
         <div className="headline">
           Send files wallet-to-wallet

@@ -624,6 +624,57 @@ select.input:focus-visible {
   }
 }
 
+/* Welcome modal steps grid */
+.welcomeSteps {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .welcomeSteps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Welcome modal step cards: centered content + responsive icon */
+.welcomeStepCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  position: relative; /* allow absolute-positioned step number */
+}
+.welcomeStepNum {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--accent);
+  position: absolute;
+  left: 10px;
+  top: 10px;
+}
+.welcomeStepIcon {
+  width: 64px; /* larger on mobile */
+  height: 64px;
+  display: block;
+}
+@media (min-width: 640px) {
+  .welcomeStepIcon {
+    width: 44px; /* slightly smaller on larger screens */
+    height: 44px;
+  }
+}
+
 /* Home CTA actions: horizontal on desktop, full width on mobile */
 .homeCtaActions {
   display: flex;

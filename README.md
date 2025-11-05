@@ -35,8 +35,6 @@
 Set these variables in `.env.local` (never commit them):
 
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` – WalletConnect Cloud project id for RainbowKit.
-- `NEXT_PUBLIC_MINIAPP_URL` – canonical HTTPS origin used in the Base mini app manifest (defaults to `https://3send.xyz` when unset).
-- `MINIAPP_OWNER_ADDRESS` – Base account address that owns the mini app listing in Base Build.
 - `MINIAPP_ACCOUNT_ASSOCIATION_HEADER` / `MINIAPP_ACCOUNT_ASSOCIATION_PAYLOAD` / `MINIAPP_ACCOUNT_ASSOCIATION_SIGNATURE` – values generated in Base Build once the manifest is live.
 - `EE_CHAINSTORE_API_URL` / `CSTORE_API_URL` – Ratio1 CStore endpoint used by `@ratio1/edge-sdk-ts`.
 - `EE_R1FS_API_URL` / `R1FS_API_URL` – Ratio1 R1FS endpoint for encrypted payload storage.
@@ -44,8 +42,6 @@ Set these variables in `.env.local` (never commit them):
 - `EE_CHAINSTORE_PEERS` _(optional)_ – JSON array of peer URLs if you need to hydrate the SDK with additional Ratio1 nodes.
 - `RPC_URL_BASE` and `RPC_URL_BASE_SEPOLIA` _(optional)_ – override RPC endpoints for the on-chain receipt checks performed in `/api/send/upload`.
 - `EE_HOST_ID` _(optional)_ – shows which edge node served the request in `components/ServedByComponent.tsx`.
-- `MINIAPP_WEBHOOK_URL` _(optional)_ – automation endpoint to receive Base mini app events.
-- `MINIAPP_SCREENSHOT_URLS` _(optional)_ – comma-separated list of publicly hosted screenshots referenced in the Base manifest.
 
 The Ratio1 SDK also accepts the above variables via `window.__RATIO1_ENV__` when deployed.
 

@@ -22,10 +22,12 @@ const baseMetadata: Metadata = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const baseOther = baseMetadata.other as Record<string, string | number | (string | number)[]> | undefined;
+
   return {
     ...baseMetadata,
     other: {
-      ...(baseMetadata.other ?? {}),
+      ...(baseOther ?? {}),
       'fc:miniapp': JSON.stringify(buildMiniAppEmbedMetadata()),
     },
   };

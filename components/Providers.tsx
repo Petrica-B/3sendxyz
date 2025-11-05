@@ -1,9 +1,9 @@
 'use client';
 
 import { REQUIRED_CHAIN_ID, SUPPORTED_CHAINS } from '@/lib/constants';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { RainbowKitProvider, getDefaultConfig, lightTheme } from '@rainbow-me/rainbowkit';
 import '@rainbow-me/rainbowkit/styles.css';
-import { sdk } from '@farcaster/miniapp-sdk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useEffect, useState } from 'react';
 import { ToastContainer } from 'react-toastify';

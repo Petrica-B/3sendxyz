@@ -92,7 +92,7 @@ export default function WelcomeModal() {
         </button>
 
         <div id="welcome-modal-title" style={{ fontWeight: 700, fontSize: 18 }}>
-          Welcome to 3send
+          Welcome to <span style={{ color: 'var(--accent)' }}>3send</span>
         </div>
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.6 }}>
           Say goodbye to file-sharing privacy concerns. Send encrypted files wallet-to-wallet on
@@ -106,8 +106,9 @@ export default function WelcomeModal() {
               1
             </span>
             <Image className="welcomeStepIcon" src="/Connect.svg" alt="" width={40} height={40} />
+            <div style={{ fontWeight: 700, fontSize: 13 }}>Connect your wallet.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              Connect your wallet.
+              Start instantly — no accounts or setup required.
             </div>
           </div>
           {/* Step 2 */}
@@ -116,8 +117,9 @@ export default function WelcomeModal() {
               2
             </span>
             <Image className="welcomeStepIcon" src="/Upload.svg" alt="" width={40} height={40} />
+            <div style={{ fontWeight: 700, fontSize: 13 }}>Select files and a recipient address.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              Select files and a recipient address.
+              Choose what to send and who receives it.
             </div>
           </div>
           {/* Step 3 */}
@@ -126,9 +128,9 @@ export default function WelcomeModal() {
               3
             </span>
             <Image className="welcomeStepIcon" src="/Lock.svg" alt="" width={40} height={40} />
+            <div style={{ fontWeight: 700, fontSize: 13 }}>Encrypt locally and send decentralized.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              You encrypt locally and send decentralized by paying the platform burn (R1, USDC or
-              ETH).
+              Your files are sealed on your device and delivered via the Ratio1 network.
             </div>
           </div>
           {/* Step 4 */}
@@ -137,8 +139,9 @@ export default function WelcomeModal() {
               4
             </span>
             <Image className="welcomeStepIcon" src="/Unlock.svg" alt="" width={40} height={40} />
+            <div style={{ fontWeight: 700, fontSize: 13 }}>Recipient decrypts in their inbox.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              Recipient decrypts in their Inbox.
+              The recipient unlocks the file privately with their wallet.
             </div>
           </div>
         </div>
@@ -152,15 +155,6 @@ export default function WelcomeModal() {
             title="Read more"
           >
             Read more
-          </Link>
-          <Link
-            href="/send"
-            className="button accent"
-            onClick={dismiss}
-            aria-label="Send"
-            title="Send"
-          >
-            Send
           </Link>
         </div>
       </div>

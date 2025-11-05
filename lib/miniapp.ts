@@ -33,9 +33,9 @@ export const buildMiniAppManifest = () => {
       iconUrl: `${baseUrl}/Icon.png`,
       splashImageUrl: `${baseUrl}/Splash.png`,
       splashBackgroundColor: DEFAULT_SPLASH_BACKGROUND,
-      subtitle: 'Wallet-to-wallet file transfer on Base',
+      subtitle: 'Wallet to wallet file transfer',
       description:
-        'Send encrypted files peer-to-peer using Base wallets and Ratio1 infrastructure. Transfers stay private end-to-end.',
+        'Send encrypted files peer to peer using Base wallets and Ratio1 infrastructure. Transfers stay private end to end.',
       screenshotUrls: [
         `${baseUrl}/screenshots/s1.png`,
         `${baseUrl}/screenshots/s2.png`,
@@ -45,7 +45,7 @@ export const buildMiniAppManifest = () => {
       tags: ['file-transfer', 'base', 'encryption'],
       heroImageUrl: `${baseUrl}/Hero.png`,
       tagline: 'Encrypted file delivery for every Base wallet.',
-      ogTitle: '3send.xyz - P2P File Transfer',
+      ogTitle: '3send.xyz P2P File Transfer',
       ogDescription: 'P2P file transfer dapp using Ratio1 with Base wallet connect.',
       ogImageUrl: `${baseUrl}/Hero.png`,
     }),

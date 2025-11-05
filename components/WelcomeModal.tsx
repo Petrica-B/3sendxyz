@@ -48,21 +48,25 @@ export default function WelcomeModal() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 16,
+        padding: 12,
         zIndex: 50,
       }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') dismiss();
       }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) dismiss();
+      }}
     >
       <div
         className="card col"
         style={{
-          gap: 14,
+          gap: 10,
           maxWidth: 520,
           width: '100%',
           boxShadow: '0 10px 40px rgba(15, 23, 42, 0.25)',
           position: 'relative',
+          // No internal scrolling; keep layout compact instead
         }}
       >
         <button
@@ -87,8 +91,8 @@ export default function WelcomeModal() {
           </svg>
         </button>
 
-        <div id="welcome-modal-title" style={{ fontWeight: 800, fontSize: 18 }}>
-          Welcome to <span style={{ color: 'var(--accent)' }}>3send</span>
+        <div id="welcome-modal-title" style={{ fontWeight: 700, fontSize: 18 }}>
+          Welcome to 3send
         </div>
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.6 }}>
           Say goodbye to file-sharing privacy concerns. Send encrypted files wallet-to-wallet on
@@ -96,57 +100,50 @@ export default function WelcomeModal() {
         </div>
 
         <div className="welcomeSteps" aria-label="How it works">
-          {/* Step: Connect */}
+          {/* Step 1 */}
           <div className="welcomeStepCard">
             <span className="welcomeStepNum" aria-hidden>
               1
             </span>
-            <Image className="welcomeStepIcon" src="/Connect.svg" alt="" width={64} height={64} />
-            <div style={{ fontWeight: 700, fontSize: 13 }}>Connect your wallet</div>
+            <Image className="welcomeStepIcon" src="/Connect.svg" alt="" width={40} height={40} />
             <div className="muted" style={{ fontSize: 12 }}>
-              Open 3send and connect any crypto wallet.
+              Connect your wallet.
             </div>
           </div>
-          {/* Step: Lock (encrypt) */}
+          {/* Step 2 */}
           <div className="welcomeStepCard">
             <span className="welcomeStepNum" aria-hidden>
               2
             </span>
-            <Image className="welcomeStepIcon" src="/Upload.svg" alt="" width={64} height={64} />
-            <div style={{ fontWeight: 700, fontSize: 13 }}>
-              Upload file & enter recipient wallet
-            </div>
+            <Image className="welcomeStepIcon" src="/Upload.svg" alt="" width={40} height={40} />
             <div className="muted" style={{ fontSize: 12 }}>
-              Choose the file you want to send and paste the recipient’s wallet address.
+              Select files and a recipient address.
             </div>
           </div>
-          {/* Step: Upload */}
+          {/* Step 3 */}
           <div className="welcomeStepCard">
             <span className="welcomeStepNum" aria-hidden>
               3
             </span>
-            <Image className="welcomeStepIcon" src="/Lock.svg" alt="" width={64} height={64} />
-            <div style={{ fontWeight: 700, fontSize: 13 }}>Pay to encrypt & send</div>
+            <Image className="welcomeStepIcon" src="/Lock.svg" alt="" width={40} height={40} />
             <div className="muted" style={{ fontSize: 12 }}>
-              Confirm the burn fee with your wallet. 3send encrypts your file client-side and
-              delivers it to the recipient’s decentralized inbox.
+              You encrypt locally and send decentralized by paying the platform burn (R1, USDC or
+              ETH).
             </div>
           </div>
-          {/* Step: Unlock (recipient) */}
+          {/* Step 4 */}
           <div className="welcomeStepCard">
             <span className="welcomeStepNum" aria-hidden>
               4
             </span>
-            <Image className="welcomeStepIcon" src="/Unlock.svg" alt="" width={64} height={64} />
-            <div style={{ fontWeight: 700, fontSize: 13 }}>Recipient decrypts in their inbox</div>
+            <Image className="welcomeStepIcon" src="/Unlock.svg" alt="" width={40} height={40} />
             <div className="muted" style={{ fontSize: 12 }}>
-              The recipient connects their wallet, unlocks their keys, and decrypts the file locally
-              - fully private, end-to-end encrypted.
+              Recipient decrypts in their Inbox.
             </div>
           </div>
         </div>
 
-        <div className="row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+        <div className="row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
           <Link
             href="/docs"
             className="button secondary"

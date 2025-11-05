@@ -627,12 +627,12 @@ select.input:focus-visible {
 /* Welcome modal steps grid */
 .welcomeSteps {
   display: grid;
-  gap: 12px;
-  grid-template-columns: 1fr;
+  gap: 10px; /* tighter gaps to reduce height */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-@media (min-width: 640px) {
+@media (max-width: 360px) {
   .welcomeSteps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr; /* fall back to single column on very narrow screens */
   }
 }
 
@@ -642,8 +642,8 @@ select.input:focus-visible {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
-  padding: 12px;
+  gap: 6px; /* smaller vertical spacing */
+  padding: 10px; /* tighter padding */
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -652,7 +652,7 @@ select.input:focus-visible {
 .welcomeStepNum {
   display: inline-block;
   font-weight: 800;
-  font-size: 11px;
+  font-size: 10px; /* slightly smaller badge */
   line-height: 1;
   padding: 4px 8px;
   border-radius: 999px;
@@ -660,17 +660,17 @@ select.input:focus-visible {
   background: #fff;
   color: var(--accent);
   position: absolute;
-  left: 10px;
-  top: 10px;
+  left: 8px;
+  top: 8px;
 }
 .welcomeStepIcon {
-  width: 64px; /* larger on mobile */
-  height: 64px;
+  width: 40px; /* smaller to fit without scrolling */
+  height: 40px;
   display: block;
 }
 @media (min-width: 640px) {
   .welcomeStepIcon {
-    width: 44px; /* slightly smaller on larger screens */
+    width: 44px; /* a bit larger on bigger screens */
     height: 44px;
   }
 }

@@ -108,7 +108,7 @@ export default function WelcomeModal() {
             <Image className="welcomeStepIcon" src="/Connect.svg" alt="" width={40} height={40} />
             <div style={{ fontWeight: 700, fontSize: 13 }}>Connect your wallet.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              Start instantly — no accounts or setup required.
+              Start instantly - no accounts or setup required.
             </div>
           </div>
           {/* Step 2 */}
@@ -117,7 +117,9 @@ export default function WelcomeModal() {
               2
             </span>
             <Image className="welcomeStepIcon" src="/Upload.svg" alt="" width={40} height={40} />
-            <div style={{ fontWeight: 700, fontSize: 13 }}>Select files and a recipient address.</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>
+              Select files and a recipient address.
+            </div>
             <div className="muted" style={{ fontSize: 12 }}>
               Choose what to send and who receives it.
             </div>
@@ -128,7 +130,9 @@ export default function WelcomeModal() {
               3
             </span>
             <Image className="welcomeStepIcon" src="/Lock.svg" alt="" width={40} height={40} />
-            <div style={{ fontWeight: 700, fontSize: 13 }}>Encrypt locally and send decentralized.</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>
+              Encrypt locally and send decentralized.
+            </div>
             <div className="muted" style={{ fontSize: 12 }}>
               Your files are sealed on your device and delivered via the Ratio1 network.
             </div>

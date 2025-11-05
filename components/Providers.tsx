@@ -1,10 +1,11 @@
 'use client';
 
 import { REQUIRED_CHAIN_ID, SUPPORTED_CHAINS } from '@/lib/constants';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { RainbowKitProvider, getDefaultConfig, lightTheme } from '@rainbow-me/rainbowkit';
 import '@rainbow-me/rainbowkit/styles.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import type { Config } from 'wagmi';
@@ -31,6 +32,26 @@ const config = globalWithWagmi.wagmiConfig;
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (!('farcaster' in window)) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('Mini app environment not detected; skipping ready() call');
+      }
+      return;
+    }
+
+    sdk.actions.ready().catch((error) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('Mini app ready() failed', error);
+      }
+    });
+  }, []);
+
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>

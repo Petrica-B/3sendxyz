@@ -34,21 +34,8 @@ export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (!('farcaster' in window)) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.debug('Mini app environment not detected; skipping ready() call');
-      }
-      return;
-    }
-
     sdk.actions.ready().catch((error) => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.debug('Mini app ready() failed', error);
-      }
+      console.error('Mini app ready() failed', error);
     });
   }, []);
 

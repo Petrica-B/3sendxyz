@@ -12,17 +12,17 @@ const withValidProperties = <T extends ManifestRecord>(properties: T) =>
     )
   );
 
-const resolveAccountAssociation = () => ({
-  header: process.env.MINIAPP_ACCOUNT_ASSOCIATION_HEADER || '',
-  payload: process.env.MINIAPP_ACCOUNT_ASSOCIATION_PAYLOAD || '',
-  signature: process.env.MINIAPP_ACCOUNT_ASSOCIATION_SIGNATURE || '',
-});
-
 export const buildMiniAppManifest = () => {
   const baseUrl = normalizeUrl(DEFAULT_BASE_URL);
 
   return {
-    accountAssociation: resolveAccountAssociation(),
+    accountAssociation: {
+      header:
+        'eyJmaWQiOjE0NDE4MDYsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg1NDU3REE1N0Q1NTYzZDZiMjgzRDZmZWYyMzczMzhBNEI1YUU1QTFGIn0',
+      payload: 'eyJkb21haW4iOiIzc2VuZC54eXoifQ',
+      signature:
+        'HAO/Go1HGayEPFXgg+AGv5M57J1kUfJfCLcrl+dJCT8VJhUtkveK0cr1lx0pSNsgbfNu5SE+MOAyASJQgr6hRBw=',
+    },
     baseBuilder: {
       ownerAddress: '0x4ca1baf0125038cd0c5fcdff9c760bf95b92e484',
     },
@@ -33,7 +33,6 @@ export const buildMiniAppManifest = () => {
       iconUrl: `${baseUrl}/Icon.png`,
       splashImageUrl: `${baseUrl}/Splash.png`,
       splashBackgroundColor: DEFAULT_SPLASH_BACKGROUND,
-      //verify, not used webhookUrl: resolveWebhookUrl(),
       subtitle: 'Wallet-to-wallet file transfer on Base',
       description:
         'Send encrypted files peer-to-peer using Base wallets and Ratio1 infrastructure. Transfers stay private end-to-end.',

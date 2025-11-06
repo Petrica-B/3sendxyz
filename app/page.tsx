@@ -143,7 +143,7 @@ export default async function Home() {
             serve privacy‑concerned people and businesses better.
           </div>
         </div>
-        <div className="homeCtaActions">
+        <div className="homeCtaActions" style={{ justifyContent: 'flex-end', width: '100%' }}>
           <a
             href="https://t.me/threesendxyz"
             target="_blank"

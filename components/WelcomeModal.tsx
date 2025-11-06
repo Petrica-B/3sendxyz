@@ -163,13 +163,13 @@ export default function WelcomeModal() {
 
         <div className="row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
           <Link
-            href="/docs"
-            className="button secondary"
+            href="/"
+            className="button accent"
             onClick={dismiss}
-            aria-label="Read more"
-            title="Read more"
+            aria-label="Start now"
+            title="Start now"
           >
-            Read more
+            Start Now
           </Link>
         </div>
       </div>

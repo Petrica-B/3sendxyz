@@ -5,6 +5,7 @@ import WelcomeModal from '@/components/WelcomeModal';
 import { getCachedPlatformStats } from '@/lib/stats';
 import type { Metadata } from 'next';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
@@ -48,7 +49,7 @@ export default async function Home() {
       </section>
 
       <HomeCta />
-      <Dashboard initialPlatformStats={platformStats} />
+
       <section aria-labelledby="how-it-works-title" className="card col" style={{ gap: 12 }}>
         <div id="how-it-works-title" style={{ fontWeight: 800, fontSize: 16 }}>
           How it works
@@ -103,8 +104,28 @@ export default async function Home() {
             </div>
           </div>
         </div>
+        <div className="homeCtaActions" style={{ justifyContent: 'flex-end', width: '100%' }}>
+          <Link
+            href="/docs"
+            className="button"
+            style={{ textDecoration: 'none' }}
+            aria-label="Read more"
+            title="Read more"
+          >
+            Read more
+          </Link>
+          <Link
+            href="/send"
+            className="button accent"
+            style={{ textDecoration: 'none' }}
+            aria-label="Start sending"
+            title="Start sending"
+          >
+            Start sending
+          </Link>
+        </div>
       </section>
-
+      <Dashboard initialPlatformStats={platformStats} />
       <section
         className="card"
         style={{

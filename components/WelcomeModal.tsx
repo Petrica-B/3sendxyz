@@ -5,14 +5,25 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function WelcomeModal() {
-  const [open, setOpen] = useState<boolean>(() => {
-    try {
-      if (typeof window === 'undefined') return false;
-      return !localStorage.getItem('3send.welcome.seen');
-    } catch {
-      return true;
-    }
-  });
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      try {
+        const hasSeen = window.localStorage.getItem('3send.welcome.seen');
+        setOpen((prev) => (prev === !hasSeen ? prev : !hasSeen));
+      } catch {
+        setOpen(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Mark as seen immediately when we show it the first time
   useEffect(() => {

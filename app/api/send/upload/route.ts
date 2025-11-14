@@ -316,18 +316,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const signatureVerified = await verifyMessage({
-      address: initiatorAddress as `0x${string}`,
-      message: handshakeMessage,
-      signature,
-    });
-    if (!signatureVerified) {
-      return NextResponse.json(
-        { success: false, error: 'Handshake signature mismatch' },
-        { status: 400 }
-      );
-    }
-
     const rpcDetails = getRpcUrl(chainId);
     if (!rpcDetails) {
       return NextResponse.json({ success: false, error: 'Unsupported chain' }, { status: 400 });
@@ -335,6 +323,29 @@ export async function POST(request: Request) {
 
     const { chain, rpcUrl } = rpcDetails;
     const client = createPublicClient({ chain, transport: http(rpcUrl) });
+
+    let signatureVerified = false;
+    try {
+      signatureVerified = await client.verifyMessage({
+        address: initiatorAddress as `0x${string}`,
+        message: handshakeMessage,
+        signature,
+      });
+    } catch (err) {
+      console.warn('[upload] Failed smart wallet verification, falling back to EOA', err);
+      signatureVerified = await verifyMessage({
+        address: initiatorAddress as `0x${string}`,
+        message: handshakeMessage,
+        signature,
+      });
+    }
+
+    if (!signatureVerified) {
+      return NextResponse.json(
+        { success: false, error: 'Handshake signature mismatch' },
+        { status: 400 }
+      );
+    }
 
     let receipt;
     try {

@@ -22,6 +22,15 @@ import { base, baseSepolia, type Chain } from 'viem/chains';
 
 export const runtime = 'nodejs';
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '5gb',
+    },
+    responseLimit: false,
+  },
+};
+
 function getRpcUrl(chainId: number): { chain: Chain; rpcUrl: string } | null {
   const chain = chainId === base.id ? base : chainId === baseSepolia.id ? baseSepolia : null;
   if (!chain) return null;

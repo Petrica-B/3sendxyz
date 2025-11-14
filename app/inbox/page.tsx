@@ -1,9 +1,10 @@
 'use client';
 
 import { AddressLink, TxLink } from '@/components/Links';
+import { RoundedLoaderList } from '@/components/RoundedLoader';
 import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
 import { decodeBase64, decryptFileFromEnvelope, decryptNoteFromEnvelope } from '@/lib/encryption';
-import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
+import { formatBytes, formatDate, formatDateShort, nextUtcMidnight } from '@/lib/format';
 import { deriveSeedKeyPair } from '@/lib/keys';
 import { derivePasskeyX25519KeyPair } from '@/lib/passkeyClient';
 import type { RegisteredKeyRecord, RegisteredPasskeyRecord, StoredUploadRecord } from '@/lib/types';
@@ -13,7 +14,6 @@ import { toast } from 'react-toastify';
 import { formatUnits } from 'viem';
 import { useAccount, useSignMessage } from 'wagmi';
 import { loadProfile } from '../profile/storage';
-import { RoundedLoaderList } from '@/components/RoundedLoader';
 
 type ReceivedItem = StoredUploadRecord & { id: string };
 type NoteState = {
@@ -521,7 +521,7 @@ export default function InboxPage() {
               const rotationDisabledStyles = keyRotationLocked
                 ? { opacity: 0.55, cursor: 'not-allowed' as const }
                 : null;
-              const expiresAt = item.expiresAt ?? item.sentAt + FILE_EXPIRATION_MS;
+              const expiresAt = nextUtcMidnight(item.sentAt + FILE_EXPIRATION_MS);
               return (
                 <div key={item.id} className="transferItem">
                   <div style={{ flex: 1 }}>

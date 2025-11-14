@@ -37,6 +37,12 @@ export function formatDateShort(ts: number, locale: string = 'en-GB') {
   return d.toLocaleDateString(locale);
 }
 
+export function nextUtcMidnight(ts: number) {
+  if (!Number.isFinite(ts)) return ts;
+  const date = new Date(ts);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
+}
+
 export function daysLeft(expiryTs: number): string {
   const now = Date.now();
   const diff = Math.max(0, expiryTs - now);

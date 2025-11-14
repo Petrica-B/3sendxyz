@@ -87,7 +87,6 @@ export async function seedMockForAddress(address: string) {
       name: files[i],
       size: Math.floor(Math.random() * 5 * 1024 * 1024),
       createdAt,
-      expiresAt,
       status: 'available',
       packetId: `dummy-packet-${i}`,
       viaNodes: ['draco', 'lyra', 'aether'],

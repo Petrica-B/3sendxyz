@@ -32,7 +32,6 @@ export type StoredUploadRecord = {
   originalFilesize?: number;
   encryptedFilesize?: number;
   encryption?: EncryptionMetadata;
-  expiresAt?: number;
 };
 
 export type AddressStatsRecord = {

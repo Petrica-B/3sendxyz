@@ -1,11 +1,11 @@
 'use client';
 
 import { AddressLink, TxLink } from '@/components/Links';
+import { RoundedLoaderList } from '@/components/RoundedLoader';
 import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
-import { formatBytes, formatDate, formatDateShort } from '@/lib/format';
+import { formatBytes, formatDate, formatDateShort, nextUtcMidnight } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
 import { useCallback, useEffect, useState } from 'react';
-import { RoundedLoaderList } from '@/components/RoundedLoader';
 import { toast } from 'react-toastify';
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
@@ -119,7 +119,7 @@ export default function OutboxPage() {
               const hasEncryptedNote =
                 !hasPlainNote &&
                 Boolean(item.encryption?.noteCiphertext && item.encryption?.noteIv);
-              const expiresAt = item.expiresAt ?? item.sentAt + FILE_EXPIRATION_MS;
+              const expiresAt = nextUtcMidnight(item.sentAt + FILE_EXPIRATION_MS);
               return (
                 <div key={item.id} className="transferItem">
                   <div style={{ flex: 1 }}>

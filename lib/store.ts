@@ -1,3 +1,4 @@
+import { FILE_EXPIRATION_MS } from '@/lib/constants';
 import type { Ratio1Packet } from '@/lib/ratio1';
 
 export type OutboxStatus = 'pending' | 'encrypting' | 'sent' | 'failed';
@@ -23,7 +24,6 @@ export type InboxItem = {
   name: string;
   size: number;
   createdAt: number;
-  expiresAt: number;
   status: InboxStatus;
   packetId: string;
   viaNodes?: string[];
@@ -138,7 +138,9 @@ export function listInbox(address: string): InboxItem[] {
   const now = Date.now();
   const items = read<InboxItem[]>(keyInbox(address), []);
   // filter out expired and ongoing items (no ongoing section)
-  const filtered = items.filter((it) => now <= it.expiresAt && it.status !== 'ongoing');
+  const filtered = items.filter(
+    (it) => now <= it.createdAt + FILE_EXPIRATION_MS && it.status !== 'ongoing'
+  );
   if (filtered.length !== items.length) write(keyInbox(address), filtered);
   return filtered.sort((a, b) => b.createdAt - a.createdAt);
 }

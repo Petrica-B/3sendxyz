@@ -17,7 +17,14 @@ import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { Buffer } from 'node:buffer';
-import { createPublicClient, decodeEventLog, http, isAddress, verifyMessage } from 'viem';
+import {
+  createPublicClient,
+  decodeEventLog,
+  http,
+  isAddress,
+  isErc6492Signature,
+  verifyMessage,
+} from 'viem';
 import { base, baseSepolia, type Chain } from 'viem/chains';
 
 export const runtime = 'nodejs';
@@ -367,9 +374,14 @@ export async function POST(request: Request) {
       throw new Error('Payment transaction not confirmed');
     }
 
-    const receiptInitiator = receipt.from?.toLowerCase();
-    if (!receiptInitiator || receiptInitiator !== initiatorAddr) {
-      throw new Error('Payment transaction initiator does not match sender');
+    const typedSignature = signature as `0x${string}`;
+    const maybeSmartWalletSignature =
+      typedSignature.length > 132 || isErc6492Signature(typedSignature);
+    if (!maybeSmartWalletSignature) {
+      const receiptInitiator = receipt.from?.toLowerCase();
+      if (!receiptInitiator || receiptInitiator !== initiatorAddr) {
+        throw new Error('Payment transaction initiator does not match sender');
+      }
     }
 
     const paymentLog = receipt.logs

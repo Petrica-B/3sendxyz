@@ -711,7 +711,7 @@ export function SendFileCard() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || 'Upload failed');
+        throw new Error(payload?.error || `Upload failed with status ${response.status}.`);
       }
 
       setFile(null);
@@ -927,7 +927,10 @@ export function SendFileCard() {
             {!quoteLoading && !quoteError && quoteData && (
               <div className="col" style={{ gap: 12 }}>
                 <div className="col" style={{ gap: 8 }}>
-                  <span className="muted mono" style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>
+                  <span
+                    className="muted mono"
+                    style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}
+                  >
                     Select your preferred payment asset.
                   </span>
                   <div className="paymentOptions">

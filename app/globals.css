@@ -365,42 +365,6 @@ select.input:focus-visible {
   }
 }
 
-/* Inline loading bar for primary CTA */
-.loadingBar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.loadingBarTrack {
-  position: relative;
-  width: 80px;
-  height: 10px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.08);
-}
-.loadingBarFill {
-  position: absolute;
-  inset: 0;
-  width: 180%;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--accent) 0,
-    var(--accent) 12px,
-    #fcd34d 12px,
-    #fcd34d 24px
-  );
-  animation: loadingBarSlide 1s linear infinite;
-  transform: translateX(-40%);
-  opacity: 0.9;
-}
-@keyframes loadingBarSlide {
-  to {
-    transform: translateX(0%);
-  }
-}
-
 /* (removed skeleton bar styles) */
 
 /* Pagination controls */

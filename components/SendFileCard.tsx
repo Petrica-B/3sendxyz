@@ -773,12 +773,8 @@ export function SendFileCard() {
     ? `Switch to ${REQUIRED_CHAIN_NAME}`
     : sending
       ? (
-          <span className="row" style={{ gap: 10, justifyContent: 'center' }}>
-            <span className="loadingBar" aria-hidden="true">
-              <span className="loadingBarTrack">
-                <span className="loadingBarFill" />
-              </span>
-            </span>
+          <span className="row" style={{ gap: 8, justifyContent: 'center' }}>
+            <span className="spinner" aria-hidden="true" style={{ width: 16, height: 16 }} />
             <span>Sending…</span>
           </span>
         )

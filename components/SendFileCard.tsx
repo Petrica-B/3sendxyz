@@ -768,10 +768,20 @@ export function SendFileCard() {
     writeContractAsync,
   ]);
 
-  const buttonLabel = wrongNetwork
+  const statusMessage = sending && status ? status : null;
+  const buttonContent = wrongNetwork
     ? `Switch to ${REQUIRED_CHAIN_NAME}`
     : sending
-      ? (status ?? 'Processing…')
+      ? (
+          <span className="row" style={{ gap: 10, justifyContent: 'center' }}>
+            <span className="loadingBar" aria-hidden="true">
+              <span className="loadingBarTrack">
+                <span className="loadingBarFill" />
+              </span>
+            </span>
+            <span>Sending…</span>
+          </span>
+        )
       : `Send with ${paymentAsset}`;
 
   return (
@@ -1079,10 +1089,23 @@ export function SendFileCard() {
           Switch your wallet network to {REQUIRED_CHAIN_NAME} to send files.
         </div>
       )}
-      <div className="row" style={{ justifyContent: 'flex-end' }}>
-        <button className="button" onClick={onSend} disabled={disabled}>
-          {buttonLabel}
-        </button>
+      <div className="col" style={{ alignItems: 'flex-end', gap: 6 }}>
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button
+            className="button"
+            onClick={onSend}
+            disabled={disabled}
+            aria-busy={sending || undefined}
+            aria-live="polite"
+          >
+            {buttonContent}
+          </button>
+        </div>
+        {statusMessage ? (
+          <div className="muted" style={{ fontSize: 12, textAlign: 'right' }} role="status">
+            {statusMessage}
+          </div>
+        ) : null}
       </div>
     </div>
   );

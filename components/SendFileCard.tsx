@@ -769,17 +769,16 @@ export function SendFileCard() {
   ]);
 
   const statusLabel = status ?? 'Processing…';
-  const statusMessage = sending && status ? status : null;
-  const buttonContent = wrongNetwork
-    ? `Switch to ${REQUIRED_CHAIN_NAME}`
-    : sending
-      ? (
-          <span className="row" style={{ gap: 8, justifyContent: 'center' }}>
-            <span className="spinner" aria-hidden="true" style={{ width: 16, height: 16 }} />
-            <span>{statusLabel}</span>
-          </span>
-        )
-      : `Send with ${paymentAsset}`;
+  const buttonContent = wrongNetwork ? (
+    `Switch to ${REQUIRED_CHAIN_NAME}`
+  ) : sending ? (
+    <span className="row" style={{ gap: 8, justifyContent: 'center' }}>
+      <span className="spinner" aria-hidden="true" style={{ width: 16, height: 16 }} />
+      <span>{statusLabel}</span>
+    </span>
+  ) : (
+    `Send with ${paymentAsset}`
+  );
 
   return (
     <div className="card col" style={{ gap: 16 }}>
@@ -1098,11 +1097,6 @@ export function SendFileCard() {
             {buttonContent}
           </button>
         </div>
-        {statusMessage ? (
-          <div className="muted" style={{ fontSize: 12, textAlign: 'right' }} role="status">
-            {statusMessage}
-          </div>
-        ) : null}
       </div>
     </div>
   );

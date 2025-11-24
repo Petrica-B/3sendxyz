@@ -1,22 +1,50 @@
 'use client';
 
-import { shortAddress } from '@/lib/format';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
 
 export function MinimalConnect() {
-  const { address, isConnected } = useAccount();
   return (
     <ConnectButton.Custom>
-      {({ openAccountModal, openConnectModal }) => (
-        <button
-          type="button"
-          className="button"
-          onClick={isConnected ? openAccountModal : openConnectModal}
-        >
-          {isConnected ? shortAddress(address || '', 4) : 'Connect Wallet'}
-        </button>
-      )}
+      {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+        const connected = mounted && account && chain;
+
+        return (
+          <div
+            {...(!mounted && {
+              'aria-hidden': true,
+              style: {
+                opacity: 0,
+                pointerEvents: 'none',
+                userSelect: 'none',
+              },
+            })}
+          >
+            {(() => {
+              if (!connected) {
+                return (
+                  <button onClick={openConnectModal} className="button" type="button">
+                    Connect Wallet
+                  </button>
+                );
+              }
+
+              if (chain.unsupported) {
+                return (
+                  <button onClick={openChainModal} className="button" type="button">
+                    Switch Network
+                  </button>
+                );
+              }
+
+              return (
+                <button onClick={openAccountModal} className="button" type="button">
+                  {account.displayName}
+                </button>
+              );
+            })()}
+          </div>
+        );
+      }}
     </ConnectButton.Custom>
   );
 }

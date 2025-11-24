@@ -768,6 +768,7 @@ export function SendFileCard() {
     writeContractAsync,
   ]);
 
+  const statusLabel = status ?? 'Processing…';
   const statusMessage = sending && status ? status : null;
   const buttonContent = wrongNetwork
     ? `Switch to ${REQUIRED_CHAIN_NAME}`
@@ -775,7 +776,7 @@ export function SendFileCard() {
       ? (
           <span className="row" style={{ gap: 8, justifyContent: 'center' }}>
             <span className="spinner" aria-hidden="true" style={{ width: 16, height: 16 }} />
-            <span>Sending…</span>
+            <span>{statusLabel}</span>
           </span>
         )
       : `Send with ${paymentAsset}`;

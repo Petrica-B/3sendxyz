@@ -218,16 +218,6 @@ export function SendFileCard() {
     }
   }, [isOnSupportedChain, quoteError]);
 
-  useEffect(() => {
-    if (freeAllowanceError) {
-      const message =
-        freeAllowanceError instanceof Error && freeAllowanceError.message
-          ? freeAllowanceError.message
-          : 'Failed to load free micro-send allowance.';
-      toast.error(message, { toastId: 'free-allowance-error' });
-    }
-  }, [freeAllowanceError]);
-
   const {
     data: walletBalances,
     isFetching: balancesLoading,
@@ -291,6 +281,21 @@ export function SendFileCard() {
       return payload.allowance as FreeSendAllowance;
     },
   });
+
+  useEffect(() => {
+    if (freeAllowanceError) {
+      const message =
+        freeAllowanceError instanceof Error && freeAllowanceError.message
+          ? freeAllowanceError.message
+          : 'Failed to load free micro-send allowance.';
+      toast.error(message, { toastId: 'free-allowance-error' });
+    }
+  }, [freeAllowanceError]);
+
+  const isMicroTierSelected = tierInfo?.id === FREE_MICRO_TIER_ID;
+  const freeRemaining = freeAllowance?.remaining ?? 0;
+  const freeLimit = freeAllowance?.limit ?? 0;
+  const freeSendEligible = Boolean(isMicroTierSelected && freeRemaining > 0);
 
   const quoteDataForDisplay = isOnSupportedChain ? quoteData : null;
   const walletBalancesForDisplay = isOnSupportedChain ? walletBalances : null;
@@ -564,11 +569,6 @@ export function SendFileCard() {
 
     return map;
   }, [ethDisplay, ethMaxDisplay, quoteDataForDisplay, r1Display, r1MaxDisplay, usdcDisplay]);
-
-  const isMicroTierSelected = tierInfo?.id === FREE_MICRO_TIER_ID;
-  const freeRemaining = freeAllowance?.remaining ?? 0;
-  const freeLimit = freeAllowance?.limit ?? 0;
-  const freeSendEligible = Boolean(isMicroTierSelected && freeRemaining > 0);
 
   useEffect(() => {
     if (freeSendEligible && !userOverrodeFreeSend) {

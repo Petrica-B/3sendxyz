@@ -11,6 +11,7 @@ import {
   parseSendHandshakeMessage,
 } from '@/lib/handshake';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
+import { consumeFreeSend, isFreePaymentReference, isMicroTier } from '@/lib/freeSends';
 import { PLATFORM_STATS_CACHE_TAG, updateStatsAfterUpload } from '@/lib/stats';
 import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
@@ -65,6 +66,8 @@ export async function POST(request: Request) {
     const signatureRaw = formData.get('signature');
     const sentAtRaw = formData.get('sentAt');
     const paymentTxHashRaw = formData.get('paymentTxHash');
+    const paymentAssetRaw = formData.get('paymentAsset');
+    const paymentTypeRaw = formData.get('paymentType');
     const chainIdRaw = formData.get('chainId');
     const tierIdRaw = formData.get('tierId');
     const originalSizeRaw = formData.get('originalSize');
@@ -118,9 +121,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (typeof paymentTxHashRaw !== 'string' || !paymentTxHashRaw.startsWith('0x')) {
+    if (typeof paymentTxHashRaw !== 'string' || paymentTxHashRaw.trim().length === 0) {
       return NextResponse.json({ success: false, error: 'Missing paymentTxHash' }, { status: 400 });
     }
+    const paymentTxHashProvided = paymentTxHashRaw.trim().toLowerCase();
 
     const handshakeMessage = handshakeMessageRaw.replace(/\r\n/g, '\n').trim();
     if (handshakeMessage.length === 0) {
@@ -130,7 +134,7 @@ export async function POST(request: Request) {
       );
     }
     const signature = signatureRaw.trim() as `0x${string}`;
-    const paymentTxHash = paymentTxHashRaw.toLowerCase() as `0x${string}`;
+    const paymentTxHash = paymentTxHashProvided;
 
     const chainId = typeof chainIdRaw === 'string' ? Number(chainIdRaw) : Number(chainIdRaw ?? NaN);
     if (!Number.isInteger(chainId) || chainId <= 0) {
@@ -332,6 +336,41 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedPaymentType =
+      typeof paymentTypeRaw === 'string' && paymentTypeRaw.toUpperCase() === 'FREE'
+        ? 'FREE'
+        : 'PAID';
+    let paymentAsset =
+      typeof paymentAssetRaw === 'string' && paymentAssetRaw.trim().length > 0
+        ? paymentAssetRaw.trim().toUpperCase()
+        : undefined;
+    const isFreePayment = isFreePaymentReference(paymentTxHash);
+
+    if (!isFreePayment && normalizedPaymentType === 'FREE') {
+      return NextResponse.json(
+        { success: false, error: 'Payment type mismatch for paid transfer' },
+        { status: 400 }
+      );
+    }
+
+    if (isFreePayment && !isMicroTier(expectedTier.id)) {
+      return NextResponse.json(
+        { success: false, error: 'Free micro-sends only apply to the smallest tier' },
+        { status: 400 }
+      );
+    }
+
+    if (!isFreePayment && !paymentTxHash.startsWith('0x')) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid paymentTxHash for paid transfer' },
+        { status: 400 }
+      );
+    }
+
+    if (isFreePayment) {
+      paymentAsset = 'FREE';
+    }
+
     const rpcDetails = getRpcUrl(chainId);
     if (!rpcDetails) {
       return NextResponse.json({ success: false, error: 'Unsupported chain' }, { status: 400 });
@@ -363,57 +402,62 @@ export async function POST(request: Request) {
       );
     }
 
-    let receipt;
-    try {
-      receipt = await client.getTransactionReceipt({ hash: paymentTxHash });
-    } catch {
-      throw new Error('Payment transaction not found or not yet indexed');
-    }
+    let eventUsdcAmount = 0n;
+    let eventR1Amount = 0n;
 
-    if (!receipt || receipt.status !== 'success') {
-      throw new Error('Payment transaction not confirmed');
-    }
-
-    const typedSignature = signature as `0x${string}`;
-    const maybeSmartWalletSignature =
-      typedSignature.length > 132 || isErc6492Signature(typedSignature);
-    if (!maybeSmartWalletSignature) {
-      const receiptInitiator = receipt.from?.toLowerCase();
-      if (!receiptInitiator || receiptInitiator !== initiatorAddr) {
-        throw new Error('Payment transaction initiator does not match sender');
+    if (!isFreePayment) {
+      let receipt;
+      try {
+        receipt = await client.getTransactionReceipt({ hash: paymentTxHash as `0x${string}` });
+      } catch {
+        throw new Error('Payment transaction not found or not yet indexed');
       }
-    }
 
-    const paymentLog = receipt.logs
-      .map((log) => {
-        try {
-          return decodeEventLog({
-            abi: Manager3sendAbi,
-            data: log.data,
-            topics: log.topics,
-          });
-        } catch (error) {
-          return null;
+      if (!receipt || receipt.status !== 'success') {
+        throw new Error('Payment transaction not confirmed');
+      }
+
+      const typedSignature = signature as `0x${string}`;
+      const maybeSmartWalletSignature =
+        typedSignature.length > 132 || isErc6492Signature(typedSignature);
+      if (!maybeSmartWalletSignature) {
+        const receiptInitiator = receipt.from?.toLowerCase();
+        if (!receiptInitiator || receiptInitiator !== initiatorAddr) {
+          throw new Error('Payment transaction initiator does not match sender');
         }
-      })
-      .find((decoded) => decoded?.eventName === 'PaymentProcessed');
+      }
 
-    if (!paymentLog || !paymentLog.args) {
-      throw new Error('PaymentProcessed event not found in transaction');
+      const paymentLog = receipt.logs
+        .map((log) => {
+          try {
+            return decodeEventLog({
+              abi: Manager3sendAbi,
+              data: log.data,
+              topics: log.topics,
+            });
+          } catch (error) {
+            return null;
+          }
+        })
+        .find((decoded) => decoded?.eventName === 'PaymentProcessed');
+
+      if (!paymentLog || !paymentLog.args) {
+        throw new Error('PaymentProcessed event not found in transaction');
+      }
+
+      const logTier = Number(paymentLog.args.tier ?? -1);
+      if (logTier !== expectedTier.id) {
+        throw new Error('Payment tier does not match file size');
+      }
+
+      const logSender = String(paymentLog.args.sender ?? '').toLowerCase();
+      if (logSender !== initiatorAddr) {
+        throw new Error('Payment sender does not match initiator');
+      }
+
+      eventUsdcAmount = (paymentLog.args.usdcAmount ?? 0n) as bigint;
+      eventR1Amount = (paymentLog.args.r1Amount ?? 0n) as bigint;
     }
-
-    const logTier = Number(paymentLog.args.tier ?? -1);
-    if (logTier !== expectedTier.id) {
-      throw new Error('Payment tier does not match file size');
-    }
-
-    const logSender = String(paymentLog.args.sender ?? '').toLowerCase();
-    if (logSender !== initiatorAddr) {
-      throw new Error('Payment sender does not match initiator');
-    }
-
-    const eventUsdcAmount = (paymentLog.args.usdcAmount ?? 0n) as bigint;
-    const eventR1Amount = (paymentLog.args.r1Amount ?? 0n) as bigint;
 
     const ratio1 = createEdgeSdk();
     try {
@@ -423,13 +467,23 @@ export async function POST(request: Request) {
       });
       if (existingPaymentUsage) {
         return NextResponse.json(
-          { success: false, error: 'Payment transaction hash already used for upload' },
+          { success: false, error: 'Payment reference already used for upload' },
           { status: 400 }
         );
       }
     } catch (err) {
       console.error('[upload] Failed to check payment hash reuse', err);
       throw new Error('Failed to verify payment transaction hash status');
+    }
+
+    if (isFreePayment) {
+      try {
+        await consumeFreeSend(initiatorAddr, sentTimestamp, ratio1);
+      } catch (err) {
+        const message =
+          err instanceof Error && err.message ? err.message : 'Unable to reserve free transfer.';
+        return NextResponse.json({ success: false, error: message }, { status: 400 });
+      }
     }
     const fileBase64 = await file.arrayBuffer();
     const file_base64_str = Buffer.from(fileBase64).toString('base64');
@@ -463,6 +517,8 @@ export async function POST(request: Request) {
       tierId: expectedTier.id,
       usdcAmount: eventUsdcAmount.toString(),
       r1Amount: eventR1Amount.toString(),
+      paymentType: isFreePayment ? 'free' : 'paid',
+      paymentAsset,
       originalFilename: originalFilename ?? file.name,
       originalMimeType,
       originalFilesize: parsedOriginalSize ?? undefined,

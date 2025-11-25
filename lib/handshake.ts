@@ -1,3 +1,4 @@
+import { FREE_PAYMENT_REFERENCE_PREFIX } from '@/lib/constants';
 import type { EncryptionMetadata } from '@/lib/types';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
@@ -41,6 +42,10 @@ function normalizeAddress(value: string): string {
   return `0x${trimmed.slice(2).toLowerCase()}`;
 }
 
+function sanitizeDisplayValue(value: string): string {
+  return value.replace(/[\r\n]/g, ' ').replace(/:/g, '-').replace(/\s+/g, ' ').trim();
+}
+
 function normalizeHex(value: string): string {
   const trimmed = value.trim();
   if (!trimmed.startsWith('0x')) {
@@ -49,8 +54,12 @@ function normalizeHex(value: string): string {
   return `0x${trimmed.slice(2).toLowerCase()}`;
 }
 
-function sanitizeDisplayValue(value: string): string {
-  return value.replace(/[\r\n]/g, ' ').replace(/:/g, '-').replace(/\s+/g, ' ').trim();
+function normalizePaymentReference(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.toLowerCase().startsWith(FREE_PAYMENT_REFERENCE_PREFIX)) {
+    return trimmed.toLowerCase();
+  }
+  return normalizeHex(trimmed);
 }
 
 function toSafeInteger(value: number): number {
@@ -84,7 +93,7 @@ export function computeEncryptionMetadataDigest(metadata: EncryptionMetadata): s
 export function buildSendHandshakeMessage(params: BuildSendHandshakeMessageParams): string {
   const sender = normalizeAddress(params.initiator);
   const recipient = normalizeAddress(params.recipient);
-  const paymentTx = normalizeHex(params.paymentTxHash);
+  const paymentTx = normalizePaymentReference(params.paymentTxHash);
   const sentAt = toSafeInteger(params.sentAt);
   const plaintextBytes = toSafeInteger(params.plaintextBytes);
   const ciphertextBytes = toSafeInteger(params.ciphertextBytes);
@@ -169,7 +178,7 @@ export function parseSendHandshakeMessage(message: string): ParsedSendHandshakeM
 
   const sender = normalizeAddress(senderRaw);
   const recipient = normalizeAddress(recipientRaw);
-  const paymentTxHash = normalizeHex(paymentTxRaw);
+  const paymentTxHash = normalizePaymentReference(paymentTxRaw);
   const chainId = parseRequiredNumber(fields, 'Chain ID');
   const sentAtMs = parseRequiredNumber(fields, 'Sent At (ms)');
   const tierId = parseRequiredNumber(fields, 'Tier ID');

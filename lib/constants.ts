@@ -14,6 +14,7 @@ export const VAULT_CSTORE_HKEY = '3sendxyz_vault';
 export const REGISTERED_KEYS_CSTORE_HKEY = '3sendxyz_register_keys';
 export const STATS_CSTORE_HKEY = '3sendxyz_stats';
 export const FILE_CLEANUP_INDEX_CSTORE_HKEY = '3sendxyz_file_cleanup_index';
+export const FREE_SENDS_CSTORE_HKEY = '3sendxyz_free_sends';
 export const FILE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 export const SUPPORTED_CHAINS = [base] as const satisfies readonly Chain[];
@@ -33,6 +34,10 @@ export const MANAGER_CONTRACT_ADDRESS = '0x6660d6b8eB523cEC00ecc4091174d006De5F7
 export const R1_CONTRACT_ADDRESS = '0x6444C6c2D527D85EA97032da9A7504d6d1448ecF' as const;
 export const USDC_CONTRACT_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const;
 export const WETH_CONTRACT_ADDRESS = '0x4200000000000000000000000000000000000006' as const;
+
+export const FREE_MICRO_SENDS_PER_MONTH = 3;
+export const FREE_MICRO_TIER_ID = 0;
+export const FREE_PAYMENT_REFERENCE_PREFIX = 'free:';
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;

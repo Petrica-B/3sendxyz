@@ -1,4 +1,5 @@
 import PricingCta from '@/components/PricingCta';
+import { PricingFreeAllowanceCard } from '@/components/PricingFreeAllowanceCard';
 import { TIER_CONFIG } from '@/lib/constants';
 import type { TierConfig } from '@/lib/types';
 import type { Metadata } from 'next';
@@ -72,6 +73,7 @@ export default function PricingPage() {
       </section>
 
       <PricingCta />
+      <PricingFreeAllowanceCard />
 
       <div className="pricingGrid">
         {TIER_CONFIG.map((tier) => {

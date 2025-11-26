@@ -115,6 +115,10 @@ export default function OutboxPage() {
               } catch {}
               const r1Display = r1Burn ? Number.parseFloat(r1Burn).toFixed(6) : null;
               const usdDisplay = usdBurn ? Number.parseFloat(usdBurn).toFixed(2) : null;
+              const isFreeTransfer =
+                item.paymentType === 'free' ||
+                item.paymentAsset === 'FREE' ||
+                (!item.txHash.startsWith('0x') && item.tierId === 0);
               const hasPlainNote = typeof item.note === 'string' && item.note.length > 0;
               const hasEncryptedNote =
                 !hasPlainNote &&
@@ -139,11 +143,23 @@ export default function OutboxPage() {
                           from: <AddressLink address={item.initiator} size={5} />
                         </div>
                         <div>
-                          tx: <TxLink tx={item.txHash} size={5} />
+                          tx:{' '}
+                          {isFreeTransfer ? (
+                            <span className="muted">Free micro-send</span>
+                          ) : (
+                            <TxLink tx={item.txHash} size={5} />
+                          )}
                         </div>
                         <div>tier: {tier ? tier.label : `Tier ${item.tierId}`}</div>
                         <div>
-                          burned: {r1Display ?? '-'} R1 {usdDisplay ? `(≈ ${usdDisplay} $)` : ''}
+                          burned:{' '}
+                          {isFreeTransfer ? (
+                            '0 R1 (free credit)'
+                          ) : (
+                            <>
+                              {r1Display ?? '-'} R1 {usdDisplay ? `(≈ ${usdDisplay} $)` : ''}
+                            </>
+                          )}
                         </div>
                         <div>
                           note: {hasPlainNote ? item.note : hasEncryptedNote ? '(encrypted)' : '-'}

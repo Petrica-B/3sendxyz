@@ -2,18 +2,21 @@
 
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import {
+  FREE_MICRO_SENDS_PER_MONTH,
+  FREE_MICRO_TIER_ID,
+  FREE_PAYMENT_REFERENCE_PREFIX,
+  isSupportedChainId,
   MANAGER_CONTRACT_ADDRESS,
   MAX_FILE_BYTES,
   R1_CONTRACT_ADDRESS,
   REQUIRED_CHAIN_NAME,
+  resolveTierBySize,
   USDC_CONTRACT_ADDRESS,
   WETH_CONTRACT_ADDRESS,
-  isSupportedChainId,
-  resolveTierBySize,
 } from '@/lib/constants';
 import { encryptFileForRecipient } from '@/lib/encryption';
 import { buildSendHandshakeMessage } from '@/lib/handshake';
-import { QuoteData } from '@/lib/types';
+import { FreeSendAllowance, QuoteData } from '@/lib/types';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -251,6 +254,47 @@ export function SendFileCard() {
     },
   });
 
+  const {
+    data: freeAllowance,
+    isFetching: freeAllowanceLoading,
+    error: freeAllowanceError,
+    refetch: refetchFreeAllowance,
+  } = useQuery<FreeSendAllowance | null>({
+    queryKey: ['free-allowance', address],
+    enabled: Boolean(address),
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!address) return null;
+      const response = await fetch(
+        `/api/send/freeAllowance?address=${encodeURIComponent(address)}`
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success || !payload.allowance) {
+        const message =
+          (payload?.error as string | undefined) || 'Failed to fetch free micro-send allowance.';
+        throw new Error(message);
+      }
+      return payload.allowance as FreeSendAllowance;
+    },
+  });
+
+  useEffect(() => {
+    if (freeAllowanceError) {
+      const message =
+        freeAllowanceError instanceof Error && freeAllowanceError.message
+          ? freeAllowanceError.message
+          : 'Failed to load free micro-send allowance.';
+      toast.error(message, { toastId: 'free-allowance-error' });
+    }
+  }, [freeAllowanceError]);
+
+  const isMicroTierSelected = tierInfo?.id === FREE_MICRO_TIER_ID;
+  const freeRemaining = freeAllowance?.remaining ?? 0;
+  const freeLimit = freeAllowance?.limit ?? 0;
+  const freeSendEligible = Boolean(isMicroTierSelected && freeRemaining > 0);
+  const useFreeSend = freeSendEligible;
+
   const quoteDataForDisplay = isOnSupportedChain ? quoteData : null;
   const walletBalancesForDisplay = isOnSupportedChain ? walletBalances : null;
 
@@ -320,6 +364,10 @@ export function SendFileCard() {
     if (sizeExceedsLimit) return true;
     if (!isOnSupportedChain) return true;
     if (!MANAGER_CONTRACT_ADDRESS) return true;
+    if (useFreeSend && freeSendEligible) {
+      if (freeAllowanceLoading) return true;
+      return false;
+    }
     if (quoteLoading) return true;
     if (!quoteData) return true;
     if (balancesLoading) return true;
@@ -350,9 +398,13 @@ export function SendFileCard() {
     balancesLoading,
     walletBalances,
     paymentAsset,
+    useFreeSend,
+    freeSendEligible,
+    freeAllowanceLoading,
   ]);
 
   const insufficientMessage = useMemo(() => {
+    if (useFreeSend && freeSendEligible) return null;
     if (!quoteDataForDisplay || !walletBalancesForDisplay) return null;
 
     if (
@@ -397,9 +449,26 @@ export function SendFileCard() {
     }
 
     return null;
-  }, [paymentAsset, quoteDataForDisplay, walletBalancesForDisplay]);
+  }, [paymentAsset, quoteDataForDisplay, walletBalancesForDisplay, useFreeSend, freeSendEligible]);
 
   const summaryItems = useMemo(() => {
+    if (useFreeSend && freeSendEligible) {
+      const helper =
+        freeAllowanceLoading || !freeAllowance
+          ? 'Monthly free credits apply to micro-sends.'
+          : `${freeRemaining} out of ${freeLimit} free micro-sends left this month.`;
+      return [
+        {
+          label: 'Payment',
+          value: 'Free micro-send',
+          helper,
+        },
+        {
+          label: 'Tier',
+          value: tierInfo?.label ?? 'Micro Send',
+        },
+      ];
+    }
     if (!quoteDataForDisplay) return [];
     const items: Array<{ label: string; value: string; helper?: string }> = [
       {
@@ -439,6 +508,13 @@ export function SendFileCard() {
 
     return items;
   }, [
+    useFreeSend,
+    freeSendEligible,
+    freeAllowanceLoading,
+    freeAllowance,
+    freeRemaining,
+    freeLimit,
+    tierInfo,
     paymentAsset,
     quoteDataForDisplay,
     usdcDisplay,
@@ -450,6 +526,7 @@ export function SendFileCard() {
   ]);
 
   const activeBalanceDisplay = useMemo(() => {
+    if (useFreeSend && freeSendEligible) return null;
     if (!walletBalancesForDisplay) return null;
     if (paymentAsset === 'R1') {
       return `${Number.parseFloat(
@@ -465,7 +542,7 @@ export function SendFileCard() {
     return `${Number.parseFloat(formatUnits(walletBalancesForDisplay.ethBalance, decimals)).toFixed(
       6
     )} ETH`;
-  }, [walletBalancesForDisplay, paymentAsset, quoteDataForDisplay]);
+  }, [walletBalancesForDisplay, paymentAsset, quoteDataForDisplay, useFreeSend, freeSendEligible]);
 
   const paymentAmountByAsset = useMemo<Record<PaymentAsset, string | null>>(() => {
     const map: Record<PaymentAsset, string | null> = {
@@ -501,8 +578,9 @@ export function SendFileCard() {
         ? selectedFile.type
         : 'application/octet-stream';
     const originalSize = selectedFile.size;
+    const usingFreeSend = useFreeSend && freeSendEligible;
     setSending(true);
-    setStatus('Preparing payment…');
+    setStatus(usingFreeSend ? 'Reserving free send…' : 'Preparing payment…');
     try {
       if (!MANAGER_CONTRACT_ADDRESS) {
         throw new Error('Manager contract address is not configured.');
@@ -519,15 +597,20 @@ export function SendFileCard() {
       if (!isOnSupportedChain) {
         throw new Error(`Please switch to ${REQUIRED_CHAIN_NAME} before sending.`);
       }
+      if (usingFreeSend && freeAllowanceLoading) {
+        throw new Error('Checking free micro-send status. Please try again in a moment.');
+      }
 
-      const currentQuote = quoteData ?? (await refetchQuote().then((res) => res.data ?? null));
-      if (!currentQuote) {
+      const currentQuote = usingFreeSend
+        ? quoteData
+        : (quoteData ?? (await refetchQuote().then((res) => res.data ?? null)));
+      if (!usingFreeSend && !currentQuote) {
         throw new Error('Could not fetch payment quote.');
       }
 
-      const maxR1Amount = currentQuote.maxR1WithSlippage;
-      const minR1Amount = currentQuote.minR1WithSlippage;
-      const usdcAmount = currentQuote.usdcAmount;
+      const maxR1Amount = currentQuote?.maxR1WithSlippage;
+      const minR1Amount = currentQuote?.minR1WithSlippage;
+      const usdcAmount = currentQuote?.usdcAmount;
 
       setStatus('Resolving recipient key…');
       if (!normalizedRecipient) {
@@ -554,9 +637,17 @@ export function SendFileCard() {
       });
       encryptionMetadata.keySource = receiverKeySource;
 
-      let paymentTxHash: `0x${string}` | undefined;
+      let paymentTxHash: string | undefined;
+      let paymentAssetUsed: string | undefined = usingFreeSend ? 'FREE' : paymentAsset;
 
-      if (paymentAsset === 'R1') {
+      if (usingFreeSend) {
+        const nonce = Math.random().toString(16).slice(2, 10);
+        paymentTxHash = `${FREE_PAYMENT_REFERENCE_PREFIX}${address}:${Date.now()}:${nonce}`;
+        setStatus('Applying free micro-send…');
+      } else if (paymentAsset === 'R1') {
+        if (!maxR1Amount || !minR1Amount) {
+          throw new Error('Missing quote for R1 payment.');
+        }
         setStatus('Checking R1 balance…');
         const r1Balance = (await publicClient.readContract({
           address: R1_CONTRACT_ADDRESS,
@@ -597,6 +688,9 @@ export function SendFileCard() {
         await waitForTransaction(transferHash, 'Waiting for R1 burn confirmation…');
         paymentTxHash = transferHash;
       } else if (paymentAsset === 'USDC') {
+        if (!usdcAmount || !minR1Amount) {
+          throw new Error('Missing quote for USDC payment.');
+        }
         setStatus('Checking USDC balance…');
         const usdcBalance = (await publicClient.readContract({
           address: USDC_CONTRACT_ADDRESS,
@@ -637,12 +731,18 @@ export function SendFileCard() {
         await waitForTransaction(transferHash, 'Waiting for USDC swap confirmation…');
         paymentTxHash = transferHash;
       } else {
+        if (!currentQuote) {
+          throw new Error('Missing quote for ETH payment.');
+        }
         if (
           !currentQuote.wethAmount ||
           !currentQuote.maxWethWithSlippage ||
           currentQuote.wethDecimals == null
         ) {
           throw new Error('Unable to quote ETH payment right now.');
+        }
+        if (!minR1Amount) {
+          throw new Error('Missing quote for ETH payment.');
         }
 
         setStatus('Checking ETH balance…');
@@ -699,7 +799,8 @@ export function SendFileCard() {
       formData.append('paymentTxHash', paymentTxHash);
       formData.append('chainId', String(chainId));
       formData.append('tierId', String(tierInfo.id));
-      formData.append('paymentAsset', paymentAsset);
+      formData.append('paymentAsset', paymentAssetUsed ?? paymentAsset);
+      formData.append('paymentType', usingFreeSend ? 'FREE' : 'PAID');
       formData.append('originalFilename', originalFilename);
       formData.append('originalMimeType', originalMimeType);
       formData.append('originalSize', String(originalSize));
@@ -720,6 +821,7 @@ export function SendFileCard() {
       setStatus(null);
       await refetchQuote();
       await refetchWalletBalances();
+      await refetchFreeAllowance();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ratio1:upload-completed'));
       }
@@ -760,9 +862,13 @@ export function SendFileCard() {
     refetchQuote,
     refetchRecipientKey,
     refetchWalletBalances,
+    refetchFreeAllowance,
     signMessageAsync,
     isOnSupportedChain,
     tierInfo,
+    freeSendEligible,
+    freeAllowanceLoading,
+    useFreeSend,
     paymentAsset,
     waitForTransaction,
     writeContractAsync,
@@ -776,6 +882,8 @@ export function SendFileCard() {
       <span className="spinner" aria-hidden="true" style={{ width: 16, height: 16 }} />
       <span>{statusLabel}</span>
     </span>
+  ) : useFreeSend && freeSendEligible ? (
+    'Send free micro-send'
   ) : (
     `Send with ${paymentAsset}`
   );
@@ -785,8 +893,9 @@ export function SendFileCard() {
       <div>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send a file</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          Pay in R1, ETH, or USDC. Encrypt and send securely through the Ratio1 Edge Nodes network -
-          all with one click. All tokens are converted to R1 and burned.
+          Pay in R1, ETH, or USDC - or use your 3 free micro-sends (≤50 MB) each month. Encrypt and
+          send securely through the Ratio1 Edge Nodes network; all tokens are converted to R1 and
+          burned.
         </div>
       </div>
 
@@ -925,82 +1034,144 @@ export function SendFileCard() {
                 {tierInfo.description}
               </div>
             </div>
-            {quoteLoading && (
+            {isMicroTierSelected && (
+              <div
+                className="col"
+                style={{
+                  gap: 6,
+                  padding: 12,
+                  borderRadius: 12,
+                  border: '1px dashed var(--accent)',
+                  background: '#fff7ed',
+                }}
+              >
+                <div
+                  className="row"
+                  style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
+                >
+                  <div className="col" style={{ gap: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>Free micro-sends</span>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {freeAllowanceLoading
+                        ? 'Checking your monthly credits…'
+                        : `You have ${freeRemaining} out of ${freeLimit || FREE_MICRO_SENDS_PER_MONTH} free micro-sends left this month.`}
+                    </span>
+                  </div>
+                </div>
+                {useFreeSend && freeSendEligible && (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    No payment required for micro-sends while credits remain.
+                  </span>
+                )}
+                {!freeSendEligible && !freeAllowanceLoading && (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    All monthly free micro-sends are used. Pay normally to continue.
+                  </span>
+                )}
+              </div>
+            )}
+            {quoteLoading && !useFreeSend && (
               <div className="muted" style={{ fontSize: 12 }}>
                 Fetching payment quote…
               </div>
             )}
-            {!quoteLoading && !quoteError && quoteData && (
-              <div className="col" style={{ gap: 12 }}>
-                <div className="col" style={{ gap: 8 }}>
-                  <span
-                    className="muted mono"
-                    style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}
-                  >
-                    Select your preferred payment asset.
-                  </span>
-                  <div className="paymentOptions">
-                    {PAYMENT_OPTIONS.map((option) => {
-                      const isActive = paymentAsset === option.id;
-                      const isDisabled =
-                        option.id === 'ETH' &&
-                        (!quoteData.wethAmount || !quoteData.maxWethWithSlippage);
-                      const amountCopy =
-                        paymentAmountByAsset[option.id] ??
-                        (quoteLoading ? 'Fetching…' : 'Quote unavailable');
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          className="button paymentOption"
-                          disabled={isDisabled}
-                          onClick={() => {
-                            if (isDisabled) return;
-                            setPaymentAsset(option.id);
-                          }}
-                          style={{
-                            padding: '12px 16px',
-                            textAlign: 'left' as const,
-                            borderRadius: 12,
-                            border: isActive
-                              ? '1px solid var(--accent)'
-                              : '1px solid rgba(148, 163, 184, 0.6)',
-                            background: isActive ? '#fefce8' : '#f9fafb',
-                            color: '#0f172a',
-                            opacity: isDisabled ? 0.5 : 1,
-                            cursor: isDisabled ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 6,
-                            transition:
-                              'background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease',
-                            boxShadow: isActive
-                              ? '0 6px 18px rgba(247, 147, 26, 0.15)'
-                              : '0 4px 16px rgba(15, 23, 42, 0.07)',
-                          }}
-                        >
-                          <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
-                            <span style={{ fontWeight: 600, fontSize: 13 }}>{option.label}</span>
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: '#0f172a',
-                                whiteSpace: 'nowrap',
-                              }}
+            <div className="col" style={{ gap: 12 }}>
+              {!useFreeSend ? (
+                !quoteLoading &&
+                !quoteError &&
+                quoteData && (
+                  <div className="col" style={{ gap: 8 }}>
+                    <span
+                      className="muted mono"
+                      style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}
+                    >
+                      Select your preferred payment asset.
+                    </span>
+                    <div className="paymentOptions">
+                      {PAYMENT_OPTIONS.map((option) => {
+                        const isActive = paymentAsset === option.id;
+                        const isDisabled =
+                          option.id === 'ETH' &&
+                          (!quoteData.wethAmount || !quoteData.maxWethWithSlippage);
+                        const amountCopy =
+                          paymentAmountByAsset[option.id] ??
+                          (quoteLoading ? 'Fetching…' : 'Quote unavailable');
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className="button paymentOption"
+                            disabled={isDisabled}
+                            onClick={() => {
+                              if (isDisabled) return;
+                              setPaymentAsset(option.id);
+                            }}
+                            style={{
+                              padding: '12px 16px',
+                              textAlign: 'left' as const,
+                              borderRadius: 12,
+                              border: isActive
+                                ? '1px solid var(--accent)'
+                                : '1px solid rgba(148, 163, 184, 0.6)',
+                              background: isActive ? '#fefce8' : '#f9fafb',
+                              color: '#0f172a',
+                              opacity: isDisabled ? 0.5 : 1,
+                              cursor: isDisabled ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 6,
+                              transition:
+                                'background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease',
+                              boxShadow: isActive
+                                ? '0 6px 18px rgba(247, 147, 26, 0.15)'
+                                : '0 4px 16px rgba(15, 23, 42, 0.07)',
+                            }}
+                          >
+                            <div
+                              className="row"
+                              style={{ justifyContent: 'space-between', gap: 8 }}
                             >
-                              {amountCopy ?? '—'}
+                              <span style={{ fontWeight: 600, fontSize: 13 }}>{option.label}</span>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: '#0f172a',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {amountCopy ?? '—'}
+                              </span>
+                            </div>
+                            <span className="muted" style={{ fontSize: 11, color: '#475569' }}>
+                              {option.helper}
                             </span>
-                          </div>
-                          <span className="muted" style={{ fontSize: 11, color: '#475569' }}>
-                            {option.helper}
-                          </span>
-                        </button>
-                      );
-                    })}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+                )
+              ) : (
+                <div
+                  className="col"
+                  style={{
+                    gap: 6,
+                    padding: 12,
+                    borderRadius: 12,
+                    background: '#f8fafc',
+                    border: '1px solid rgba(148, 163, 184, 0.4)',
+                    boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>No payment required</span>
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    This transfer uses one of your monthly free micro-sends.
+                  </span>
                 </div>
+              )}
 
+              {summaryItems.length > 0 && (
                 <div
                   className="col"
                   style={{
@@ -1055,8 +1226,8 @@ export function SendFileCard() {
                     <div style={{ color: '#dc2626', fontSize: 12 }}>{insufficientMessage}</div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>

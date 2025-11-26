@@ -27,6 +27,8 @@ export type StoredUploadRecord = {
   tierId: number;
   usdcAmount: string;
   r1Amount: string;
+  paymentType?: 'free' | 'paid';
+  paymentAsset?: string;
   originalFilename?: string;
   originalMimeType?: string;
   originalFilesize?: number;
@@ -67,6 +69,14 @@ export type TierConfig = {
   minBytes: number;
   maxBytes: number;
   usd: number;
+};
+
+export type FreeSendAllowance = {
+  month: string;
+  used: number;
+  remaining: number;
+  limit: number;
+  resetsAt: number;
 };
 
 export type QuoteData = {

@@ -1,4 +1,5 @@
 import PricingCta from '@/components/PricingCta';
+import { PricingFreeAllowanceCard } from '@/components/PricingFreeAllowanceCard';
 import { TIER_CONFIG } from '@/lib/constants';
 import type { TierConfig } from '@/lib/types';
 import type { Metadata } from 'next';
@@ -97,6 +98,9 @@ export default function PricingPage() {
           );
         })}
       </div>
+
+      <PricingFreeAllowanceCard />
+
       <div
         className="card muted"
         style={{ borderColor: 'var(--accent)', fontSize: 14, lineHeight: 1.6 }}

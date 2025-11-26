@@ -1,5 +1,6 @@
 'use client';
 
+import { FREE_MICRO_SENDS_PER_MONTH } from '@/lib/constants';
 import { shortAddress } from '@/lib/format';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Link from 'next/link';
@@ -10,27 +11,44 @@ export default function HomeCta() {
   const { isConnected, address } = useAccount();
   const [sentCount, setSentCount] = useState<number | null>(null);
   const [inboxCount, setInboxCount] = useState<number | null>(null);
+  const [freeAllowance, setFreeAllowance] = useState<{ remaining: number; limit: number } | null>(
+    null
+  );
+  const [freeAllowanceError, setFreeAllowanceError] = useState<string | null>(null);
   const sentLoading = isConnected && Boolean(address) && sentCount === null;
   const inboxLoading = isConnected && Boolean(address) && inboxCount === null;
+  const freeAllowanceLoading =
+    isConnected && Boolean(address) && freeAllowance === null && !freeAllowanceError;
 
   useEffect(() => {
     let aborted = false;
+    const toSafeCount = (value: unknown): number | null => {
+      const num = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(num)) return null;
+      return Math.max(0, Math.floor(num));
+    };
+
     async function fetchCounts() {
       if (!isConnected || !address) {
         setSentCount(null);
         setInboxCount(null);
+        setFreeAllowance(null);
+        setFreeAllowanceError(null);
         return;
       }
       try {
         const qsSent = new URLSearchParams({ initiator: address });
         const qsInbox = new URLSearchParams({ recipient: address });
-        const [resSent, resInbox] = await Promise.all([
+        const allowanceUrl = `/api/send/freeAllowance?address=${encodeURIComponent(address)}`;
+        const [resSent, resInbox, resFreeAllowance] = await Promise.all([
           fetch(`/api/sent?${qsSent.toString()}`),
           fetch(`/api/inbox?${qsInbox.toString()}`),
+          fetch(allowanceUrl),
         ]);
-        const [payloadSent, payloadInbox] = await Promise.all([
+        const [payloadSent, payloadInbox, payloadFreeAllowance] = await Promise.all([
           resSent.json().catch(() => null),
           resInbox.json().catch(() => null),
+          resFreeAllowance.json().catch(() => null),
         ]);
         if (!aborted) {
           const s =
@@ -43,11 +61,34 @@ export default function HomeCta() {
               : 0;
           setSentCount(s);
           setInboxCount(i);
+
+          if (resFreeAllowance.ok && payloadFreeAllowance?.success && payloadFreeAllowance.allowance) {
+            const remaining = toSafeCount(payloadFreeAllowance.allowance.remaining);
+            const limit =
+              toSafeCount(payloadFreeAllowance.allowance.limit) ?? FREE_MICRO_SENDS_PER_MONTH;
+            if (remaining !== null) {
+              setFreeAllowance({ remaining: Math.min(remaining, limit), limit });
+              setFreeAllowanceError(null);
+            } else {
+              setFreeAllowance(null);
+              setFreeAllowanceError('Free micro-send balance unavailable.');
+            }
+          } else {
+            const msg =
+              typeof payloadFreeAllowance?.error === 'string' &&
+              payloadFreeAllowance.error.trim().length > 0
+                ? payloadFreeAllowance.error
+                : 'Unable to load free micro-sends.';
+            setFreeAllowance(null);
+            setFreeAllowanceError(msg);
+          }
         }
       } catch {
         if (!aborted) {
           setSentCount(0);
           setInboxCount(0);
+          setFreeAllowance(null);
+          setFreeAllowanceError('Unable to load free micro-sends.');
         }
       }
     }
@@ -86,6 +127,20 @@ export default function HomeCta() {
           </div>
           <div className="muted" style={{ fontSize: 12 }}>
             Check your files
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 6, color: '#F7931A' }}>
+            {freeAllowanceLoading ? (
+              'Checking your free micro-sends…'
+            ) : freeAllowance ? (
+              <>
+                Free micro-sends remaining this month: {freeAllowance.remaining} /{' '}
+                {freeAllowance.limit}
+              </>
+            ) : freeAllowanceError ? (
+              freeAllowanceError
+            ) : (
+              `Free micro-sends remaining this month: — / ${FREE_MICRO_SENDS_PER_MONTH}`
+            )}
           </div>
         </div>
         <div className="homeCtaActions">

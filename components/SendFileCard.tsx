@@ -1256,19 +1256,21 @@ export function SendFileCard() {
           Switch your wallet network to {REQUIRED_CHAIN_NAME} to send files.
         </div>
       )}
-      <div className="col" style={{ alignItems: 'flex-end', gap: 6 }}>
-        <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button
-            className="button"
-            onClick={onSend}
-            disabled={disabled}
-            aria-busy={sending || undefined}
-            aria-live="polite"
-          >
-            {buttonContent}
-          </button>
+      {file && (
+        <div className="col" style={{ alignItems: 'flex-end', gap: 6 }}>
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <button
+              className="button"
+              onClick={onSend}
+              disabled={disabled}
+              aria-busy={sending || undefined}
+              aria-live="polite"
+            >
+              {buttonContent}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

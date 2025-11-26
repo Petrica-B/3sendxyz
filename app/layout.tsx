@@ -4,6 +4,7 @@ import { Navbar } from '@/components/Navbar';
 import { Providers } from '@/components/Providers';
 import { buildMiniAppEmbedMetadata } from '@/lib/miniapp';
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import './globals.css';
 
 const baseMetadata: Metadata = {
@@ -37,10 +38,26 @@ export const viewport: Viewport = {
   themeColor: '#ffffff',
 };
 
+const googleAnalyticsId = process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
+        {googleAnalyticsId ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${googleAnalyticsId}');`}
+            </Script>
+          </>
+        ) : null}
         <Providers>
           <Navbar />
           <div className="container">{children}</div>

@@ -35,6 +35,7 @@
 Set these variables in `.env.local` (never commit them):
 
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` – WalletConnect Cloud project id for RainbowKit.
+- `NEXT_PUBLIC_GOOGLE_ANALYTICS_ID` – GA4 measurement id (e.g., `G-XXXXXXXXXX`) used for site analytics.
 - `MINIAPP_ACCOUNT_ASSOCIATION_HEADER` / `MINIAPP_ACCOUNT_ASSOCIATION_PAYLOAD` / `MINIAPP_ACCOUNT_ASSOCIATION_SIGNATURE` – values generated in Base Build once the manifest is live.
 - `EE_CHAINSTORE_API_URL` / `CSTORE_API_URL` – Ratio1 CStore endpoint used by `@ratio1/edge-sdk-ts`.
 - `EE_R1FS_API_URL` / `R1FS_API_URL` – Ratio1 R1FS endpoint for encrypted payload storage.

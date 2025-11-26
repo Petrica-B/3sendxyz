@@ -2,17 +2,17 @@
 
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import {
+  FREE_MICRO_SENDS_PER_MONTH,
+  FREE_MICRO_TIER_ID,
+  FREE_PAYMENT_REFERENCE_PREFIX,
+  isSupportedChainId,
   MANAGER_CONTRACT_ADDRESS,
   MAX_FILE_BYTES,
   R1_CONTRACT_ADDRESS,
   REQUIRED_CHAIN_NAME,
+  resolveTierBySize,
   USDC_CONTRACT_ADDRESS,
   WETH_CONTRACT_ADDRESS,
-  FREE_MICRO_TIER_ID,
-  FREE_PAYMENT_REFERENCE_PREFIX,
-  FREE_MICRO_SENDS_PER_MONTH,
-  isSupportedChainId,
-  resolveTierBySize,
 } from '@/lib/constants';
 import { encryptFileForRecipient } from '@/lib/encryption';
 import { buildSendHandshakeMessage } from '@/lib/handshake';
@@ -71,8 +71,6 @@ export function SendFileCard() {
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [paymentAsset, setPaymentAsset] = useState<PaymentAsset>('R1');
-  const [useFreeSend, setUseFreeSend] = useState(false);
-  const [userOverrodeFreeSend, setUserOverrodeFreeSend] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -274,8 +272,7 @@ export function SendFileCard() {
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.success || !payload.allowance) {
         const message =
-          (payload?.error as string | undefined) ||
-          'Failed to fetch free micro-send allowance.';
+          (payload?.error as string | undefined) || 'Failed to fetch free micro-send allowance.';
         throw new Error(message);
       }
       return payload.allowance as FreeSendAllowance;
@@ -296,6 +293,7 @@ export function SendFileCard() {
   const freeRemaining = freeAllowance?.remaining ?? 0;
   const freeLimit = freeAllowance?.limit ?? 0;
   const freeSendEligible = Boolean(isMicroTierSelected && freeRemaining > 0);
+  const useFreeSend = freeSendEligible;
 
   const quoteDataForDisplay = isOnSupportedChain ? quoteData : null;
   const walletBalancesForDisplay = isOnSupportedChain ? walletBalances : null;
@@ -458,7 +456,7 @@ export function SendFileCard() {
       const helper =
         freeAllowanceLoading || !freeAllowance
           ? 'Monthly free credits apply to micro-sends.'
-          : `${freeRemaining} of ${freeLimit} free micro-sends left this month.`;
+          : `${freeRemaining} out of ${freeLimit} free micro-sends left this month.`;
       return [
         {
           label: 'Payment',
@@ -570,16 +568,6 @@ export function SendFileCard() {
     return map;
   }, [ethDisplay, ethMaxDisplay, quoteDataForDisplay, r1Display, r1MaxDisplay, usdcDisplay]);
 
-  useEffect(() => {
-    if (freeSendEligible && !userOverrodeFreeSend) {
-      setUseFreeSend(true);
-    }
-    if (!freeSendEligible) {
-      setUseFreeSend(false);
-      setUserOverrodeFreeSend(false);
-    }
-  }, [freeSendEligible, userOverrodeFreeSend]);
-
   const onSend = useCallback(async () => {
     if (!address || !file) return;
     const selectedFile = file;
@@ -609,16 +597,13 @@ export function SendFileCard() {
       if (!isOnSupportedChain) {
         throw new Error(`Please switch to ${REQUIRED_CHAIN_NAME} before sending.`);
       }
-      if (usingFreeSend && !freeSendEligible) {
-        throw new Error('No free micro-sends remaining this month.');
-      }
       if (usingFreeSend && freeAllowanceLoading) {
         throw new Error('Checking free micro-send status. Please try again in a moment.');
       }
 
       const currentQuote = usingFreeSend
         ? quoteData
-        : quoteData ?? (await refetchQuote().then((res) => res.data ?? null));
+        : (quoteData ?? (await refetchQuote().then((res) => res.data ?? null)));
       if (!usingFreeSend && !currentQuote) {
         throw new Error('Could not fetch payment quote.');
       }
@@ -897,8 +882,10 @@ export function SendFileCard() {
       <span className="spinner" aria-hidden="true" style={{ width: 16, height: 16 }} />
       <span>{statusLabel}</span>
     </span>
+  ) : useFreeSend && freeSendEligible ? (
+    'Send free micro-send'
   ) : (
-    useFreeSend && freeSendEligible ? 'Send free micro-send' : `Send with ${paymentAsset}`
+    `Send with ${paymentAsset}`
   );
 
   return (
@@ -906,7 +893,7 @@ export function SendFileCard() {
       <div>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send a file</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          Pay in R1, ETH, or USDC — or use your 3 free micro-sends (≤50 MB) each month. Encrypt and
+          Pay in R1, ETH, or USDC - or use your 3 free micro-sends (≤50 MB) each month. Encrypt and
           send securely through the Ratio1 Edge Nodes network; all tokens are converted to R1 and
           burned.
         </div>
@@ -1067,26 +1054,9 @@ export function SendFileCard() {
                     <span className="muted" style={{ fontSize: 12 }}>
                       {freeAllowanceLoading
                         ? 'Checking your monthly credits…'
-                        : `You have ${freeRemaining} of ${freeLimit || FREE_MICRO_SENDS_PER_MONTH} free micro-sends left this month.`}
+                        : `You have ${freeRemaining} out of ${freeLimit || FREE_MICRO_SENDS_PER_MONTH} free micro-sends left this month.`}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className="button secondary"
-                    disabled={!freeSendEligible || freeAllowanceLoading}
-                    onClick={() => {
-                      if (!freeSendEligible) return;
-                      if (useFreeSend) {
-                        setUseFreeSend(false);
-                        setUserOverrodeFreeSend(true);
-                      } else {
-                        setUseFreeSend(true);
-                        setUserOverrodeFreeSend(false);
-                      }
-                    }}
-                  >
-                    {useFreeSend && freeSendEligible ? 'Using free credit' : 'Use free credit'}
-                  </button>
                 </div>
                 {useFreeSend && freeSendEligible && (
                   <span className="muted" style={{ fontSize: 12 }}>
@@ -1100,14 +1070,16 @@ export function SendFileCard() {
                 )}
               </div>
             )}
-            {quoteLoading && (!useFreeSend || !freeSendEligible) && (
+            {quoteLoading && !useFreeSend && (
               <div className="muted" style={{ fontSize: 12 }}>
                 Fetching payment quote…
               </div>
             )}
             <div className="col" style={{ gap: 12 }}>
-              {!useFreeSend || !freeSendEligible ? (
-                !quoteLoading && !quoteError && quoteData && (
+              {!useFreeSend ? (
+                !quoteLoading &&
+                !quoteError &&
+                quoteData && (
                   <div className="col" style={{ gap: 8 }}>
                     <span
                       className="muted mono"

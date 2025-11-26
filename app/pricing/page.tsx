@@ -73,7 +73,6 @@ export default function PricingPage() {
       </section>
 
       <PricingCta />
-      <PricingFreeAllowanceCard />
 
       <div className="pricingGrid">
         {TIER_CONFIG.map((tier) => {
@@ -99,6 +98,9 @@ export default function PricingPage() {
           );
         })}
       </div>
+
+      <PricingFreeAllowanceCard />
+
       <div
         className="card muted"
         style={{ borderColor: 'var(--accent)', fontSize: 14, lineHeight: 1.6 }}

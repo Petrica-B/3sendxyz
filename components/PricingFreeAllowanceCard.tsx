@@ -65,8 +65,8 @@ export function PricingFreeAllowanceCard() {
           'Unable to load your free sends right now.'
         ) : (
           <>
-            You have {remaining} of {limit} free micro-sends left this month
-            {resets ? ` · resets on ${resets}` : ''}.
+            You have {remaining} out of {limit} free micro-sends left this month
+            {resets && remaining !== limit ? ` · resets on ${resets}` : ''}.
           </>
         )}
       </div>

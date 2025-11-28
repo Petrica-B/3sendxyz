@@ -11,6 +11,7 @@
     "cleanup": "tsx scripts/cleanup-old-uploads.ts"
   },
   "dependencies": {
+    "@coinbase/onchainkit": "^1.1.2",
     "@farcaster/miniapp-sdk": "^0.2.1",
     "@noble/hashes": "^1.8.0",
     "@rainbow-me/rainbowkit": "^2.2.9",

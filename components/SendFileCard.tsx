@@ -1,5 +1,6 @@
 'use client';
 
+import { IdentityBadge } from '@/components/IdentityBadge';
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import {
   FREE_MICRO_SENDS_PER_MONTH,
@@ -916,6 +917,14 @@ export function SendFileCard() {
             <span className="muted" style={{ fontSize: 12 }}>
               Address looks valid
             </span>
+            {normalizedRecipient ? (
+              <div className="row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  Recipient
+                </span>
+                <IdentityBadge address={normalizedRecipient} size={5} />
+              </div>
+            ) : null}
             {normalizedRecipient ? (
               recipientKeyLoading ? (
                 <span className="muted" style={{ fontSize: 12 }}>

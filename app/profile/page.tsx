@@ -1,10 +1,10 @@
 'use client';
 
+import { IdentityBadge } from '@/components/IdentityBadge';
 import EncryptionModesSection, {
   type PasskeyRegistrationStep,
 } from '@/components/profile/EncryptionModesSection';
 import { encodeBase64 } from '@/lib/encryption';
-import { shortAddress } from '@/lib/format';
 import { buildRegisteredKeyMessage } from '@/lib/keyAccess';
 import {
   deriveSeedKeyPair,
@@ -499,11 +499,11 @@ export default function ProfilePage() {
     <main className="col" style={{ gap: 24 }}>
       <div className="hero">
         <div className="headline">My Profile</div>
-        <div className="muted" style={{ fontSize: 12 }}>
-          Connected as{' '}
-          <span className="mono" style={{ color: 'var(--accent)' }}>
-            {shortAddress(address, 5)}
-          </span>
+        <div
+          className="muted"
+          style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
+        >
+          Connected as <IdentityBadge address={address} size={5} />
         </div>
       </div>
 

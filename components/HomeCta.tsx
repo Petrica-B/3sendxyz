@@ -2,13 +2,26 @@
 
 import { IdentityBadge } from '@/components/IdentityBadge';
 import { FREE_MICRO_SENDS_PER_MONTH } from '@/lib/constants';
+import { shortAddress } from '@/lib/format';
+import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
+import { useQuery } from '@tanstack/react-query';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import { useAccount } from 'wagmi';
 
 export default function HomeCta() {
   const { isConnected, address } = useAccount();
+  const normalizedAddress = address?.trim().toLowerCase() ?? '';
+  const { data: identityProfile } = useQuery({
+    queryKey: identityQueryKey(normalizedAddress),
+    queryFn: () => fetchIdentityProfile(normalizedAddress),
+    enabled: Boolean(normalizedAddress),
+    staleTime: 30 * 60 * 1000,
+  });
+  const hasBaseName = Boolean(identityProfile?.name?.trim());
+  const shortAddr = address ? shortAddress(address, 4) : '';
   const [sentCount, setSentCount] = useState<number | null>(null);
   const [inboxCount, setInboxCount] = useState<number | null>(null);
   const [freeAllowance, setFreeAllowance] = useState<{ remaining: number; limit: number } | null>(
@@ -19,6 +32,20 @@ export default function HomeCta() {
   const inboxLoading = isConnected && Boolean(address) && inboxCount === null;
   const freeAllowanceLoading =
     isConnected && Boolean(address) && freeAllowance === null && !freeAllowanceError;
+
+  const copyAddress = useCallback(async () => {
+    if (!address) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(address);
+      toast.success('Address copied.');
+    } catch (err) {
+      console.error('[home] copy address failed', err);
+      toast.error('Unable to copy address.');
+    }
+  }, [address]);
 
   useEffect(() => {
     let aborted = false;
@@ -131,15 +158,63 @@ export default function HomeCta() {
             }}
           >
             <span>Hello</span>
-            {address ? <IdentityBadge address={address} size={4} /> : null}
+            {address ? (
+              <button
+                type="button"
+                onClick={copyAddress}
+                aria-label="Copy wallet address"
+                title="Copy wallet address"
+              style={{
+                color: 'var(--accent)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                fontSize: 'inherit',
+              }}
+            >
+              <IdentityBadge address={address} size={4} basicStyle={true} />
+            </button>
+          ) : null}
           </div>
+          {hasBaseName && address ? (
+            <div
+              className="row"
+              style={{ gap: 8, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}
+            >
+              <button
+                type="button"
+                onClick={copyAddress}
+                aria-label="Copy wallet address"
+                title="Copy wallet address"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: 'var(--accent)',
+                  cursor: 'pointer',
+                }}
+              >
+                <span className="mono" style={{ fontSize: 12, color: 'var(--accent)' }}>
+                  {shortAddr}
+                </span>
+              </button>
+            </div>
+          ) : null}
           <div className="muted" style={{ fontSize: 12 }}>
             Check your files
           </div>
           <div className="muted" style={{ fontSize: 12, marginTop: 6, color: '#F7931A' }}>
             {freeAllowanceLoading ? (
               'Checking your free micro-sends…'
-            ) : freeAllowance ? (
+          ) : freeAllowance ? (
               <>
                 Free micro-sends remaining this month: {freeAllowance.remaining} /{' '}
                 {freeAllowance.limit}

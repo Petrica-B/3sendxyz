@@ -5,6 +5,8 @@ import EncryptionModesSection, {
   type PasskeyRegistrationStep,
 } from '@/components/profile/EncryptionModesSection';
 import { encodeBase64 } from '@/lib/encryption';
+import { shortAddress } from '@/lib/format';
+import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
 import { buildRegisteredKeyMessage } from '@/lib/keyAccess';
 import {
   deriveSeedKeyPair,
@@ -19,6 +21,7 @@ import type {
   RegisteredSeedRecord,
   UserProfile,
 } from '@/lib/types';
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { useAccount, useSignMessage } from 'wagmi';
@@ -37,6 +40,15 @@ type PasskeyCredential = PublicKeyCredential & {
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
+  const normalizedAddress = address?.trim().toLowerCase() ?? '';
+  const { data: identityProfile } = useQuery({
+    queryKey: identityQueryKey(normalizedAddress),
+    queryFn: () => fetchIdentityProfile(normalizedAddress),
+    enabled: Boolean(normalizedAddress),
+    staleTime: 30 * 60 * 1000,
+  });
+  const hasBaseName = Boolean(identityProfile?.name?.trim());
+  const shortAddr = address ? shortAddress(address, 4) : '';
   const [profile, setProfile] = useState<UserProfile>({});
   const [keyLabelInput, setKeyLabelInput] = useState('');
   const [privKeyOnce, setPrivKeyOnce] = useState<string | null>(null);
@@ -481,6 +493,20 @@ export default function ProfilePage() {
     [address, signMessageAsync, hidePrivKeyOnce]
   );
 
+  const copyAddress = useCallback(async () => {
+    if (!address) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(address);
+      toast.success('Address copied.');
+    } catch (err) {
+      console.error('[profile] copy address failed', err);
+      toast.error('Unable to copy address.');
+    }
+  }, [address]);
+
   if (!isConnected || !address) {
     return (
       <main className="col" style={{ gap: 16 }}>
@@ -503,8 +529,31 @@ export default function ProfilePage() {
           className="muted"
           style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
         >
-          Connected as <IdentityBadge address={address} size={5} />
+          Connected as{' '}
+          <span
+            style={{
+              color: 'var(--accent)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}
+          >
+            <IdentityBadge address={address} size={5} basicStyle={true} />
+            <CopyAddressButton onCopy={copyAddress} />
+          </span>
         </div>
+        {hasBaseName && address ? (
+          <div
+            className="row"
+            style={{ gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}
+          >
+            <span className="mono" style={{ fontSize: 12, color: 'var(--accent)' }}>
+              {shortAddr}
+            </span>
+            <CopyAddressButton onCopy={copyAddress} />
+          </div>
+        ) : null}
       </div>
 
       {/* Handle settings removed for now */}
@@ -538,5 +587,52 @@ export default function ProfilePage() {
         onHideRecoveryPhrase={hidePrivKeyOnce}
       />
     </main>
+  );
+}
+
+function CopyAddressButton({ onCopy }: { onCopy: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      aria-label="Copy wallet address"
+      title="Copy wallet address"
+      style={{
+        background: 'transparent',
+        border: '1px solid var(--accent)',
+        borderRadius: 6,
+        padding: 2,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--accent)',
+        cursor: 'pointer',
+        lineHeight: 1,
+      }}
+    >
+      <CopyIcon />
+    </button>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M15.75 5.25h2.25a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 6 5.25h2.25"
+      stroke="var(--accent)"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.75 3.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v0.75h-4.5V3.75Z"
+      stroke="var(--accent)"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <rect x="9.75" y="3.75" width="4.5" height="1.5" rx="0.75" fill="var(--accent)" />
+  </svg>
   );
 }

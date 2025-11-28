@@ -1,6 +1,8 @@
 'use client';
 
 import { MinimalConnect } from '@/components/MinimalConnect';
+import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
+import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -26,7 +28,15 @@ function NavItem({ href, label }: { href: string; label: string }) {
 }
 
 export function Navbar() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
+  const normalizedAddress = address?.trim().toLowerCase() ?? '';
+  const { data: identityProfile } = useQuery({
+    queryKey: identityQueryKey(normalizedAddress),
+    queryFn: () => fetchIdentityProfile(normalizedAddress),
+    enabled: Boolean(normalizedAddress),
+    staleTime: 30 * 60 * 1000,
+  });
+  const avatarUrl = identityProfile?.avatarUrl;
   return (
     <div className="navbar">
       <div className="container navbarInner">
@@ -78,21 +88,45 @@ export function Navbar() {
               style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
               title="Profile"
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-                width="18"
-                height="18"
-                style={{ display: 'block' }}
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+              {avatarUrl ? (
+                <span
+                  aria-hidden
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(0,0,0,0.06)',
+                    background: '#f3f4f6',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={avatarUrl}
+                    alt="Profile avatar"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </span>
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                  width="18"
+                  height="18"
+                  style={{ display: 'block' }}
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              )}
             </Link>
           )}
           <Link

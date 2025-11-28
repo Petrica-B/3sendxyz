@@ -1,7 +1,7 @@
 'use client';
 
+import { IdentityBadge } from '@/components/IdentityBadge';
 import { FREE_MICRO_SENDS_PER_MONTH } from '@/lib/constants';
-import { shortAddress } from '@/lib/format';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -62,7 +62,11 @@ export default function HomeCta() {
           setSentCount(s);
           setInboxCount(i);
 
-          if (resFreeAllowance.ok && payloadFreeAllowance?.success && payloadFreeAllowance.allowance) {
+          if (
+            resFreeAllowance.ok &&
+            payloadFreeAllowance?.success &&
+            payloadFreeAllowance.allowance
+          ) {
             const remaining = toSafeCount(payloadFreeAllowance.allowance.remaining);
             const limit =
               toSafeCount(payloadFreeAllowance.allowance.limit) ?? FREE_MICRO_SENDS_PER_MONTH;
@@ -117,13 +121,17 @@ export default function HomeCta() {
         }}
       >
         <div>
-          <div style={{ fontWeight: 700 }}>
-            Hello
-            {address ? (
-              <>
-                , <span style={{ color: 'var(--accent)' }}>{shortAddress(address, 5)}</span>
-              </>
-            ) : null}
+          <div
+            style={{
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span>Hello</span>
+            {address ? <IdentityBadge address={address} size={4} /> : null}
           </div>
           <div className="muted" style={{ fontSize: 12 }}>
             Check your files
@@ -150,8 +158,23 @@ export default function HomeCta() {
             style={{ textDecoration: 'none', display: 'flex', gap: 8, alignItems: 'center' }}
           >
             <span>Open Outbox</span>
-            <span className="pill" aria-label="outbox-active-count" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24 }}>
-              {sentLoading ? <span className="spinner" aria-hidden /> : typeof sentCount === 'number' ? sentCount : '—'}
+            <span
+              className="pill"
+              aria-label="outbox-active-count"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 24,
+              }}
+            >
+              {sentLoading ? (
+                <span className="spinner" aria-hidden />
+              ) : typeof sentCount === 'number' ? (
+                sentCount
+              ) : (
+                '—'
+              )}
             </span>
           </Link>
           <Link
@@ -160,8 +183,23 @@ export default function HomeCta() {
             style={{ textDecoration: 'none', display: 'flex', gap: 8, alignItems: 'center' }}
           >
             <span>Open Inbox</span>
-            <span className="pill" aria-label="inbox-active-count" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24 }}>
-              {inboxLoading ? <span className="spinner" aria-hidden /> : typeof inboxCount === 'number' ? inboxCount : '—'}
+            <span
+              className="pill"
+              aria-label="inbox-active-count"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 24,
+              }}
+            >
+              {inboxLoading ? (
+                <span className="spinner" aria-hidden />
+              ) : typeof inboxCount === 'number' ? (
+                inboxCount
+              ) : (
+                '—'
+              )}
             </span>
           </Link>
         </div>

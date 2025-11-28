@@ -1,6 +1,7 @@
 'use client';
 
-import { AddressLink, TxLink } from '@/components/Links';
+import { IdentityBadge } from '@/components/IdentityBadge';
+import { TxLink } from '@/components/Links';
 import { RoundedLoaderList } from '@/components/RoundedLoader';
 import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
 import { decodeBase64, decryptFileFromEnvelope, decryptNoteFromEnvelope } from '@/lib/encryption';
@@ -552,7 +553,7 @@ export default function InboxPage() {
                     {expanded[item.id] && (
                       <div className="details mono" style={{ fontSize: 12 }}>
                         <div>
-                          from: <AddressLink address={item.initiator} size={5} />
+                          from: <IdentityBadge address={item.initiator} size={5} />
                         </div>
                         <div>
                           tx:{' '}

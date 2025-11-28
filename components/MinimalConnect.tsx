@@ -1,5 +1,6 @@
 'use client';
 
+import { IdentityBadge } from '@/components/IdentityBadge';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export function MinimalConnect() {
@@ -37,8 +38,17 @@ export function MinimalConnect() {
               }
 
               return (
-                <button onClick={openAccountModal} className="button" type="button">
-                  {account.displayName}
+                <button
+                  onClick={openAccountModal}
+                  className="button"
+                  type="button"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                >
+                  {account?.address ? (
+                    <IdentityBadge address={account.address} size={4} basicStyle={true} />
+                  ) : (
+                    account.displayName
+                  )}
                 </button>
               );
             })()}

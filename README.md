@@ -9,6 +9,7 @@
 - Client-side X25519 + AES-GCM encryption for files and optional notes (`lib/encryption.ts`) with deterministic handshake messages assembled in `lib/handshake.ts`.
 - Key management that supports vault-managed keys, WebAuthn passkeys, and recovery phrases; APIs live under `app/api/keys/*` and `app/api/vault/*`, while UI controls ship from `app/profile/page.tsx`.
 - Inbox and outbox pages backed by Ratio1 CStore and R1FS (`app/api/inbox/*`, `app/api/sent/route.ts`, `app/api/send/upload/route.ts`) with in-browser decryption via `app/inbox/page.tsx`.
+- Base identity lookups for avatars and display names via Coinbase OnchainKit identity utilities.
 - Documentation and pricing routes (`app/docs`, `app/pricing`) so the production app and repo stay aligned on feature explanations and tiering.
 
 ## How a transfer works

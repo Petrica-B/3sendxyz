@@ -47,33 +47,31 @@ export function IdentityBadge({
         background: !basicStyle ? 'rgba(0,0,0,0.03)' : undefined,
       }}
     >
-      <span
-        aria-hidden
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: '50%',
-          overflow: 'hidden',
-          border: '1px solid rgba(0,0,0,0.06)',
-          background: '#f3f4f6',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 12,
-          color: '#6b7280',
-        }}
-      >
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
+      {avatarUrl && (
+        <span
+          aria-hidden
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: '1px solid rgba(0,0,0,0.06)',
+            background: '#f3f4f6',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12,
+            color: '#6b7280',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={avatarUrl}
             alt={`${displayName} avatar`}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
-        ) : (
-          fallbackLetter
-        )}
-      </span>
+        </span>
+      )}
       <span style={{ fontWeight: 600, lineHeight: 1 }}>{displayName}</span>
       {data?.name && !basicStyle ? (
         <span className="mono muted" style={{ fontSize: 11, color: '#6b7280' }}>

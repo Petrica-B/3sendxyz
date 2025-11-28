@@ -719,3 +719,38 @@ select.input:focus-visible {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Toasts: align with app card style */
+.Toastify__toast-container {
+  padding: 10px;
+}
+.Toastify__toast {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  font-family: inherit;
+}
+.Toastify__toast-body {
+  font-size: 13px;
+  gap: 10px;
+  align-items: center;
+}
+.Toastify__toast--success {
+  border-color: var(--accent);
+}
+.Toastify__toast--error {
+  border-color: #f87171;
+}
+.Toastify__toast--warning {
+  border-color: #fbbf24;
+}
+.Toastify__close-button {
+  color: var(--muted);
+  opacity: 1;
+}
+.Toastify__progress-bar {
+  background: var(--accent);
+  height: 3px;
+}

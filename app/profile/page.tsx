@@ -567,7 +567,8 @@ export default function ProfilePage() {
                 margin: 0,
                 textAlign: 'left',
                 color: 'var(--accent)',
-                fontWeight: 700,
+                fontWeight: 800,
+                fontSize: 16,
                 cursor: 'pointer',
               }}
             >

@@ -32,6 +32,7 @@ export default function HomeCta() {
   const inboxLoading = isConnected && Boolean(address) && inboxCount === null;
   const freeAllowanceLoading =
     isConnected && Boolean(address) && freeAllowance === null && !freeAllowanceError;
+  const baseName = identityProfile?.name?.trim();
 
   const copyAddress = useCallback(async () => {
     if (!address) return;
@@ -46,6 +47,20 @@ export default function HomeCta() {
       toast.error('Unable to copy address.');
     }
   }, [address]);
+
+  const copyBasename = useCallback(async () => {
+    if (!baseName) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(baseName);
+      toast.success('Basename copied.');
+    } catch (err) {
+      console.error('[home] copy basename failed', err);
+      toast.error('Unable to copy basename.');
+    }
+  }, [baseName]);
 
   useEffect(() => {
     let aborted = false;
@@ -161,25 +176,25 @@ export default function HomeCta() {
             {address ? (
               <button
                 type="button"
-                onClick={copyAddress}
+                onClick={hasBaseName ? copyBasename : copyAddress}
                 aria-label="Copy wallet address"
-                title="Copy wallet address"
-              style={{
-                color: 'var(--accent)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
+                title={hasBaseName ? 'Copy basename' : 'Copy wallet address'}
+                style={{
+                  color: 'var(--accent)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
                 flexWrap: 'wrap',
                 background: 'transparent',
                 border: 'none',
                 padding: 0,
-                cursor: 'pointer',
-                fontSize: 'inherit',
-              }}
-            >
-              <IdentityBadge address={address} size={4} basicStyle={true} />
-            </button>
-          ) : null}
+                  cursor: 'pointer',
+                  fontSize: 'inherit',
+                }}
+              >
+                <IdentityBadge address={address} size={4} basicStyle={true} />
+              </button>
+            ) : null}
           </div>
           {hasBaseName && address ? (
             <div

@@ -47,6 +47,7 @@ export default function ProfilePage() {
     staleTime: 30 * 60 * 1000,
   });
   const hasBaseName = Boolean(identityProfile?.name?.trim());
+  const baseName = identityProfile?.name?.trim();
   const shortAddr = address ? shortAddress(address, 4) : '';
   const [profile, setProfile] = useState<UserProfile>({});
   const [keyLabelInput, setKeyLabelInput] = useState('');
@@ -506,6 +507,20 @@ export default function ProfilePage() {
     }
   }, [address]);
 
+  const copyBasename = useCallback(async () => {
+    if (!baseName) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(baseName);
+      toast.success('Basename copied.');
+    } catch (err) {
+      console.error('[profile] copy basename failed', err);
+      toast.error('Unable to copy basename.');
+    }
+  }, [baseName]);
+
   if (!isConnected || !address) {
     return (
       <main className="col" style={{ gap: 16 }}>
@@ -540,7 +555,24 @@ export default function ProfilePage() {
         </div>
         <div className="col" style={{ gap: 4 }}>
           {hasBaseName && identityProfile?.name ? (
-            <div style={{ color: 'var(--accent)', fontWeight: 700 }}>{identityProfile.name}</div>
+            <button
+              type="button"
+              onClick={copyBasename}
+              aria-label="Copy basename"
+              title="Copy basename"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                margin: 0,
+                textAlign: 'left',
+                color: 'var(--accent)',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {identityProfile.name}
+            </button>
           ) : null}
           <div
             style={{

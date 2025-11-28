@@ -1,7 +1,8 @@
 'use client';
 
-import { IdentityBadge } from '@/components/IdentityBadge';
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
+import { shortAddress } from '@/lib/format';
+import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
 import {
   FREE_MICRO_SENDS_PER_MONTH,
   FREE_MICRO_TIER_ID,
@@ -102,6 +103,16 @@ export function SendFileCard() {
 
   const recipientAddress = directRecipientAddress ?? resolvedRecipientAddress ?? null;
   const recipientResolvedFromName = Boolean(!directRecipientAddress && resolvedRecipientAddress);
+  const normalizedRecipientAddress = recipientAddress?.trim().toLowerCase() ?? '';
+  const shortRecipientAddress = recipientAddress ? shortAddress(recipientAddress, 4) : '';
+
+  const { data: recipientIdentity } = useQuery({
+    queryKey: identityQueryKey(normalizedRecipientAddress || 'pending-recipient'),
+    queryFn: () => fetchIdentityProfile(normalizedRecipientAddress),
+    enabled: Boolean(normalizedRecipientAddress),
+    staleTime: 30 * 60 * 1000,
+  });
+  const recipientBaseName = recipientIdentity?.name?.trim();
 
   const waitForTransaction = useCallback(
     async (hash: `0x${string}`, pendingLabel: string) => {
@@ -916,6 +927,34 @@ export function SendFileCard() {
     `Send with ${paymentAsset}`
   );
 
+  const copyRecipientAddress = useCallback(async () => {
+    if (!recipientAddress) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(recipientAddress);
+      toast.success('Recipient address copied.');
+    } catch (err) {
+      console.error('[send] copy recipient address failed', err);
+      toast.error('Unable to copy recipient address.');
+    }
+  }, [recipientAddress]);
+
+  const copyRecipientBasename = useCallback(async () => {
+    if (!recipientBaseName) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(recipientBaseName);
+      toast.success('Basename copied.');
+    } catch (err) {
+      console.error('[send] copy recipient basename failed', err);
+      toast.error('Unable to copy basename.');
+    }
+  }, [recipientBaseName]);
+
   return (
     <div className="card col" style={{ gap: 16 }}>
       <div>
@@ -944,11 +983,70 @@ export function SendFileCard() {
             <span className="muted" style={{ fontSize: 12 }}>
               {recipientResolvedFromName ? 'Basename resolved to address' : 'Address looks valid'}
             </span>
-            <div className="row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span className="muted" style={{ fontSize: 12 }}>
+            <div
+              className="card col"
+              style={{
+                gap: 6,
+                alignSelf: 'flex-start',
+                width: 'fit-content',
+                maxWidth: '100%',
+              }}
+            >
+              <div className="muted" style={{ fontSize: 12 }}>
                 Recipient
-              </span>
-              <IdentityBadge address={recipientAddress} size={5} />
+              </div>
+              <div className="col" style={{ gap: 4 }}>
+                {recipientBaseName ? (
+                  <button
+                    type="button"
+                    onClick={copyRecipientBasename}
+                    aria-label="Copy recipient basename"
+                    title="Copy recipient basename"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0,
+                      textAlign: 'left',
+                      color: 'var(--accent)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {recipientBaseName}
+                  </button>
+                ) : null}
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    color: 'var(--accent)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={copyRecipientAddress}
+                    aria-label="Copy recipient address"
+                    title="Copy recipient address"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      color: 'var(--accent)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span className="mono" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.4 }}>
+                      {shortRecipientAddress}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
             {recipientKeyLoading ? (
               <span className="muted" style={{ fontSize: 12 }}>

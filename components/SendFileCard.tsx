@@ -18,6 +18,7 @@ import {
 import { encryptFileForRecipient } from '@/lib/encryption';
 import { buildSendHandshakeMessage } from '@/lib/handshake';
 import { FreeSendAllowance, QuoteData } from '@/lib/types';
+import { getAddress as resolveAddressFromName } from '@coinbase/onchainkit/identity';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -66,7 +67,7 @@ export function SendFileCard() {
   const isOnSupportedChain = isSupportedChainId(chainId);
   const wrongNetwork = isConnected && !isOnSupportedChain;
 
-  const [recipient, setRecipient] = useState('');
+  const [recipientInput, setRecipientInput] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
@@ -75,10 +76,32 @@ export function SendFileCard() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const normalizedRecipient = useMemo(() => {
-    const trimmed = recipient.trim();
-    return isAddress(trimmed) ? trimmed.toLowerCase() : null;
-  }, [recipient]);
+  const normalizedRecipientInput = useMemo(() => recipientInput.trim(), [recipientInput]);
+
+  const directRecipientAddress = useMemo(() => {
+    return isAddress(normalizedRecipientInput) ? normalizedRecipientInput.toLowerCase() : null;
+  }, [normalizedRecipientInput]);
+
+  const {
+    data: resolvedRecipientAddress,
+    isFetching: recipientResolutionLoading,
+    error: recipientResolutionError,
+  } = useQuery<string | null>({
+    queryKey: ['recipient-address', normalizedRecipientInput],
+    enabled: Boolean(normalizedRecipientInput && !directRecipientAddress),
+    retry: false,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const resolved = await resolveAddressFromName({ name: normalizedRecipientInput });
+      if (!resolved) {
+        throw new Error('Unable to resolve this name to an address.');
+      }
+      return resolved.toLowerCase();
+    },
+  });
+
+  const recipientAddress = directRecipientAddress ?? resolvedRecipientAddress ?? null;
+  const recipientResolvedFromName = Boolean(!directRecipientAddress && resolvedRecipientAddress);
 
   const waitForTransaction = useCallback(
     async (hash: `0x${string}`, pendingLabel: string) => {
@@ -117,14 +140,14 @@ export function SendFileCard() {
     publicKey: string;
     type: 'vault' | 'passkey' | 'seed';
   } | null>({
-    queryKey: ['recipient-key', normalizedRecipient],
-    enabled: Boolean(normalizedRecipient),
+    queryKey: ['recipient-key', recipientAddress],
+    enabled: Boolean(recipientAddress),
     retry: false,
     staleTime: 60_000,
     queryFn: async () => {
-      if (!normalizedRecipient) return null;
+      if (!recipientAddress) return null;
       const response = await fetch(
-        `/api/send/getReceiverPublicKey?address=${encodeURIComponent(normalizedRecipient)}`,
+        `/api/send/getReceiverPublicKey?address=${encodeURIComponent(recipientAddress)}`,
         { method: 'GET' }
       );
       const payload = await response.json().catch(() => null);
@@ -358,7 +381,8 @@ export function SendFileCard() {
 
   const disabled = useMemo(() => {
     if (!isConnected) return true;
-    if (!isAddress(recipient)) return true;
+    if (!recipientAddress) return true;
+    if (recipientResolutionLoading) return true;
     if (!file) return true;
     if (sending) return true;
     if (!tierInfo) return true;
@@ -388,7 +412,8 @@ export function SendFileCard() {
     return false;
   }, [
     isConnected,
-    recipient,
+    recipientAddress,
+    recipientResolutionLoading,
     file,
     sending,
     tierInfo,
@@ -570,9 +595,9 @@ export function SendFileCard() {
   }, [ethDisplay, ethMaxDisplay, quoteDataForDisplay, r1Display, r1MaxDisplay, usdcDisplay]);
 
   const onSend = useCallback(async () => {
-    if (!address || !file) return;
+    if (!address || !file || !recipientAddress) return;
     const selectedFile = file;
-    const targetAddress = recipient;
+    const targetAddress = recipientAddress;
     const originalFilename = selectedFile.name;
     const originalMimeType =
       selectedFile.type && selectedFile.type.trim().length > 0
@@ -614,7 +639,7 @@ export function SendFileCard() {
       const usdcAmount = currentQuote?.usdcAmount;
 
       setStatus('Resolving recipient key…');
-      if (!normalizedRecipient) {
+      if (!recipientAddress) {
         throw new Error('Recipient address is not valid.');
       }
       let receiverKeyRecord = recipientKeyData ?? null;
@@ -633,7 +658,7 @@ export function SendFileCard() {
       const { encryptedFile, metadata: encryptionMetadata } = await encryptFileForRecipient({
         file: selectedFile,
         recipientPublicKey: receiverPublicKey,
-        recipientAddress: recipient,
+        recipientAddress,
         note: hasNote ? note : undefined,
       });
       encryptionMetadata.keySource = receiverKeySource;
@@ -777,7 +802,7 @@ export function SendFileCard() {
           : originalSize;
       const handshakeMsg = buildSendHandshakeMessage({
         initiator: address,
-        recipient,
+        recipient: recipientAddress,
         chainId,
         paymentTxHash,
         sentAt: startedAt,
@@ -793,7 +818,7 @@ export function SendFileCard() {
       const formData = new FormData();
       formData.append('file', encryptedFile);
       formData.append('initiator', address);
-      formData.append('recipient', recipient);
+      formData.append('recipient', recipientAddress);
       formData.append('handshakeMessage', handshakeMsg);
       formData.append('signature', signature);
       formData.append('sentAt', String(startedAt));
@@ -817,7 +842,7 @@ export function SendFileCard() {
       }
 
       setFile(null);
-      setRecipient('');
+      setRecipientInput('');
       setNote('');
       setStatus(null);
       await refetchQuote();
@@ -830,9 +855,11 @@ export function SendFileCard() {
         fileInputRef.current.value = '';
       }
       const recipientDisplay =
-        targetAddress && targetAddress.length > 10
+        normalizedRecipientInput ||
+        (targetAddress && targetAddress.length > 10
           ? `${targetAddress.slice(0, 6)}…${targetAddress.slice(-4)}`
-          : targetAddress || 'recipient';
+          : targetAddress) ||
+        'recipient';
       const fileLabel = originalFilename || 'your file';
       const fileDisplay =
         fileLabel.length > 60 ? `${fileLabel.slice(0, 40)}…${fileLabel.slice(-15)}` : fileLabel;
@@ -857,9 +884,9 @@ export function SendFileCard() {
     note,
     publicClient,
     quoteData,
-    recipient,
+    recipientAddress,
     recipientKeyData,
-    normalizedRecipient,
+    normalizedRecipientInput,
     refetchQuote,
     refetchRecipientKey,
     refetchWalletBalances,
@@ -902,60 +929,66 @@ export function SendFileCard() {
 
       <label className="col">
         <span className="muted mono" style={{ fontSize: 12 }}>
-          Recipient wallet address
+          Recipient address or basename
         </span>
         <input
           className="input"
-          placeholder="0x…"
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value.trim())}
+          placeholder="0x… or yourname.base.eth"
+          value={recipientInput}
+          onChange={(e) => setRecipientInput(e.target.value.trim())}
           autoComplete="off"
           data-1p-ignore
         />
-        {!recipient ? null : isAddress(recipient) ? (
+        {!normalizedRecipientInput ? null : recipientAddress ? (
           <div className="col" style={{ gap: 4 }}>
             <span className="muted" style={{ fontSize: 12 }}>
-              Address looks valid
+              {recipientResolvedFromName ? 'Basename resolved to address' : 'Address looks valid'}
             </span>
-            {normalizedRecipient ? (
-              <div className="row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span className="muted" style={{ fontSize: 12 }}>
-                  Recipient
-                </span>
-                <IdentityBadge address={normalizedRecipient} size={5} />
-              </div>
-            ) : null}
-            {normalizedRecipient ? (
-              recipientKeyLoading ? (
-                <span className="muted" style={{ fontSize: 12 }}>
-                  Checking recipient encryption mode…
-                </span>
-              ) : recipientKeyError ? (
-                <span style={{ color: '#f87171', fontSize: 12 }}>
-                  {recipientKeyError instanceof Error
-                    ? recipientKeyError.message
-                    : 'Unable to verify recipient encryption mode.'}
-                </span>
-              ) : recipientKeyData ? (
-                <span className="muted" style={{ fontSize: 12 }}>
-                  {recipientKeyData.type === 'vault'
-                    ? 'Recipient uses Light encryption (vault managed key).'
-                    : 'Recipient has Pro encryption.'}{' '}
-                  <a
-                    className="accentLink"
-                    href="/docs#encryption-modes"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Learn about 3send encryption modes
-                  </a>
-                  .
-                </span>
-              ) : null
+            <div className="row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span className="muted" style={{ fontSize: 12 }}>
+                Recipient
+              </span>
+              <IdentityBadge address={recipientAddress} size={5} />
+            </div>
+            {recipientKeyLoading ? (
+              <span className="muted" style={{ fontSize: 12 }}>
+                Checking recipient encryption mode…
+              </span>
+            ) : recipientKeyError ? (
+              <span style={{ color: '#f87171', fontSize: 12 }}>
+                {recipientKeyError instanceof Error
+                  ? recipientKeyError.message
+                  : 'Unable to verify recipient encryption mode.'}
+              </span>
+            ) : recipientKeyData ? (
+              <span className="muted" style={{ fontSize: 12 }}>
+                {recipientKeyData.type === 'vault'
+                  ? 'Recipient uses Light encryption (vault managed key).'
+                  : 'Recipient has Pro encryption.'}{' '}
+                <a
+                  className="accentLink"
+                  href="/docs#encryption-modes"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Learn about 3send encryption modes
+                </a>
+                .
+              </span>
             ) : null}
           </div>
+        ) : recipientResolutionLoading ? (
+          <span className="muted" style={{ fontSize: 12 }}>
+            Resolving name to address…
+          </span>
+        ) : recipientResolutionError ? (
+          <span style={{ color: '#f87171', fontSize: 12 }}>
+            {recipientResolutionError instanceof Error
+              ? recipientResolutionError.message
+              : 'Could not resolve this name to an address.'}
+          </span>
         ) : (
-          <span style={{ color: '#f87171', fontSize: 12 }}>Invalid address format</span>
+          <span style={{ color: '#f87171', fontSize: 12 }}>Enter a valid address or basename</span>
         )}
       </label>
 

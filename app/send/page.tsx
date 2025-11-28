@@ -23,12 +23,6 @@ export default function SendPage() {
       <div className="hero">
         <div className="headline">Send</div>
         <div className="subhead">Send encrypted files to another wallet.</div>
-        <div
-          className="muted"
-          style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
-        >
-          Sending from <IdentityBadge address={address} size={5} />
-        </div>
       </div>
       <SendFileCard />
     </main>

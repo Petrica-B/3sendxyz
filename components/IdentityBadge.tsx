@@ -10,6 +10,8 @@ type IdentityBadgeProps = {
   size?: number;
   className?: string;
   basicStyle?: boolean;
+  showAvatar?: boolean;
+  nameMaxLength?: number;
 };
 
 export function IdentityBadge({
@@ -17,6 +19,8 @@ export function IdentityBadge({
   size = 5,
   className,
   basicStyle = false,
+  showAvatar = false,
+  nameMaxLength,
 }: IdentityBadgeProps) {
   const normalized = address?.trim().toLowerCase() ?? '';
   const enabled = normalized.length > 0;
@@ -31,7 +35,11 @@ export function IdentityBadge({
     return null;
   }
 
-  const displayName = data?.name?.trim() || shortAddress(normalized, size);
+  const baseName = data?.name?.trim();
+  const displayName =
+    (baseName && nameMaxLength && baseName.length > nameMaxLength
+      ? `${baseName.slice(0, nameMaxLength)}…`
+      : baseName) || shortAddress(normalized, size);
   const avatarUrl = data?.avatarUrl;
   const fallbackLetter = displayName ? displayName[0]?.toUpperCase() : '?';
 
@@ -47,7 +55,7 @@ export function IdentityBadge({
         background: !basicStyle ? 'rgba(0,0,0,0.03)' : undefined,
       }}
     >
-      {avatarUrl && (
+      {avatarUrl && showAvatar && (
         <span
           aria-hidden
           style={{

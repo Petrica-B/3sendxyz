@@ -85,18 +85,18 @@ export function Navbar() {
               href="/profile"
               aria-label="Open profile"
               className="button square"
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
               title="Profile"
             >
               {avatarUrl ? (
                 <span
                   aria-hidden
                   style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: '50%',
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: 8,
                     overflow: 'hidden',
-                    border: '1px solid rgba(0,0,0,0.06)',
+                    border: '1px solid rgba(0,0,0,0.08)',
                     background: '#f3f4f6',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -107,7 +107,7 @@ export function Navbar() {
                   <img
                     src={avatarUrl}
                     alt="Profile avatar"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   />
                 </span>
               ) : (

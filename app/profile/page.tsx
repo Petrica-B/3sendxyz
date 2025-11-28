@@ -1,11 +1,9 @@
 'use client';
 
-import { IdentityBadge } from '@/components/IdentityBadge';
 import EncryptionModesSection, {
   type PasskeyRegistrationStep,
 } from '@/components/profile/EncryptionModesSection';
 import { encodeBase64 } from '@/lib/encryption';
-import { shortAddress } from '@/lib/format';
 import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
 import { buildRegisteredKeyMessage } from '@/lib/keyAccess';
 import {
@@ -14,6 +12,7 @@ import {
   generateMnemonicKeyPair,
   isValidMnemonic,
 } from '@/lib/keys';
+import { shortAddress } from '@/lib/format';
 import { derivePasskeyX25519KeyPair, randomPrfSalt } from '@/lib/passkeyClient';
 import type {
   RegisteredKeyRecord,
@@ -525,35 +524,55 @@ export default function ProfilePage() {
     <main className="col" style={{ gap: 24 }}>
       <div className="hero">
         <div className="headline">My Profile</div>
-        <div
-          className="muted"
-          style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
-        >
-          Connected as{' '}
-          <span
+      </div>
+
+      <div
+        className="card col"
+        style={{
+          gap: 6,
+          alignSelf: 'flex-start',
+          width: 'fit-content',
+          maxWidth: '100%',
+        }}
+      >
+        <div className="muted" style={{ fontSize: 12 }}>
+          Connected as
+        </div>
+        <div className="col" style={{ gap: 4 }}>
+          {hasBaseName && identityProfile?.name ? (
+            <div style={{ color: 'var(--accent)', fontWeight: 700 }}>{identityProfile.name}</div>
+          ) : null}
+          <div
             style={{
-              color: 'var(--accent)',
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              flexWrap: 'wrap',
+              color: 'var(--accent)',
             }}
           >
-            <IdentityBadge address={address} size={5} basicStyle={true} />
-            <CopyAddressButton onCopy={copyAddress} />
-          </span>
-        </div>
-        {hasBaseName && address ? (
-          <div
-            className="row"
-            style={{ gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}
-          >
-            <span className="mono" style={{ fontSize: 12, color: 'var(--accent)' }}>
-              {shortAddr}
-            </span>
-            <CopyAddressButton onCopy={copyAddress} />
+            <button
+              type="button"
+              onClick={copyAddress}
+              aria-label="Copy wallet address"
+              title="Copy wallet address"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                margin: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                color: 'var(--accent)',
+                cursor: 'pointer',
+              }}
+            >
+              <span className="mono" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.4 }}>
+                {shortAddr}
+              </span>
+            </button>
           </div>
-        ) : null}
+        </div>
       </div>
 
       {/* Handle settings removed for now */}
@@ -587,52 +606,5 @@ export default function ProfilePage() {
         onHideRecoveryPhrase={hidePrivKeyOnce}
       />
     </main>
-  );
-}
-
-function CopyAddressButton({ onCopy }: { onCopy: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onCopy}
-      aria-label="Copy wallet address"
-      title="Copy wallet address"
-      style={{
-        background: 'transparent',
-        border: '1px solid var(--accent)',
-        borderRadius: 6,
-        padding: 2,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--accent)',
-        cursor: 'pointer',
-        lineHeight: 1,
-      }}
-    >
-      <CopyIcon />
-    </button>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path
-      d="M15.75 5.25h2.25a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 6 5.25h2.25"
-      stroke="var(--accent)"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M9.75 3.75a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v0.75h-4.5V3.75Z"
-      stroke="var(--accent)"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <rect x="9.75" y="3.75" width="4.5" height="1.5" rx="0.75" fill="var(--accent)" />
-  </svg>
   );
 }

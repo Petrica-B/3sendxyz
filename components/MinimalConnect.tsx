@@ -45,7 +45,12 @@ export function MinimalConnect() {
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
                 >
                   {account?.address ? (
-                    <IdentityBadge address={account.address} size={4} basicStyle={true} />
+                    <IdentityBadge
+                      address={account.address}
+                      size={4}
+                      basicStyle={true}
+                      nameMaxLength={15}
+                    />
                   ) : (
                     account.displayName
                   )}

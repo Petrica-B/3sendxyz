@@ -990,6 +990,7 @@ export function SendFileCard() {
                 alignSelf: 'flex-start',
                 width: 'fit-content',
                 maxWidth: '100%',
+                marginTop: 8,
               }}
             >
               <div className="muted" style={{ fontSize: 12 }}>
@@ -1049,17 +1050,17 @@ export function SendFileCard() {
               </div>
             </div>
             {recipientKeyLoading ? (
-              <span className="muted" style={{ fontSize: 12 }}>
+              <span className="muted" style={{ fontSize: 12, marginTop: 8 }}>
                 Checking recipient encryption mode…
               </span>
             ) : recipientKeyError ? (
-              <span style={{ color: '#f87171', fontSize: 12 }}>
+              <span style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>
                 {recipientKeyError instanceof Error
                   ? recipientKeyError.message
                   : 'Unable to verify recipient encryption mode.'}
               </span>
             ) : recipientKeyData ? (
-              <span className="muted" style={{ fontSize: 12 }}>
+              <span className="muted" style={{ fontSize: 12, marginTop: 8 }}>
                 {recipientKeyData.type === 'vault'
                   ? 'Recipient uses Light encryption (vault managed key).'
                   : 'Recipient has Pro encryption.'}{' '}

@@ -1,7 +1,8 @@
 'use client';
 
-import { AddressLink, TxLink } from '@/components/Links';
+import { TxLink } from '@/components/Links';
 import { RoundedLoaderList } from '@/components/RoundedLoader';
+import { WalletIdentityCard } from '@/components/WalletIdentityCard';
 import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
 import { formatBytes, formatDate, formatDateShort, nextUtcMidnight } from '@/lib/format';
 import type { StoredUploadRecord } from '@/lib/types';
@@ -136,9 +137,10 @@ export default function OutboxPage() {
                     </div>
                     {expanded[item.id] && (
                       <div className="details mono" style={{ fontSize: 12 }}>
-                        <div>to: <AddressLink address={item.recipient} size={4} /></div>
-                        <div>from: <AddressLink address={item.initiator} size={4} /></div>
-                        <div>
+                        <div className="col" style={{ gap: 6 }}>
+                          <WalletIdentityCard label="To" address={item.recipient} />
+                        </div>
+                        <div style={{ marginTop: 10 }}>
                           tx:{' '}
                           {isFreeTransfer ? (
                             <span className="muted">Free micro-send</span>

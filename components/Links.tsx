@@ -7,7 +7,22 @@ export function AddressLink({ address, size = 5 }: { address: string; size?: num
   if (!address) return null;
   const href = explorerAddressUrl(address);
   return (
-    <a className="accentLink mono" href={href} target="_blank" rel="noreferrer">
+    <a
+      className="mono accentLink"
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      title={`View ${address} on Basescan`}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        color: 'var(--accent)',
+        fontWeight: 700,
+        fontSize: 12,
+        lineHeight: 1.4,
+      }}
+    >
       {shortAddress(address, size)}
     </a>
   );

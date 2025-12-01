@@ -15,7 +15,7 @@ export function WalletIdentityCard({ address, label }: WalletIdentityCardProps) 
   const normalized = useMemo(() => address?.trim().toLowerCase() ?? '', [address]);
   const enabled = normalized.length > 0;
 
-  const { data, isFetching, isError } = useQuery({
+  const { data } = useQuery({
     queryKey: identityQueryKey(normalized || 'pending-identity'),
     queryFn: () => fetchIdentityProfile(normalized),
     enabled,
@@ -61,6 +61,7 @@ export function WalletIdentityCard({ address, label }: WalletIdentityCardProps) 
               textAlign: 'left',
               color: 'var(--accent)',
               fontWeight: 700,
+              fontSize: 14,
               cursor: 'pointer',
             }}
           >
@@ -96,15 +97,6 @@ export function WalletIdentityCard({ address, label }: WalletIdentityCardProps) 
               {short}
             </span>
           </button>
-          {isFetching ? (
-            <span className="muted" style={{ fontSize: 11 }}>
-              Resolving…
-            </span>
-          ) : isError ? (
-            <span className="muted" style={{ fontSize: 11 }}>
-              Unable to resolve name
-            </span>
-          ) : null}
         </div>
       </div>
     </div>

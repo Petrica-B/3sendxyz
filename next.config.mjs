@@ -29,6 +29,7 @@ const nextConfig = {
     };
     return config;
   },
+  serverExternalPackages: ['pino', 'pino-pretty', 'thread-stream'],
   output: 'standalone',
 };
 

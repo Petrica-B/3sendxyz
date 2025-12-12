@@ -17,7 +17,6 @@ import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } fr
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
-import { Buffer } from 'node:buffer';
 import {
   createPublicClient,
   decodeEventLog,
@@ -506,12 +505,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: message }, { status: 400 });
       }
     }
-    const fileBase64 = await file.arrayBuffer();
-    const file_base64_str = Buffer.from(fileBase64).toString('base64');
     const endR1fsUpload = timers.start('r1fsUpload');
-    const uploadResult = await ratio1.r1fs.addFileBase64({
-      file_base64_str,
-      filename: file.name,
+    const uploadResult = await ratio1.r1fs.addFile({
+      file,
       secret: recipientKey,
     });
     endR1fsUpload();

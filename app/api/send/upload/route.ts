@@ -44,8 +44,27 @@ function getRpcUrl(chainId: number): { chain: Chain; rpcUrl: string } | null {
   return { chain, rpcUrl };
 }
 
+type StepTimers = {
+  timings: Record<string, number>;
+  start: (label: string) => () => void;
+};
+
+function createStepTimers(): StepTimers {
+  const timings: Record<string, number> = {};
+  const start = (label: string) => {
+    const startedAt = Date.now();
+    return () => {
+      timings[label] = Date.now() - startedAt;
+    };
+  };
+  return { timings, start };
+}
+
 export async function POST(request: Request) {
   try {
+    const timers = createStepTimers();
+    const endInitialVerification = timers.start('initialVerification');
+
     const formData = await request.formData();
     const file = formData.get('file');
     const recipient = formData.get('recipient');
@@ -368,6 +387,9 @@ export async function POST(request: Request) {
     const { chain, rpcUrl } = rpcDetails;
     const client = createPublicClient({ chain, transport: http(rpcUrl) });
 
+    endInitialVerification();
+
+    const endSignatureVerification = timers.start('signatureVerification');
     let signatureVerified = false;
     try {
       signatureVerified = await client.verifyMessage({
@@ -384,6 +406,8 @@ export async function POST(request: Request) {
       });
     }
 
+    endSignatureVerification();
+
     if (!signatureVerified) {
       return NextResponse.json(
         { success: false, error: 'Handshake signature mismatch' },
@@ -395,6 +419,7 @@ export async function POST(request: Request) {
     let eventR1Amount = 0n;
 
     if (!isFreePayment) {
+      const endPaymentOnchainCheck = timers.start('paymentOnchainCheck');
       let receipt;
       try {
         receipt = await client.getTransactionReceipt({ hash: paymentTxHash as `0x${string}` });
@@ -446,14 +471,19 @@ export async function POST(request: Request) {
 
       eventUsdcAmount = (paymentLog.args.usdcAmount ?? 0n) as bigint;
       eventR1Amount = (paymentLog.args.r1Amount ?? 0n) as bigint;
+
+      endPaymentOnchainCheck();
     }
 
     const ratio1 = createEdgeSdk();
     try {
+      const endPaymentReuseCheck = timers.start('paymentReuseCheck');
       const existingPaymentUsage = await ratio1.cstore.hget({
         hkey: USED_PAYMENT_TXS_CSTORE_HKEY,
         key: paymentTxHash,
       });
+      endPaymentReuseCheck();
+
       if (existingPaymentUsage) {
         return NextResponse.json(
           { success: false, error: 'Payment reference already used for upload' },
@@ -467,7 +497,9 @@ export async function POST(request: Request) {
 
     if (isFreePayment) {
       try {
+        const endFreeSendReservation = timers.start('freeSendReservation');
         await consumeFreeSend(initiatorAddr, sentTimestamp, ratio1);
+        endFreeSendReservation();
       } catch (err) {
         const message =
           err instanceof Error && err.message ? err.message : 'Unable to reserve free transfer.';
@@ -476,11 +508,13 @@ export async function POST(request: Request) {
     }
     const fileBase64 = await file.arrayBuffer();
     const file_base64_str = Buffer.from(fileBase64).toString('base64');
+    const endR1fsUpload = timers.start('r1fsUpload');
     const uploadResult = await ratio1.r1fs.addFileBase64({
       file_base64_str,
       filename: file.name,
       secret: recipientKey,
     });
+    endR1fsUpload();
     const cid = uploadResult.cid;
     if (!cid) {
       throw new Error('Failed to store file in R1FS');
@@ -516,22 +550,31 @@ export async function POST(request: Request) {
     };
 
     const recordJson = JSON.stringify(record);
+    const endCstoreWriteReceived = timers.start('cstoreWriteReceived');
     await ratio1.cstore.hset({
       hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${recipientKey}`,
       key: paymentTxHash,
       value: recordJson,
     });
+    endCstoreWriteReceived();
+
+    const endCstoreWriteSent = timers.start('cstoreWriteSent');
     await ratio1.cstore.hset({
       hkey: `${SENT_FILES_CSTORE_HKEY}_${initiatorAddr}`,
       key: paymentTxHash,
       value: recordJson,
     });
+    endCstoreWriteSent();
+
+    const endCstoreWritePaymentUsed = timers.start('cstoreWritePaymentUsed');
     await ratio1.cstore.hset({
       hkey: USED_PAYMENT_TXS_CSTORE_HKEY,
       key: paymentTxHash,
       value: true,
     });
+    endCstoreWritePaymentUsed();
 
+    const endStatsUpdate = timers.start('statsUpdate');
     try {
       await updateStatsAfterUpload({
         ratio1,
@@ -543,6 +586,8 @@ export async function POST(request: Request) {
       revalidateTag(PLATFORM_STATS_CACHE_TAG, 'default');
     } catch (err) {
       console.error('[upload] Failed to update stats store', err);
+    } finally {
+      endStatsUpdate();
     }
 
     const cleanupIndexEntry: FileCleanupIndexEntry = {
@@ -552,16 +597,19 @@ export async function POST(request: Request) {
       initiator: initiatorAddr,
       sentAt: sentTimestamp,
     };
+    const endCleanupIndexWrite = timers.start('cleanupIndexWrite');
     await ratio1.cstore.hset({
       hkey: FILE_CLEANUP_INDEX_CSTORE_HKEY,
       key: paymentTxHash,
       value: JSON.stringify(cleanupIndexEntry),
     });
+    endCleanupIndexWrite();
 
     return NextResponse.json({
       success: true,
       recordKey: recipientKey,
       record,
+      timings: timers.timings,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

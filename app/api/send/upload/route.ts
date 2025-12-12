@@ -5,13 +5,13 @@ import {
   USED_PAYMENT_TXS_CSTORE_HKEY,
   resolveTierBySize,
 } from '@/lib/constants';
+import { consumeFreeSend, isFreePaymentReference, isMicroTier } from '@/lib/freeSends';
 import {
   buildSendHandshakeMessage,
   computeEncryptionMetadataDigest,
   parseSendHandshakeMessage,
 } from '@/lib/handshake';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
-import { consumeFreeSend, isFreePaymentReference, isMicroTier } from '@/lib/freeSends';
 import { PLATFORM_STATS_CACHE_TAG, updateStatsAfterUpload } from '@/lib/stats';
 import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
@@ -27,17 +27,6 @@ import {
   verifyMessage,
 } from 'viem';
 import { base, baseSepolia, type Chain } from 'viem/chains';
-
-export const runtime = 'nodejs';
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '5gb',
-    },
-    responseLimit: false,
-  },
-};
 
 function getRpcUrl(chainId: number): { chain: Chain; rpcUrl: string } | null {
   const chain = chainId === base.id ? base : chainId === baseSepolia.id ? baseSepolia : null;

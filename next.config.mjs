@@ -31,6 +31,11 @@ const nextConfig = {
   },
   serverExternalPackages: ['pino', 'pino-pretty', 'thread-stream'],
   output: 'standalone',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '5gb',
+    },
+  },
 };
 
 export default nextConfig;

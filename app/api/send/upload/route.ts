@@ -18,7 +18,6 @@ import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } fr
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
-import { Readable } from 'stream';
 import {
   createPublicClient,
   decodeEventLog,
@@ -495,11 +494,12 @@ export async function POST(request: Request) {
     }
     const endR1fsUpload = timers.start('r1fsUpload');
     console.log('[upload] Starting R1FS upload');
-    const stream = Readable.fromWeb(file.stream() as any);
-    const uploadResult = await ratio1.r1fs.addFileFull({
-      file: stream,
-      filename: file.name,
-      contentType: file.type,
+    const formDataRequest = new FormData();
+    formDataRequest.append('file', file);
+    formDataRequest.append('filename', file.name);
+    formDataRequest.append('contentType', file.type);
+    const uploadResult = await ratio1.r1fs.addFile({
+      formData: formDataRequest,
       secret: recipientKey,
     });
     console.log('[upload] Completed R1FS upload');

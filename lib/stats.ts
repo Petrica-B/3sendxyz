@@ -2,6 +2,7 @@ import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { unstable_cache } from 'next/cache';
 
 import { STATS_CSTORE_HKEY } from './constants';
+import { createStepTimers } from './timers';
 import type { AddressStatsRecord, PlatformStatsRecord } from './types';
 
 const TOTALS_KEY = 'totals';
@@ -63,10 +64,7 @@ function parsePlatformStats(raw: string | null): PlatformStatsRecord {
     const inferredUniqueUsers =
       parsed.uniqueUsers ??
       (typeof legacyUniqueSenders === 'number' || typeof legacyUniqueReceivers === 'number'
-        ? Math.max(
-            toSafeInteger(legacyUniqueSenders),
-            toSafeInteger(legacyUniqueReceivers)
-          )
+        ? Math.max(toSafeInteger(legacyUniqueSenders), toSafeInteger(legacyUniqueReceivers))
         : 0);
     stats.uniqueUsers = toSafeInteger(inferredUniqueUsers);
     stats.totalR1Burned = toBigIntString(parsed.totalR1Burned);
@@ -159,18 +157,23 @@ export async function updateStatsAfterUpload(args: {
   totals: PlatformStatsRecord;
   sender: AddressStatsRecord;
   recipient: AddressStatsRecord;
+  timings: Record<string, number>;
 }> {
+  const timers = createStepTimers();
   const { ratio1, sender, recipient, filesize, r1Burn } = args;
   const senderLc = sender.toLowerCase();
   const recipientLc = recipient.toLowerCase();
   const sameAddress = senderLc === recipientLc;
 
+  const endFetchStats = timers.start('updateStatsAfterUploadFetchStats');
   const [totals, senderStats, recipientStatsRaw] = await Promise.all([
     fetchPlatformStats(ratio1),
     fetchAddressStats(senderLc, ratio1),
     sameAddress ? Promise.resolve(null) : fetchAddressStats(recipientLc, ratio1),
   ]);
+  endFetchStats();
 
+  const endPrepareStats = timers.start('updateStatsAfterUploadPrepareStats');
   const now = Date.now();
   const safeFilesize = toSafeInteger(filesize);
   const senderPrevInteractions = senderStats.sentFiles + senderStats.receivedFiles;
@@ -185,7 +188,7 @@ export async function updateStatsAfterUpload(args: {
 
   const recipientStats = sameAddress
     ? senderStats
-    : recipientStatsRaw ?? createEmptyAddressStats(recipientLc);
+    : (recipientStatsRaw ?? createEmptyAddressStats(recipientLc));
 
   recipientStats.receivedFiles += 1;
   recipientStats.receivedBytes += safeFilesize;
@@ -205,7 +208,9 @@ export async function updateStatsAfterUpload(args: {
     }
   }
   totals.updatedAt = now;
+  endPrepareStats();
 
+  const endCstoreWrite = timers.start('updateStatsAfterUploadCstoreWrite');
   const writes: Promise<void>[] = [
     writeStats(ratio1, TOTALS_KEY, totals),
     writeStats(ratio1, getAddressKey(senderLc), senderStats),
@@ -214,11 +219,13 @@ export async function updateStatsAfterUpload(args: {
     writes.push(writeStats(ratio1, getAddressKey(recipientLc), recipientStats));
   }
   await Promise.all(writes);
+  endCstoreWrite();
 
   return {
     totals,
     sender: senderStats,
     recipient: recipientStats,
+    timings: timers.timings,
   };
 }
 

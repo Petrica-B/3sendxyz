@@ -13,6 +13,7 @@ import {
 } from '@/lib/handshake';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
 import { PLATFORM_STATS_CACHE_TAG, updateStatsAfterUpload } from '@/lib/stats';
+import { createStepTimers } from '@/lib/timers';
 import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
@@ -42,22 +43,6 @@ function getRpcUrl(chainId: number): { chain: Chain; rpcUrl: string } | null {
     throw new Error('Missing RPC URL for selected chain');
   }
   return { chain, rpcUrl };
-}
-
-type StepTimers = {
-  timings: Record<string, number>;
-  start: (label: string) => () => void;
-};
-
-function createStepTimers(): StepTimers {
-  const timings: Record<string, number> = {};
-  const start = (label: string) => {
-    const startedAt = Date.now();
-    return () => {
-      timings[label] = Date.now() - startedAt;
-    };
-  };
-  return { timings, start };
 }
 
 export async function POST(request: Request) {
@@ -405,7 +390,6 @@ export async function POST(request: Request) {
         signature,
       });
     }
-
     endSignatureVerification();
 
     if (!signatureVerified) {
@@ -498,22 +482,27 @@ export async function POST(request: Request) {
     if (isFreePayment) {
       try {
         const endFreeSendReservation = timers.start('freeSendReservation');
-        await consumeFreeSend(initiatorAddr, sentTimestamp, ratio1);
+        const { timings } = await consumeFreeSend(initiatorAddr, sentTimestamp, ratio1);
         endFreeSendReservation();
+        timers.timings = { ...timers.timings, ...timings };
       } catch (err) {
         const message =
           err instanceof Error && err.message ? err.message : 'Unable to reserve free transfer.';
         return NextResponse.json({ success: false, error: message }, { status: 400 });
       }
     }
+    const endBase64Encoding = timers.start('base64Encoding');
     const fileBase64 = await file.arrayBuffer();
     const file_base64_str = Buffer.from(fileBase64).toString('base64');
+    endBase64Encoding();
     const endR1fsUpload = timers.start('r1fsUpload');
+    console.log('[upload] Starting R1FS upload');
     const uploadResult = await ratio1.r1fs.addFileBase64({
       file_base64_str,
       filename: file.name,
       secret: recipientKey,
     });
+    console.log('[upload] Completed R1FS upload');
     endR1fsUpload();
     const cid = uploadResult.cid;
     if (!cid) {
@@ -574,15 +563,16 @@ export async function POST(request: Request) {
     });
     endCstoreWritePaymentUsed();
 
-    const endStatsUpdate = timers.start('statsUpdate');
+    const endStatsUpdate = timers.start('statsUpdate'); //TODO add more detailed timers inside
     try {
-      await updateStatsAfterUpload({
+      const { timings } = await updateStatsAfterUpload({
         ratio1,
         sender: initiatorAddr,
         recipient: recipientKey,
         filesize: effectiveFileSize,
         r1Burn: eventR1Amount,
       });
+      timers.timings = { ...timers.timings, ...timings };
       revalidateTag(PLATFORM_STATS_CACHE_TAG, 'default');
     } catch (err) {
       console.error('[upload] Failed to update stats store', err);

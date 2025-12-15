@@ -6,6 +6,7 @@ import {
 } from '@/lib/constants';
 import type { FreeSendAllowance } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
+import { createStepTimers } from './timers';
 
 const ADDRESS_KEY_PREFIX = 'addr:';
 
@@ -46,7 +47,10 @@ function parseUsage(raw: string | null, currentMonth: string): FreeSendUsageReco
   }
   try {
     const parsed = JSON.parse(raw) as Partial<FreeSendUsageRecord>;
-    const month = typeof parsed.month === 'string' && parsed.month.trim().length > 0 ? parsed.month : currentMonth;
+    const month =
+      typeof parsed.month === 'string' && parsed.month.trim().length > 0
+        ? parsed.month
+        : currentMonth;
     const used = toSafeInteger(parsed.used);
     const updatedAt = toSafeInteger(parsed.updatedAt);
     if (month !== currentMonth) {
@@ -58,7 +62,11 @@ function parseUsage(raw: string | null, currentMonth: string): FreeSendUsageReco
   }
 }
 
-async function readUsage(address: string, now: number, ratio1?: EdgeSdk): Promise<FreeSendUsageRecord> {
+async function readUsage(
+  address: string,
+  now: number,
+  ratio1?: EdgeSdk
+): Promise<FreeSendUsageRecord> {
   const client = ratio1 ?? createEdgeSdk();
   const key = makeAddressKey(address);
   let raw: string | null = null;
@@ -97,10 +105,13 @@ export async function consumeFreeSend(
   address: string,
   now: number = Date.now(),
   ratio1?: EdgeSdk
-): Promise<FreeSendAllowance> {
+): Promise<FreeSendAllowance & { timings: Record<string, number> }> {
+  const timers = createStepTimers();
   const client = ratio1 ?? createEdgeSdk();
   const monthKey = toMonthKey(now);
+  const endReadUsage = timers.start('consumeFreeSendReadUsage');
   const usage = await readUsage(address, now, client);
+  endReadUsage();
   const used = usage.month === monthKey ? usage.used : 0;
   if (used >= FREE_MICRO_SENDS_PER_MONTH) {
     throw new Error('No free micro-sends remaining this month.');
@@ -110,17 +121,20 @@ export async function consumeFreeSend(
     used: used + 1,
     updatedAt: now,
   };
+  const endCstoreWrite = timers.start('consumeFreeSendCstoreWrite');
   await client.cstore.hset({
     hkey: FREE_SENDS_CSTORE_HKEY,
     key: makeAddressKey(address),
     value: JSON.stringify(nextUsage),
   });
+  endCstoreWrite();
   return {
     month: monthKey,
     used: nextUsage.used,
     remaining: Math.max(0, FREE_MICRO_SENDS_PER_MONTH - nextUsage.used),
     limit: FREE_MICRO_SENDS_PER_MONTH,
     resetsAt: nextMonthReset(now),
+    timings: timers.timings,
   };
 }
 

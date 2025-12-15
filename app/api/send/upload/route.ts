@@ -18,7 +18,6 @@ import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } fr
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
-import { Buffer } from 'node:buffer';
 import {
   createPublicClient,
   decodeEventLog,
@@ -44,6 +43,8 @@ function getRpcUrl(chainId: number): { chain: Chain; rpcUrl: string } | null {
   }
   return { chain, rpcUrl };
 }
+
+export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
@@ -491,15 +492,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: message }, { status: 400 });
       }
     }
-    const endBase64Encoding = timers.start('base64Encoding');
-    const fileBase64 = await file.arrayBuffer();
-    const file_base64_str = Buffer.from(fileBase64).toString('base64');
-    endBase64Encoding();
     const endR1fsUpload = timers.start('r1fsUpload');
     console.log('[upload] Starting R1FS upload');
-    const uploadResult = await ratio1.r1fs.addFileBase64({
-      file_base64_str,
-      filename: file.name,
+    const uploadResult = await ratio1.r1fs.addFile({
+      file,
       secret: recipientKey,
     });
     console.log('[upload] Completed R1FS upload');

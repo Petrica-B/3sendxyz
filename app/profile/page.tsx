@@ -1,5 +1,6 @@
 'use client';
 
+import { LoginButton } from '@/components/LoginButton';
 import EncryptionModesSection, {
   type PasskeyRegistrationStep,
 } from '@/components/profile/EncryptionModesSection';
@@ -14,6 +15,7 @@ import {
 } from '@/lib/keys';
 import { shortAddress } from '@/lib/format';
 import { derivePasskeyX25519KeyPair, randomPrfSalt } from '@/lib/passkeyClient';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import type {
   RegisteredKeyRecord,
   RegisteredPasskeyRecord,
@@ -37,13 +39,14 @@ type PasskeyCredential = PublicKeyCredential & {
 };
 
 export default function ProfilePage() {
-  const { address, isConnected } = useAccount();
+  const { authMethod, canUseWallet, isLoggedIn } = useAuthStatus();
+  const { address } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const normalizedAddress = address?.trim().toLowerCase() ?? '';
   const { data: identityProfile } = useQuery({
     queryKey: identityQueryKey(normalizedAddress),
     queryFn: () => fetchIdentityProfile(normalizedAddress),
-    enabled: Boolean(normalizedAddress),
+    enabled: Boolean(normalizedAddress && canUseWallet),
     staleTime: 30 * 60 * 1000,
   });
   const hasBaseName = Boolean(identityProfile?.name?.trim());
@@ -89,15 +92,15 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    if (!address) return;
+    if (!canUseWallet || !address) return;
     const p = loadProfile(address);
     setProfile(p);
     // no handle UI for now
     setKeyLabelInput('');
-  }, [address]);
+  }, [canUseWallet, address]);
 
   useEffect(() => {
-    if (!address) {
+    if (!canUseWallet || !address) {
       setRegisteredKeyRecord(null);
       setRegisteredKeyLoading(false);
       return;
@@ -137,7 +140,7 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [canUseWallet, address]);
 
   // handle management temporarily removed
 
@@ -521,12 +524,23 @@ export default function ProfilePage() {
     }
   }, [baseName]);
 
-  if (!isConnected || !address) {
+  if (!canUseWallet) {
     return (
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">My Profile</div>
-          <div className="subhead">Connect your wallet to manage your keys.</div>
+          <div className="subhead">
+            {authMethod === 'clerk'
+              ? 'Email login is active. Sign out to connect a wallet.'
+              : authMethod === 'mixed'
+                ? 'Multiple logins active. Disconnect one to continue.'
+                : 'Log in to manage your keys.'}
+          </div>
+          {!isLoggedIn && (
+            <div style={{ marginTop: 12 }}>
+              <LoginButton />
+            </div>
+          )}
         </div>
       </main>
     );

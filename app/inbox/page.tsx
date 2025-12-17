@@ -1,5 +1,6 @@
 'use client';
 
+import { LoginButton } from '@/components/LoginButton';
 import { TxLink } from '@/components/Links';
 import { RoundedLoaderList } from '@/components/RoundedLoader';
 import { WalletIdentityCard } from '@/components/WalletIdentityCard';
@@ -8,6 +9,7 @@ import { decodeBase64, decryptFileFromEnvelope, decryptNoteFromEnvelope } from '
 import { formatBytes, formatDate, formatDateShort, nextUtcMidnight } from '@/lib/format';
 import { deriveSeedKeyPair } from '@/lib/keys';
 import { derivePasskeyX25519KeyPair } from '@/lib/passkeyClient';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import type { RegisteredKeyRecord, RegisteredPasskeyRecord, StoredUploadRecord } from '@/lib/types';
 import { getVaultPrivateKey } from '@/lib/vaultClient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -26,7 +28,8 @@ type NoteState = {
 const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.initiator}`;
 
 export default function InboxPage() {
-  const { address, isConnected } = useAccount();
+  const { authMethod, canUseWallet, isLoggedIn } = useAuthStatus();
+  const { address } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const [records, setRecords] = useState<ReceivedItem[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -46,7 +49,7 @@ export default function InboxPage() {
   const passkeyLoading = registeredKeyLoading;
 
   const fetchInbox = useCallback(async () => {
-    if (!address) {
+    if (!canUseWallet || !address) {
       setRecords([]);
       setExpanded({});
       setLoading(false);
@@ -77,7 +80,7 @@ export default function InboxPage() {
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, [canUseWallet, address]);
 
   useEffect(() => {
     fetchInbox();
@@ -114,7 +117,7 @@ export default function InboxPage() {
 
   const fetchPasskeyStatus = useCallback(async () => {
     seedKeyCacheRef.current = null;
-    if (!address) {
+    if (!canUseWallet || !address) {
       setRegisteredKeyRecord(null);
       setRegisteredKeyLoading(false);
       setRegisteredKeyError(null);
@@ -142,7 +145,7 @@ export default function InboxPage() {
     } finally {
       setRegisteredKeyLoading(false);
     }
-  }, [address]);
+  }, [canUseWallet, address]);
 
   useEffect(() => {
     let active = true;
@@ -452,12 +455,23 @@ export default function InboxPage() {
     [resolveRecipientPrivateKey]
   );
 
-  if (!isConnected || !address) {
+  if (!canUseWallet) {
     return (
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">Inbox</div>
-          <div className="subhead">Connect your wallet to see incoming files.</div>
+          <div className="subhead">
+            {authMethod === 'clerk'
+              ? 'Email login is active. Sign out to connect a wallet.'
+              : authMethod === 'mixed'
+                ? 'Multiple logins active. Disconnect one to continue.'
+                : 'Log in to see incoming files.'}
+          </div>
+          {!isLoggedIn && (
+            <div style={{ marginTop: 12 }}>
+              <LoginButton />
+            </div>
+          )}
         </div>
       </main>
     );

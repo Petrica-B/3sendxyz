@@ -3,6 +3,7 @@
 import { FREE_MICRO_SENDS_PER_MONTH } from '@/lib/constants';
 import { formatDateShort } from '@/lib/format';
 import type { FreeSendAllowance } from '@/lib/types';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount } from 'wagmi';
 
@@ -12,11 +13,13 @@ function formatResetDate(ts?: number) {
 }
 
 export function PricingFreeAllowanceCard() {
-  const { address, isConnected } = useAccount();
+  const { authMethod, canUseWallet } = useAuthStatus();
+  const { address } = useAccount();
+  const walletActive = canUseWallet;
 
   const { data, isLoading, isError } = useQuery<FreeSendAllowance>({
     queryKey: ['pricing-free-allowance', address],
-    enabled: Boolean(isConnected && address),
+    enabled: Boolean(walletActive && address),
     staleTime: 60_000,
     queryFn: async () => {
       if (!address) {
@@ -57,8 +60,12 @@ export function PricingFreeAllowanceCard() {
         applies automatically.
       </div>
       <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: '#0f172a' }}>
-        {!isConnected ? (
-          'Connect your wallet to see your remaining free sends.'
+        {!walletActive ? (
+          authMethod === 'clerk'
+            ? 'Email login is active. Sign out to check wallet allowance.'
+            : authMethod === 'mixed'
+              ? 'Multiple logins active. Disconnect one to check wallet allowance.'
+              : 'Connect your wallet to see your remaining free sends.'
         ) : isLoading ? (
           'Checking your free sends…'
         ) : isError || !allowance ? (

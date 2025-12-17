@@ -1,13 +1,13 @@
 'use client';
 
+import { LoginButton } from '@/components/LoginButton';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import Link from 'next/link';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
 
 export default function PricingCta() {
-  const { isConnected } = useAccount();
+  const { authMethod, canUseWallet } = useAuthStatus();
 
-  if (isConnected) {
+  if (canUseWallet) {
     return (
       <div
         className="card"
@@ -28,26 +28,64 @@ export default function PricingCta() {
     );
   }
 
-  return (
-    <ConnectButton.Custom>
-      {({ openConnectModal }) => (
-        <div
-          className="card"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}
-        >
-          <div>
-            <div style={{ fontWeight: 700 }}>Ready to send?</div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Connect your wallet to start sending. Pricing adjusts automatically based on your file size.
-            </div>
-          </div>
-          <div className="homeCtaActions">
-            <button type="button" className="button" onClick={openConnectModal}>
-              Connect Now
-            </button>
+  if (authMethod === 'clerk') {
+    return (
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 700 }}>Email login active</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            To use a wallet instead, sign out of email login first.
           </div>
         </div>
-      )}
-    </ConnectButton.Custom>
+      </div>
+    );
+  }
+
+  if (authMethod === 'mixed') {
+    return (
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 700 }}>Multiple logins active</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Disconnect one login method to continue.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="card"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}
+    >
+      <div>
+        <div style={{ fontWeight: 700 }}>Ready to send?</div>
+        <div className="muted" style={{ fontSize: 12 }}>
+          Log in with email or connect a wallet to start sending.
+        </div>
+      </div>
+      <div className="homeCtaActions">
+        <LoginButton label="Login" />
+      </div>
+    </div>
   );
 }

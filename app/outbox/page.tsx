@@ -5,7 +5,9 @@ import { RoundedLoaderList } from '@/components/RoundedLoader';
 import { WalletIdentityCard } from '@/components/WalletIdentityCard';
 import { FILE_EXPIRATION_MS, getTierById } from '@/lib/constants';
 import { formatBytes, formatDate, formatDateShort, nextUtcMidnight } from '@/lib/format';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import type { StoredUploadRecord } from '@/lib/types';
+import { LoginButton } from '@/components/LoginButton';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { formatUnits } from 'viem';
@@ -16,7 +18,8 @@ type SentItem = StoredUploadRecord & { id: string };
 const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.recipient}`;
 
 export default function OutboxPage() {
-  const { address, isConnected } = useAccount();
+  const { authMethod, canUseWallet, isLoggedIn } = useAuthStatus();
+  const { address } = useAccount();
   const [records, setRecords] = useState<SentItem[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
@@ -25,7 +28,7 @@ export default function OutboxPage() {
   const pageSize = 10;
 
   const fetchSent = useCallback(async () => {
-    if (!address) {
+    if (!canUseWallet || !address) {
       setRecords([]);
       setExpanded({});
       return;
@@ -54,7 +57,7 @@ export default function OutboxPage() {
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, [canUseWallet, address]);
 
   useEffect(() => {
     fetchSent();
@@ -82,12 +85,23 @@ export default function OutboxPage() {
     setPage(1);
   }, [records]);
 
-  if (!isConnected || !address) {
+  if (!canUseWallet) {
     return (
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">Outbox</div>
-          <div className="subhead">Connect your wallet to see sent files.</div>
+          <div className="subhead">
+            {authMethod === 'clerk'
+              ? 'Email login is active. Sign out to connect a wallet.'
+              : authMethod === 'mixed'
+                ? 'Multiple logins active. Disconnect one to continue.'
+                : 'Log in to see sent files.'}
+          </div>
+          {!isLoggedIn && (
+            <div style={{ marginTop: 12 }}>
+              <LoginButton />
+            </div>
+          )}
         </div>
       </main>
     );

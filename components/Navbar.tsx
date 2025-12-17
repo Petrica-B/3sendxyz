@@ -2,7 +2,9 @@
 
 import { MinimalConnect } from '@/components/MinimalConnect';
 import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import { useQuery } from '@tanstack/react-query';
+import { SignedIn, UserButton } from '@clerk/nextjs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -28,12 +30,13 @@ function NavItem({ href, label }: { href: string; label: string }) {
 }
 
 export function Navbar() {
-  const { isConnected, address } = useAccount();
+  const { isLoggedIn, canUseWallet } = useAuthStatus();
+  const { address } = useAccount();
   const normalizedAddress = address?.trim().toLowerCase() ?? '';
   const { data: identityProfile } = useQuery({
     queryKey: identityQueryKey(normalizedAddress),
     queryFn: () => fetchIdentityProfile(normalizedAddress),
-    enabled: Boolean(normalizedAddress),
+    enabled: Boolean(normalizedAddress && canUseWallet),
     staleTime: 30 * 60 * 1000,
   });
   const avatarUrl = identityProfile?.avatarUrl;
@@ -75,12 +78,17 @@ export function Navbar() {
         <nav className="navlinks">
           <NavItem href="/" label="Home" />
           <NavItem href="/pricing" label="Pricing" />
-          {isConnected && <NavItem href="/outbox" label="Outbox" />}
-          {isConnected && <NavItem href="/inbox" label="Inbox" />}
+          {isLoggedIn && <NavItem href="/outbox" label="Outbox" />}
+          {isLoggedIn && <NavItem href="/inbox" label="Inbox" />}
         </nav>
         <div className="navbarWallet" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SignedIn>
+            <div className="navbarClerk">
+              <UserButton />
+            </div>
+          </SignedIn>
           <MinimalConnect />
-          {isConnected && (
+          {canUseWallet && (
             <Link
               href="/profile"
               aria-label="Open profile"

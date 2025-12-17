@@ -2,6 +2,7 @@
 
 import { formatBytes } from '@/lib/format';
 import type { AddressStatsRecord, PlatformStatsRecord } from '@/lib/types';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import { useEffect, useMemo, useState } from 'react';
 // Removed full-card loader in favor of per-card skeletons
 import { formatUnits } from 'viem';
@@ -61,13 +62,14 @@ type DashboardProps = {
 };
 
 export default function Dashboard({ initialPlatformStats }: DashboardProps) {
+  const { canUseWallet } = useAuthStatus();
   const [platformStats, setPlatformStats] = useState<PlatformStatsRecord>(() =>
     initialPlatformStats ? { ...initialPlatformStats } : createEmptyPlatformStats()
   );
   const [userStats, setUserStats] = useState<AddressStatsRecord>(() => createEmptyAddressStats());
   const [userLoading, setUserLoading] = useState<boolean>(false);
 
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
 
   useEffect(() => {
     let aborted = false;
@@ -95,7 +97,7 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
     let aborted = false;
     async function refreshUserStats() {
       const normalized = address?.toLowerCase() ?? '';
-      if (!isConnected || !normalized) {
+      if (!canUseWallet || !normalized) {
         if (!aborted) {
           setUserStats(createEmptyAddressStats());
           setUserLoading(false);
@@ -139,7 +141,7 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
       aborted = true;
       window.removeEventListener('ratio1:upload-completed', onCompleted);
     };
-  }, [isConnected, address]);
+  }, [canUseWallet, address]);
 
   const totalGbSent = formatGb(platformStats.totalBytesSent);
   const platformR1 = useMemo(
@@ -182,7 +184,7 @@ export default function Dashboard({ initialPlatformStats }: DashboardProps) {
         </div>
       </div>
 
-      {isConnected && (
+      {canUseWallet && (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: 700 }}>Your Stats</div>

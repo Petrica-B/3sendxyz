@@ -1,12 +1,16 @@
 'use client';
 
 import { IdentityBadge } from '@/components/IdentityBadge';
+import { LoginButton } from '@/components/LoginButton';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export function MinimalConnect() {
+  const { authMethod } = useAuthStatus();
+
   return (
     <ConnectButton.Custom>
-      {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+      {({ account, chain, openAccountModal, openChainModal, mounted }) => {
         const connected = mounted && account && chain;
 
         return (
@@ -22,11 +26,31 @@ export function MinimalConnect() {
           >
             {(() => {
               if (!connected) {
-                return (
-                  <button onClick={openConnectModal} className="button" type="button">
-                    Connect Wallet
-                  </button>
-                );
+                if (authMethod === 'clerk') {
+                  return (
+                    <button
+                      className="button"
+                      type="button"
+                      disabled
+                      title="Sign out of email login to connect a wallet."
+                    >
+                      Email login active
+                    </button>
+                  );
+                }
+                if (authMethod === 'mixed') {
+                  return (
+                    <button
+                      className="button"
+                      type="button"
+                      disabled
+                      title="Disconnect one login method to continue."
+                    >
+                      Multiple logins active
+                    </button>
+                  );
+                }
+                return <LoginButton />;
               }
 
               if (chain.unsupported) {

@@ -1,18 +1,20 @@
 'use client';
 
 import { IdentityBadge } from '@/components/IdentityBadge';
+import { LoginButton } from '@/components/LoginButton';
 import { FREE_MICRO_SENDS_PER_MONTH } from '@/lib/constants';
 import { shortAddress } from '@/lib/format';
 import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import { useQuery } from '@tanstack/react-query';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { useAccount } from 'wagmi';
 
 export default function HomeCta() {
-  const { isConnected, address } = useAccount();
+  const { authMethod, canUseWallet } = useAuthStatus();
+  const { address } = useAccount();
   const normalizedAddress = address?.trim().toLowerCase() ?? '';
   const { data: identityProfile } = useQuery({
     queryKey: identityQueryKey(normalizedAddress),
@@ -28,10 +30,11 @@ export default function HomeCta() {
     null
   );
   const [freeAllowanceError, setFreeAllowanceError] = useState<string | null>(null);
-  const sentLoading = isConnected && Boolean(address) && sentCount === null;
-  const inboxLoading = isConnected && Boolean(address) && inboxCount === null;
+  const walletActive = canUseWallet;
+  const sentLoading = walletActive && Boolean(address) && sentCount === null;
+  const inboxLoading = walletActive && Boolean(address) && inboxCount === null;
   const freeAllowanceLoading =
-    isConnected && Boolean(address) && freeAllowance === null && !freeAllowanceError;
+    walletActive && Boolean(address) && freeAllowance === null && !freeAllowanceError;
   const baseName = identityProfile?.name?.trim();
 
   const copyAddress = useCallback(async () => {
@@ -71,7 +74,7 @@ export default function HomeCta() {
     };
 
     async function fetchCounts() {
-      if (!isConnected || !address) {
+      if (!walletActive || !address) {
         setSentCount(null);
         setInboxCount(null);
         setFreeAllowance(null);
@@ -148,9 +151,9 @@ export default function HomeCta() {
       window.removeEventListener('ratio1:upload-completed', onCompleted);
       window.removeEventListener('focus', onFocus);
     };
-  }, [isConnected, address]);
+  }, [walletActive, address]);
 
-  if (isConnected) {
+  if (walletActive) {
     return (
       <div
         className="card"
@@ -297,32 +300,70 @@ export default function HomeCta() {
     );
   }
 
-  return (
-    <ConnectButton.Custom>
-      {({ openConnectModal }) => (
-        <div
-          className="card"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 700 }}>Connect now to get started</div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Check your inbox and send files with full privacy.
-            </div>
-          </div>
-          <div className="homeCtaActions">
-            <button type="button" className="button" onClick={openConnectModal}>
-              Connect Wallet
-            </button>
+  if (authMethod === 'clerk') {
+    return (
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 700 }}>Email login active</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            To use a wallet instead, sign out of email login first.
           </div>
         </div>
-      )}
-    </ConnectButton.Custom>
+      </div>
+    );
+  }
+
+  if (authMethod === 'mixed') {
+    return (
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 700 }}>Multiple logins active</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Disconnect one login method to continue.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="card"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 700 }}>Log in to get started</div>
+        <div className="muted" style={{ fontSize: 12 }}>
+          Use email and password or connect a wallet when you are ready.
+        </div>
+      </div>
+      <div className="homeCtaActions">
+        <LoginButton />
+      </div>
+    </div>
   );
 }

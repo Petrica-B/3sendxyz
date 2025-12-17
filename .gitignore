@@ -23,3 +23,5 @@ pnpm-debug.log*
 tsconfig.tsbuildinfo
 
 .DS_Store
+# clerk configuration (can include secrets)
+/.clerk/

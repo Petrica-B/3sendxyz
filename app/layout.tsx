@@ -3,6 +3,7 @@ import MobileTabBar from '@/components/MobileTabBar';
 import { Navbar } from '@/components/Navbar';
 import { Providers } from '@/components/Providers';
 import { buildMiniAppEmbedMetadata } from '@/lib/miniapp';
+import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import './globals.css';
@@ -42,29 +43,31 @@ const googleAnalyticsId = process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        {googleAnalyticsId ? (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}
-              strategy="afterInteractive"
-            />
-            <Script id="ga-init" strategy="afterInteractive">
-              {`window.dataLayer = window.dataLayer || [];
+    <ClerkProvider>
+      <html lang="en">
+        <body>
+          {googleAnalyticsId ? (
+            <>
+              <Script
+                src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}
+                strategy="afterInteractive"
+              />
+              <Script id="ga-init" strategy="afterInteractive">
+                {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', '${googleAnalyticsId}');`}
-            </Script>
-          </>
-        ) : null}
-        <Providers>
-          <Navbar />
-          <div className="container">{children}</div>
-          <Footer />
-          <MobileTabBar />
-        </Providers>
-      </body>
-    </html>
+              </Script>
+            </>
+          ) : null}
+          <Providers>
+            <Navbar />
+            <div className="container">{children}</div>
+            <Footer />
+            <MobileTabBar />
+          </Providers>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

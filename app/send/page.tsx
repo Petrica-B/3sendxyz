@@ -1,18 +1,29 @@
-"use client";
+'use client';
 
-import { IdentityBadge } from '@/components/IdentityBadge';
+import { LoginButton } from '@/components/LoginButton';
 import { SendFileCard } from '@/components/SendFileCard';
-import { useAccount } from 'wagmi';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 
 export default function SendPage() {
-  const { address, isConnected } = useAccount();
+  const { authMethod, canUseWallet, isLoggedIn } = useAuthStatus();
 
-  if (!isConnected || !address) {
+  if (!canUseWallet) {
     return (
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">Send</div>
-          <div className="subhead">Connect your wallet to send files.</div>
+          <div className="subhead">
+            {authMethod === 'clerk'
+              ? 'Email login is active. Sign out to connect a wallet.'
+              : authMethod === 'mixed'
+                ? 'Multiple logins active. Disconnect one to continue.'
+                : 'Log in to send files.'}
+          </div>
+          {!isLoggedIn && (
+            <div style={{ marginTop: 12 }}>
+              <LoginButton />
+            </div>
+          )}
         </div>
       </main>
     );

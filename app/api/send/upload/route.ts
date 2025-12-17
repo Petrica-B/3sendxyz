@@ -506,7 +506,7 @@ export async function POST(request: Request) {
     endR1fsUpload();
     const cid = uploadResult.cid;
     if (!cid) {
-      throw new Error('Failed to store file in R1FS');
+      throw new Error('Failed to store file in R1FS: ' + JSON.stringify(uploadResult));
     }
 
     const hasEncryptedNote =

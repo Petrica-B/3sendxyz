@@ -1,5 +1,5 @@
 import { VAULT_CSTORE_HKEY } from '@/lib/constants';
-import { getClerkIdentityKey } from '@/lib/clerkIdentity';
+import { getClerkIdentityKey, getClerkIdentityKeys } from '@/lib/clerkIdentity';
 import { parseIdentityKey } from '@/lib/identityKey';
 import type { VaultKeyRecord } from '@/lib/types';
 import {
@@ -38,7 +38,10 @@ export async function POST(request: Request) {
   const { address, identity, signature, message } = body;
   const rawIdentity = isString(identity) && identity.trim().length > 0 ? identity : address;
   const parsedIdentity = rawIdentity ? parseIdentityKey(rawIdentity) : null;
-  const clerkIdentity = await getClerkIdentityKey();
+  const [clerkIdentity, clerkIdentities] = await Promise.all([
+    getClerkIdentityKey(),
+    getClerkIdentityKeys(),
+  ]);
   const walletIdentity = parsedIdentity?.kind === 'wallet' ? parsedIdentity : null;
   const emailIdentity = parsedIdentity?.kind === 'email' ? parsedIdentity : null;
 
@@ -50,7 +53,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing message' }, { status: 400 });
     }
   } else if (clerkIdentity) {
-    if (emailIdentity && emailIdentity.value !== clerkIdentity.value) {
+    const matchesEmail = emailIdentity
+      ? clerkIdentities.some((key) => key.value === emailIdentity.value)
+      : true;
+    if (!matchesEmail) {
       return NextResponse.json({ success: false, error: 'Identity mismatch' }, { status: 403 });
     }
   } else {

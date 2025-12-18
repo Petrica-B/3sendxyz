@@ -1,3 +1,4 @@
+import { getClerkIdentityKeys } from '@/lib/clerkIdentity';
 import {
   FILE_CLEANUP_INDEX_CSTORE_HKEY,
   RECEIVED_FILES_CSTORE_HKEY,
@@ -5,28 +6,21 @@ import {
   USED_PAYMENT_TXS_CSTORE_HKEY,
   resolveTierBySize,
 } from '@/lib/constants';
-import { getClerkIdentityKey } from '@/lib/clerkIdentity';
 import { consumeFreeSend, isFreePaymentReference, isMicroTier } from '@/lib/freeSends';
 import {
   buildSendHandshakeMessage,
   computeEncryptionMetadataDigest,
   parseSendHandshakeMessage,
 } from '@/lib/handshake';
+import { parseIdentityKey } from '@/lib/identityKey';
 import { Manager3sendAbi } from '@/lib/SmartContracts';
 import { PLATFORM_STATS_CACHE_TAG, updateStatsAfterUpload } from '@/lib/stats';
 import { createStepTimers } from '@/lib/timers';
 import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
-import { parseIdentityKey } from '@/lib/identityKey';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
-import {
-  createPublicClient,
-  decodeEventLog,
-  http,
-  isErc6492Signature,
-  verifyMessage,
-} from 'viem';
+import { createPublicClient, decodeEventLog, http, isErc6492Signature, verifyMessage } from 'viem';
 import { base, baseSepolia, type Chain } from 'viem/chains';
 
 function getRpcUrl(chainId: number): { chain: Chain; rpcUrl: string } | null {
@@ -109,8 +103,10 @@ export async function POST(request: Request) {
     const isWalletInitiator = initiatorIdentity.kind === 'wallet';
 
     if (isEmailInitiator) {
-      const clerkIdentity = await getClerkIdentityKey();
-      if (!clerkIdentity || clerkIdentity.value !== initiatorIdentity.value) {
+      const clerkKeys = await getClerkIdentityKeys();
+      console.log(clerkKeys);
+      const matches = clerkKeys.some((key) => key.value === initiatorIdentity.value);
+      if (!matches) {
         return NextResponse.json(
           { success: false, error: 'Unauthorized initiator identity' },
           { status: 403 }

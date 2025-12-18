@@ -463,10 +463,12 @@ export async function POST(request: Request) {
     const ratio1 = createEdgeSdk();
     try {
       const endPaymentReuseCheck = timers.start('paymentReuseCheck');
+      console.log(`[upload] paymentReuseCheck started at ${Date.now()}`);
       const existingPaymentUsage = await ratio1.cstore.hget({
         hkey: USED_PAYMENT_TXS_CSTORE_HKEY,
         key: paymentTxHash,
       });
+      console.log(`[upload] paymentReuseCheck completed at ${Date.now()}`);
       endPaymentReuseCheck();
 
       if (existingPaymentUsage) {
@@ -492,17 +494,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: message }, { status: 400 });
       }
     }
-    const endR1fsUpload = timers.start('r1fsUpload');
-    console.log('[upload] Starting R1FS upload');
+    console.log(`[upload] Starting R1FS upload preparation at ${Date.now()}`);
     const formDataRequest = new FormData();
     formDataRequest.append('file', file);
     formDataRequest.append('filename', file.name);
     formDataRequest.append('contentType', file.type);
+    console.log(`[upload] Completed R1FS upload preparation at ${Date.now()}`);
+    const endR1fsUpload = timers.start('r1fsUpload');
+    console.log(`[upload] Starting R1FS upload at ${Date.now()}`);
     const uploadResult = await ratio1.r1fs.addFile({
       formData: formDataRequest,
       secret: recipientKey,
     });
-    console.log('[upload] Completed R1FS upload');
+    console.log(`[upload] Completed R1FS upload at ${Date.now()}`);
     endR1fsUpload();
     const cid = uploadResult.cid;
     if (!cid) {
@@ -540,27 +544,33 @@ export async function POST(request: Request) {
 
     const recordJson = JSON.stringify(record);
     const endCstoreWriteReceived = timers.start('cstoreWriteReceived');
+    console.log(`[upload] cstoreWriteReceived started at ${Date.now()}`);
     await ratio1.cstore.hset({
       hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${recipientKey}`,
       key: paymentTxHash,
       value: recordJson,
     });
+    console.log(`[upload] cstoreWriteReceived completed at ${Date.now()}`);
     endCstoreWriteReceived();
 
     const endCstoreWriteSent = timers.start('cstoreWriteSent');
+    console.log(`[upload] cstoreWriteSent started at ${Date.now()}`);
     await ratio1.cstore.hset({
       hkey: `${SENT_FILES_CSTORE_HKEY}_${initiatorAddr}`,
       key: paymentTxHash,
       value: recordJson,
     });
+    console.log(`[upload] cstoreWriteSent completed at ${Date.now()}`);
     endCstoreWriteSent();
 
     const endCstoreWritePaymentUsed = timers.start('cstoreWritePaymentUsed');
+    console.log(`[upload] cstoreWritePaymentUsed started at ${Date.now()}`);
     await ratio1.cstore.hset({
       hkey: USED_PAYMENT_TXS_CSTORE_HKEY,
       key: paymentTxHash,
       value: true,
     });
+    console.log(`[upload] cstoreWritePaymentUsed completed at ${Date.now()}`);
     endCstoreWritePaymentUsed();
 
     const endStatsUpdate = timers.start('statsUpdate'); //TODO add more detailed timers inside

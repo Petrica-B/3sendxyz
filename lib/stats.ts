@@ -2,17 +2,21 @@ import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { unstable_cache } from 'next/cache';
 
 import { STATS_CSTORE_HKEY } from './constants';
+import { parseIdentityKey } from './identityKey';
 import { createStepTimers } from './timers';
 import type { AddressStatsRecord, PlatformStatsRecord } from './types';
 
 const TOTALS_KEY = 'totals';
-const ADDRESS_KEY_PREFIX = 'addr:';
 export const PLATFORM_STATS_CACHE_TAG = 'stats:platform';
 
 type EdgeSdk = ReturnType<typeof createEdgeSdk>;
 
-function getAddressKey(address: string): string {
-  return `${ADDRESS_KEY_PREFIX}${address}`;
+function resolveIdentity(identity: string) {
+  const parsed = parseIdentityKey(identity);
+  if (!parsed) {
+    throw new Error('Invalid identity');
+  }
+  return parsed;
 }
 
 function toSafeInteger(value: unknown): number {
@@ -136,14 +140,20 @@ export async function fetchPlatformStats(ratio1?: EdgeSdk): Promise<PlatformStat
 }
 
 export async function fetchAddressStats(
-  address: string,
+  identity: string,
   ratio1?: EdgeSdk
 ): Promise<AddressStatsRecord> {
   const client = ratio1 ?? createEdgeSdk();
-  const normalized = address.toLowerCase();
-  const raw = await safeHget(client, getAddressKey(normalized));
-  const parsed = parseAddressStats(raw, normalized);
-  parsed.address = normalized;
+  const resolved = resolveIdentity(identity);
+  let raw = await safeHget(client, resolved.storageKey);
+  if (!raw) {
+    for (const legacyKey of resolved.legacyKeys) {
+      raw = await safeHget(client, legacyKey);
+      if (raw) break;
+    }
+  }
+  const parsed = parseAddressStats(raw, resolved.value);
+  parsed.address = resolved.value;
   return parsed;
 }
 
@@ -161,15 +171,15 @@ export async function updateStatsAfterUpload(args: {
 }> {
   const timers = createStepTimers();
   const { ratio1, sender, recipient, filesize, r1Burn } = args;
-  const senderLc = sender.toLowerCase();
-  const recipientLc = recipient.toLowerCase();
-  const sameAddress = senderLc === recipientLc;
+  const senderIdentity = resolveIdentity(sender);
+  const recipientIdentity = resolveIdentity(recipient);
+  const sameAddress = senderIdentity.value === recipientIdentity.value;
 
   const endFetchStats = timers.start('updateStatsAfterUploadFetchStats');
   const [totals, senderStats, recipientStatsRaw] = await Promise.all([
     fetchPlatformStats(ratio1),
-    fetchAddressStats(senderLc, ratio1),
-    sameAddress ? Promise.resolve(null) : fetchAddressStats(recipientLc, ratio1),
+    fetchAddressStats(senderIdentity.storageKey, ratio1),
+    sameAddress ? Promise.resolve(null) : fetchAddressStats(recipientIdentity.storageKey, ratio1),
   ]);
   endFetchStats();
 
@@ -188,7 +198,7 @@ export async function updateStatsAfterUpload(args: {
 
   const recipientStats = sameAddress
     ? senderStats
-    : (recipientStatsRaw ?? createEmptyAddressStats(recipientLc));
+    : (recipientStatsRaw ?? createEmptyAddressStats(recipientIdentity.value));
 
   recipientStats.receivedFiles += 1;
   recipientStats.receivedBytes += safeFilesize;
@@ -213,10 +223,10 @@ export async function updateStatsAfterUpload(args: {
   const endCstoreWrite = timers.start('updateStatsAfterUploadCstoreWrite');
   const writes: Promise<void>[] = [
     writeStats(ratio1, TOTALS_KEY, totals),
-    writeStats(ratio1, getAddressKey(senderLc), senderStats),
+    writeStats(ratio1, senderIdentity.storageKey, senderStats),
   ];
   if (!sameAddress) {
-    writes.push(writeStats(ratio1, getAddressKey(recipientLc), recipientStats));
+    writes.push(writeStats(ratio1, recipientIdentity.storageKey, recipientStats));
   }
   await Promise.all(writes);
   endCstoreWrite();

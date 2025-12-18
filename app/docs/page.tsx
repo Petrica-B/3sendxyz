@@ -26,8 +26,8 @@ export default function DocsPage() {
       <section id="overview" className="hero">
         <div className="headline">3send Documentation. Learn More About How It Works.</div>
         <div className="subhead">
-          Send files wallet-to-wallet on Base via Ratio1 End-to-end encrypted, decentralized file
-          transfer. Hold the keys, hold the data.
+          Send files with email or a wallet on Base via Ratio1. End-to-end encrypted, decentralized
+          file transfer. Hold the keys, hold the data.
         </div>
         <div
           className="muted"
@@ -42,21 +42,19 @@ export default function DocsPage() {
           3send exists for the moments when speed and privacy both matter: shipping production
           secrets to a distributed team, delivering legal evidence to counsel, or dropping a stealth
           launch asset to investors. Ratio1 provides the neutral rails; 3send wraps them in an
-          interface anyone with a wallet can use.
+          interface anyone can use.
         </div>
       </section>
 
       <section id="encryption-modes" className="card col" style={{ gap: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send Anything, Stay Sovereign</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          3send lets any wallet owner send end-to-end encrypted files. Pick a recipient address, pay
-          the burn fee, and the app handles encryption, upload, and inbox delivery. No extra
-          accounts, no seed phrase required to get going.
+          3send lets anyone send end-to-end encrypted files. Pick a recipient email or address, pay
+          the burn fee (when using a wallet), and the app handles encryption, upload, and inbox
+          delivery. No extra setup required to get going.
         </div>
         <ul className="muted" style={{ fontSize: 12, display: 'grid', gap: 4 }}>
-          <li>
-            Simple, for anyone: connect a wallet, choose a file, click &quot;Pay &amp; Send&quot;.
-          </li>
+          <li>Simple, for anyone: log in, choose a file, click &quot;Send&quot;.</li>
           <li>
             Privacy upgrades: switch to passkeys or a recovery phrase to have full and verifiable
             end-to-end encryption.
@@ -84,7 +82,7 @@ export default function DocsPage() {
             <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
               Ideal for newcomers. 3send generates an X25519 key pair and stores the encrypted
               private key in Ratio1 cstore using a server-held secret. Any of your connected devices
-              can fetch and decrypt it after you sign a wallet challenge. Convenience comes first,
+              can fetch and decrypt it after you confirm account access. Convenience comes first,
               while still keeping raw files encrypted at rest. This is the default mode for users
               who never interacted with 3send before.
             </div>
@@ -147,8 +145,8 @@ export default function DocsPage() {
               r1fs is Ratio1’s content-addressed file store. After a file is encrypted in the
               browser, 3send uploads the base64 payload together with the original filename. The SDK
               returns a CID that is saved in cstore. Recipients download the ciphertext by
-              presenting the CID plus their wallet-derived secret, so only the intended address can
-              resolve the blob.
+              presenting the CID plus their identity-derived secret, so only the intended recipient
+              can resolve the blob.
             </div>
           </div>
         </div>
@@ -193,7 +191,7 @@ export default function DocsPage() {
           </li>
           <li>
             <strong>Metadata envelope.</strong> The envelope bundles the ephemeral public key,
-            recipient address, IVs, and optional note ciphertext. During download,
+            recipient identity, IVs, and optional note ciphertext. During download,
             <code>decryptFileFromEnvelope</code> recomputes the shared secret from the recipient’s
             private key - whether it was unlocked from the vault, derived from a passkey PRF, or
             hashed from a mnemonic.

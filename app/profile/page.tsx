@@ -25,7 +25,7 @@ import type {
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
-import { useAccount, useSignMessage } from 'wagmi';
+import { useSignMessage } from 'wagmi';
 import { loadProfile, saveProfile } from './storage';
 import { useRegisteredKeyFingerprint } from './useRegisteredKeyFingerprint';
 
@@ -39,10 +39,10 @@ type PasskeyCredential = PublicKeyCredential & {
 };
 
 export default function ProfilePage() {
-  const { authMethod, canUseWallet, isLoggedIn } = useAuthStatus();
-  const { address } = useAccount();
+  const { authMethod, canUseWallet, isLoggedIn, identityValue } = useAuthStatus();
   const { signMessageAsync } = useSignMessage();
-  const normalizedAddress = address?.trim().toLowerCase() ?? '';
+  const normalizedAddress =
+    canUseWallet && identityValue ? identityValue.trim().toLowerCase() : '';
   const { data: identityProfile } = useQuery({
     queryKey: identityQueryKey(normalizedAddress),
     queryFn: () => fetchIdentityProfile(normalizedAddress),
@@ -51,7 +51,7 @@ export default function ProfilePage() {
   });
   const hasBaseName = Boolean(identityProfile?.name?.trim());
   const baseName = identityProfile?.name?.trim();
-  const shortAddr = address ? shortAddress(address, 4) : '';
+  const shortAddr = normalizedAddress ? shortAddress(normalizedAddress, 4) : '';
   const [profile, setProfile] = useState<UserProfile>({});
   const [keyLabelInput, setKeyLabelInput] = useState('');
   const [privKeyOnce, setPrivKeyOnce] = useState<string | null>(null);
@@ -92,15 +92,15 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    if (!canUseWallet || !address) return;
-    const p = loadProfile(address);
+    if (!identityValue) return;
+    const p = loadProfile(identityValue);
     setProfile(p);
     // no handle UI for now
     setKeyLabelInput('');
-  }, [canUseWallet, address]);
+  }, [identityValue]);
 
   useEffect(() => {
-    if (!canUseWallet || !address) {
+    if (!identityValue) {
       setRegisteredKeyRecord(null);
       setRegisteredKeyLoading(false);
       return;
@@ -110,7 +110,7 @@ export default function ProfilePage() {
       setRegisteredKeyLoading(true);
       setRegisteredKeyError(null);
       try {
-        const params = new URLSearchParams({ address });
+        const params = new URLSearchParams({ identity: identityValue });
         const res = await fetch(`/api/keys/status?${params.toString()}`);
         const payload = await res.json().catch(() => null);
         if (!res.ok || !payload?.success) {
@@ -140,7 +140,7 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [canUseWallet, address]);
+  }, [identityValue]);
 
   // handle management temporarily removed
 
@@ -149,25 +149,27 @@ export default function ProfilePage() {
   const registerSeedKey = useCallback(
     async (params: { mnemonic: string; fingerprint?: string; label?: string }) => {
       const { mnemonic, fingerprint, label } = params;
-      if (!address) {
-        throw new Error('Wallet address missing.');
-      }
-      if (!signMessageAsync) {
-        throw new Error('Wallet signer not available. Connect your wallet to continue.');
+      if (!identityValue) {
+        throw new Error('Login required.');
       }
 
       setRegisteredKeyBusy(true);
       setRegisteredKeyError(null);
       try {
         const { publicKeyBase64 } = await deriveSeedKeyPair(mnemonic);
-        const message = buildRegisteredKeyMessage(address, publicKeyBase64);
-        const signature = await signMessageAsync({ message });
+        if (canUseWallet && !signMessageAsync) {
+          throw new Error('Wallet signer not available. Connect your wallet to continue.');
+        }
+        const message = canUseWallet
+          ? buildRegisteredKeyMessage(identityValue, publicKeyBase64)
+          : undefined;
+        const signature = message ? await signMessageAsync({ message }) : undefined;
         const registerRes = await fetch('/api/keys/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'seed',
-            address,
+            identity: identityValue,
             signature,
             message,
             seedPublicKey: publicKeyBase64,
@@ -184,7 +186,7 @@ export default function ProfilePage() {
         toast.success('Recovery phrase registered.');
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
-            new CustomEvent('ratio1:registered-key-updated', { detail: { address } })
+            new CustomEvent('ratio1:registered-key-updated', { detail: { identity: identityValue } })
           );
         }
       } catch (err) {
@@ -198,11 +200,11 @@ export default function ProfilePage() {
         setRegisteredKeyBusy(false);
       }
     },
-    [address, signMessageAsync]
+    [identityValue, canUseWallet, signMessageAsync]
   );
 
   const onGenerateKeys = useCallback(async () => {
-    if (!address) return;
+    if (!identityValue) return;
     setBusy(true);
     try {
       const label = keyLabelInput.trim().slice(0, 15);
@@ -219,7 +221,7 @@ export default function ProfilePage() {
         keyCreatedAt: gen.createdAt,
         seedMnemonic: gen.mnemonic,
       };
-      saveProfile(address, next);
+      saveProfile(identityValue, next);
       setProfile(next);
       setPrivKeyOnce(gen.mnemonic);
       await registerSeedKey({ mnemonic: gen.mnemonic, fingerprint: gen.fingerprintHex, label });
@@ -229,10 +231,10 @@ export default function ProfilePage() {
     } finally {
       setBusy(false);
     }
-  }, [address, profile, keyLabelInput, registerSeedKey]);
+  }, [identityValue, profile, keyLabelInput, registerSeedKey]);
 
   const onRegenerateKeys = useCallback(async () => {
-    if (!address) return;
+    if (!identityValue) return;
     setBusy(true);
     try {
       const label = keyLabelInput.trim().slice(0, 15);
@@ -248,7 +250,7 @@ export default function ProfilePage() {
         keyCreatedAt: gen.createdAt,
         seedMnemonic: gen.mnemonic,
       };
-      saveProfile(address, next);
+      saveProfile(identityValue, next);
       setProfile(next);
       setPrivKeyOnce(gen.mnemonic);
       await registerSeedKey({ mnemonic: gen.mnemonic, fingerprint: gen.fingerprintHex, label });
@@ -258,7 +260,7 @@ export default function ProfilePage() {
     } finally {
       setBusy(false);
     }
-  }, [address, profile, keyLabelInput, registerSeedKey]);
+  }, [identityValue, profile, keyLabelInput, registerSeedKey]);
 
   const downloadPrivateKey = useCallback(() => {
     if (!privKeyOnce) return;
@@ -318,8 +320,8 @@ export default function ProfilePage() {
 
   const recoverSeedFromInput = useCallback(
     async (mnemonicInput: string) => {
-      if (!address) {
-        throw new Error('Wallet address missing. Connect your wallet and try again.');
+      if (!identityValue) {
+        throw new Error('Login required to continue.');
       }
       if (registeredKeyRecord?.type !== 'seed') {
         throw new Error('Recovery phrase is not the active key for this profile.');
@@ -355,19 +357,19 @@ export default function ProfilePage() {
         keyLabel: seedKeyRecord?.label ?? profile.keyLabel,
         keyCreatedAt: registeredKeyRecord.createdAt ?? profile.keyCreatedAt,
       };
-      saveProfile(address, nextProfile);
+      saveProfile(identityValue, nextProfile);
       setProfile(nextProfile);
       hidePrivKeyOnce();
       toast.success(
         'Recovery phrase saved on this device. Reveal it from this profile when needed.'
       );
     },
-    [address, hidePrivKeyOnce, profile, registeredKeyRecord, seedKeyRecord]
+    [identityValue, hidePrivKeyOnce, profile, registeredKeyRecord, seedKeyRecord]
   );
 
   const onRegisterPasskey = useCallback(
     async (onStatusChange?: (step: PasskeyRegistrationStep) => void) => {
-      if (!address) return;
+      if (!identityValue) return;
       if (typeof window === 'undefined' || typeof navigator === 'undefined') {
         toast.error('Passkeys are not supported in this environment.');
         return;
@@ -376,7 +378,7 @@ export default function ProfilePage() {
         toast.error('Passkeys are not supported by this browser.');
         return;
       }
-      if (!signMessageAsync) {
+      if (canUseWallet && !signMessageAsync) {
         toast.error('Wallet signer not available. Connect your wallet to continue.');
         return;
       }
@@ -386,7 +388,7 @@ export default function ProfilePage() {
       try {
         onStatusChange?.('prompt-device');
         const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-        const userId = new TextEncoder().encode(address.toLowerCase());
+        const userId = new TextEncoder().encode(identityValue.toLowerCase());
 
         const creationOptions: PublicKeyCredentialCreationOptions = {
           challenge,
@@ -396,8 +398,8 @@ export default function ProfilePage() {
           },
           user: {
             id: userId,
-            name: `3send: ${address}`,
-            displayName: `3send: ${address}`,
+            name: `3send: ${identityValue}`,
+            displayName: `3send: ${identityValue}`,
           },
           pubKeyCredParams: [
             { type: 'public-key', alg: -8 },
@@ -433,9 +435,13 @@ export default function ProfilePage() {
           salt: prfSaltBytes,
         });
         const prfSaltB64 = encodeBase64(prfSaltBytes);
-        const message = buildRegisteredKeyMessage(address, x25519PublicKey);
-        onStatusChange?.('sign-wallet');
-        const signature = await signMessageAsync({ message });
+        const message = canUseWallet
+          ? buildRegisteredKeyMessage(identityValue, x25519PublicKey)
+          : undefined;
+        if (message) {
+          onStatusChange?.('sign-wallet');
+        }
+        const signature = message ? await signMessageAsync({ message }) : undefined;
 
         onStatusChange?.('register-server');
         const registerRes = await fetch('/api/keys/register', {
@@ -443,7 +449,7 @@ export default function ProfilePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'passkey',
-            address,
+            identity: identityValue,
             signature,
             message,
             credentialId: credentialIdB64,
@@ -464,7 +470,7 @@ export default function ProfilePage() {
           delete (next as Record<string, unknown>).fingerprintHex;
           delete (next as Record<string, unknown>).keyCreatedAt;
           delete (next as Record<string, unknown>).seedMnemonic;
-          saveProfile(address, next);
+          saveProfile(identityValue, next);
           return next;
         });
         setKeyLabelInput('');
@@ -472,7 +478,7 @@ export default function ProfilePage() {
         toast.success('Passkey registered.');
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
-            new CustomEvent('ratio1:registered-key-updated', { detail: { address } })
+            new CustomEvent('ratio1:registered-key-updated', { detail: { identity: identityValue } })
           );
         }
       } catch (err) {
@@ -493,22 +499,22 @@ export default function ProfilePage() {
         setRegisteredKeyBusy(false);
       }
     },
-    [address, signMessageAsync, hidePrivKeyOnce]
+    [identityValue, canUseWallet, signMessageAsync, hidePrivKeyOnce]
   );
 
-  const copyAddress = useCallback(async () => {
-    if (!address) return;
+  const copyIdentity = useCallback(async () => {
+    if (!identityValue) return;
     try {
       if (typeof navigator === 'undefined' || !navigator.clipboard) {
         throw new Error('Clipboard unavailable');
       }
-      await navigator.clipboard.writeText(address);
-      toast.success('Address copied.');
+      await navigator.clipboard.writeText(identityValue);
+      toast.success(canUseWallet ? 'Address copied.' : 'Email copied.');
     } catch (err) {
-      console.error('[profile] copy address failed', err);
-      toast.error('Unable to copy address.');
+      console.error('[profile] copy identity failed', err);
+      toast.error('Unable to copy identity.');
     }
-  }, [address]);
+  }, [identityValue, canUseWallet]);
 
   const copyBasename = useCallback(async () => {
     if (!baseName) return;
@@ -524,23 +530,37 @@ export default function ProfilePage() {
     }
   }, [baseName]);
 
-  if (!canUseWallet) {
+  if (!isLoggedIn) {
     return (
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">My Profile</div>
-          <div className="subhead">
-            {authMethod === 'clerk'
-              ? 'Email login is active. Sign out to connect a wallet.'
-              : authMethod === 'mixed'
-                ? 'Multiple logins active. Disconnect one to continue.'
-                : 'Log in to manage your keys.'}
+          <div className="subhead">Log in to manage your keys.</div>
+          <div style={{ marginTop: 12 }}>
+            <LoginButton />
           </div>
-          {!isLoggedIn && (
-            <div style={{ marginTop: 12 }}>
-              <LoginButton />
-            </div>
-          )}
+        </div>
+      </main>
+    );
+  }
+
+  if (!identityValue && authMethod === 'mixed') {
+    return (
+      <main className="col" style={{ gap: 16 }}>
+        <div className="hero">
+          <div className="headline">My Profile</div>
+          <div className="subhead">Multiple logins active. Disconnect one to continue.</div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!identityValue) {
+    return (
+      <main className="col" style={{ gap: 16 }}>
+        <div className="hero">
+          <div className="headline">My Profile</div>
+          <div className="subhead">Select a login method to continue.</div>
         </div>
       </main>
     );
@@ -568,7 +588,7 @@ export default function ProfilePage() {
           Connected as
         </div>
         <div className="col" style={{ gap: 4 }}>
-          {hasBaseName && identityProfile?.name ? (
+          {hasBaseName && canUseWallet && identityProfile?.name ? (
             <button
               type="button"
               onClick={copyBasename}
@@ -599,9 +619,9 @@ export default function ProfilePage() {
           >
             <button
               type="button"
-              onClick={copyAddress}
-              aria-label="Copy wallet address"
-              title="Copy wallet address"
+              onClick={copyIdentity}
+              aria-label={canUseWallet ? 'Copy address' : 'Copy email'}
+              title={canUseWallet ? 'Copy address' : 'Copy email'}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -615,7 +635,7 @@ export default function ProfilePage() {
               }}
             >
               <span className="mono" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.4 }}>
-                {shortAddr}
+                {canUseWallet ? shortAddr : identityValue}
               </span>
             </button>
           </div>

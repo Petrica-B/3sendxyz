@@ -8,6 +8,10 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 export function MinimalConnect() {
   const { authMethod } = useAuthStatus();
 
+  if (authMethod === 'clerk') {
+    return null;
+  }
+
   return (
     <ConnectButton.Custom>
       {({ account, chain, openAccountModal, openChainModal, mounted }) => {
@@ -26,29 +30,8 @@ export function MinimalConnect() {
           >
             {(() => {
               if (!connected) {
-                if (authMethod === 'clerk') {
-                  return (
-                    <button
-                      className="button"
-                      type="button"
-                      disabled
-                      title="Sign out of email login to connect a wallet."
-                    >
-                      Email login active
-                    </button>
-                  );
-                }
                 if (authMethod === 'mixed') {
-                  return (
-                    <button
-                      className="button"
-                      type="button"
-                      disabled
-                      title="Disconnect one login method to continue."
-                    >
-                      Multiple logins active
-                    </button>
-                  );
+                  return null;
                 }
                 return <LoginButton />;
               }

@@ -4,6 +4,7 @@ import {
   RECEIVED_FILES_CSTORE_HKEY,
   SENT_FILES_CSTORE_HKEY,
 } from '@/lib/constants';
+import { parseIdentityKey } from '@/lib/identityKey';
 import type { FileCleanupIndexEntry } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 
@@ -102,9 +103,23 @@ export async function runFileCleanup(options?: {
     }
 
     if (succeeded) {
+      const recipientIdentity = parseIdentityKey(entry.recipient);
+      const initiatorIdentity = parseIdentityKey(entry.initiator);
+      const recipientKeys = recipientIdentity
+        ? [recipientIdentity.storageKey, ...recipientIdentity.legacyKeys]
+        : [entry.recipient];
+      const initiatorKeys = initiatorIdentity
+        ? [initiatorIdentity.storageKey, ...initiatorIdentity.legacyKeys]
+        : [entry.initiator];
       const operations: Array<{ hkey: string; key: string }> = [
-        { hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${entry.recipient}`, key: entry.txHash },
-        { hkey: `${SENT_FILES_CSTORE_HKEY}_${entry.initiator}`, key: entry.txHash },
+        ...recipientKeys.map((key) => ({
+          hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${key}`,
+          key: entry.txHash,
+        })),
+        ...initiatorKeys.map((key) => ({
+          hkey: `${SENT_FILES_CSTORE_HKEY}_${key}`,
+          key: entry.txHash,
+        })),
       ];
 
       for (const op of operations) {

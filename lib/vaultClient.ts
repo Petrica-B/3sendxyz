@@ -1,4 +1,5 @@
 import { decodeBase64 } from '@/lib/encryption';
+import { parseIdentityKey } from '@/lib/identityKey';
 import { buildVaultAccessMessage } from '@/lib/vaultAccess';
 
 type SignMessageArgs = { message: string };
@@ -6,15 +7,19 @@ type SignMessageFn = (args: SignMessageArgs) => Promise<string>;
 
 const privateKeyCache = new Map<string, Uint8Array>();
 
-async function requestVaultPrivateKey(
-  address: string,
-  signature: string,
-  message: string
-): Promise<Uint8Array> {
+async function requestVaultPrivateKey(params: {
+  identity: string;
+  signature?: string;
+  message?: string;
+}): Promise<Uint8Array> {
   const response = await fetch('/api/vault/getPrivateKey', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address, signature, message }),
+    body: JSON.stringify({
+      identity: params.identity,
+      signature: params.signature,
+      message: params.message,
+    }),
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload?.success) {
@@ -32,18 +37,34 @@ async function requestVaultPrivateKey(
 }
 
 export async function getVaultPrivateKey(
-  address: string,
-  signMessage: SignMessageFn
+  identity: string,
+  signMessage?: SignMessageFn
 ): Promise<Uint8Array> {
-  const cacheKey = address.toLowerCase();
+  const parsedIdentity = parseIdentityKey(identity);
+  if (!parsedIdentity) {
+    throw new Error('Invalid identity');
+  }
+  const cacheKey = parsedIdentity.storageKey;
   const cached = privateKeyCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  const message = buildVaultAccessMessage(address);
-  const signature = await signMessage({ message });
-  const privateKey = await requestVaultPrivateKey(address, signature, message);
+  let message: string | undefined;
+  let signature: string | undefined;
+  if (parsedIdentity.kind === 'wallet') {
+    if (!signMessage) {
+      throw new Error('Wallet signature required to access vault key');
+    }
+    message = buildVaultAccessMessage(parsedIdentity.value);
+    signature = await signMessage({ message });
+  }
+
+  const privateKey = await requestVaultPrivateKey({
+    identity: parsedIdentity.value,
+    signature,
+    message,
+  });
   privateKeyCache.set(cacheKey, privateKey);
   return privateKey;
 }

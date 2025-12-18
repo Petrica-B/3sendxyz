@@ -1,17 +1,17 @@
 import type { UserProfile } from '@/lib/types';
 
-export function loadProfile(addr: string): UserProfile {
+export function loadProfile(identity: string): UserProfile {
   try {
-    const raw = localStorage.getItem(`profile:${addr.toLowerCase()}`);
+    const raw = localStorage.getItem(`profile:${identity.toLowerCase()}`);
     return raw ? (JSON.parse(raw) as UserProfile) : {};
   } catch {
     return {};
   }
 }
 
-export function saveProfile(addr: string, data: UserProfile) {
+export function saveProfile(identity: string, data: UserProfile) {
   try {
-    localStorage.setItem(`profile:${addr.toLowerCase()}`, JSON.stringify(data));
+    localStorage.setItem(`profile:${identity.toLowerCase()}`, JSON.stringify(data));
   } catch {
     // no-op: best effort persistence in localStorage
   }

@@ -3,6 +3,7 @@
 import { Erc20Abi, Manager3sendAbi } from '@/lib/SmartContracts';
 import { shortAddress } from '@/lib/format';
 import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
+import { parseIdentityKey } from '@/lib/identityKey';
 import {
   FREE_MICRO_SENDS_PER_MONTH,
   FREE_MICRO_TIER_ID,
@@ -19,11 +20,12 @@ import {
 import { encryptFileForRecipient } from '@/lib/encryption';
 import { buildSendHandshakeMessage } from '@/lib/handshake';
 import { FreeSendAllowance, QuoteData } from '@/lib/types';
+import { useAuthStatus } from '@/lib/useAuthStatus';
 import { getAddress as resolveAddressFromName } from '@coinbase/onchainkit/identity';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
-import { formatUnits, isAddress } from 'viem';
+import { formatUnits } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSignMessage, useWriteContract } from 'wagmi';
 
 const addTenPercentBuffer = (amount: bigint) => {
@@ -60,13 +62,18 @@ const PAYMENT_OPTIONS: ReadonlyArray<{ id: PaymentAsset; label: string; helper: 
 ];
 
 export function SendFileCard() {
+  const { authMethod, identityValue } = useAuthStatus();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const { signMessageAsync } = useSignMessage();
-  const isOnSupportedChain = isSupportedChainId(chainId);
-  const wrongNetwork = isConnected && !isOnSupportedChain;
+  const isWalletLogin = authMethod === 'wallet';
+  const isEmailLogin = authMethod === 'clerk';
+  const hasIdentity = Boolean(identityValue);
+  const walletAddress = isWalletLogin ? address : undefined;
+  const isOnSupportedChain = isWalletLogin ? isSupportedChainId(chainId) : true;
+  const wrongNetwork = isWalletLogin && isConnected && !isOnSupportedChain;
 
   const [recipientInput, setRecipientInput] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -79,8 +86,9 @@ export function SendFileCard() {
 
   const normalizedRecipientInput = useMemo(() => recipientInput.trim(), [recipientInput]);
 
-  const directRecipientAddress = useMemo(() => {
-    return isAddress(normalizedRecipientInput) ? normalizedRecipientInput.toLowerCase() : null;
+  const parsedRecipientInput = useMemo(() => {
+    if (!normalizedRecipientInput) return null;
+    return parseIdentityKey(normalizedRecipientInput);
   }, [normalizedRecipientInput]);
 
   const {
@@ -89,7 +97,7 @@ export function SendFileCard() {
     error: recipientResolutionError,
   } = useQuery<string | null>({
     queryKey: ['recipient-address', normalizedRecipientInput],
-    enabled: Boolean(normalizedRecipientInput && !directRecipientAddress),
+    enabled: Boolean(normalizedRecipientInput && !parsedRecipientInput),
     retry: false,
     staleTime: 60_000,
     queryFn: async () => {
@@ -101,18 +109,25 @@ export function SendFileCard() {
     },
   });
 
-  const recipientAddress = directRecipientAddress ?? resolvedRecipientAddress ?? null;
-  const recipientResolvedFromName = Boolean(!directRecipientAddress && resolvedRecipientAddress);
-  const normalizedRecipientAddress = recipientAddress?.trim().toLowerCase() ?? '';
-  const shortRecipientAddress = recipientAddress ? shortAddress(recipientAddress, 4) : '';
+  const resolvedRecipientIdentity = useMemo(() => {
+    if (!resolvedRecipientAddress) return null;
+    return parseIdentityKey(resolvedRecipientAddress);
+  }, [resolvedRecipientAddress]);
+  const recipientIdentity = parsedRecipientInput ?? resolvedRecipientIdentity;
+  const recipientResolvedFromName = Boolean(!parsedRecipientInput && resolvedRecipientAddress);
+  const recipientValue = recipientIdentity?.value ?? null;
+  const recipientWalletAddress = recipientIdentity?.kind === 'wallet' ? recipientIdentity.value : null;
+  const recipientEmail = recipientIdentity?.kind === 'email' ? recipientIdentity.value : null;
+  const normalizedRecipientAddress = recipientWalletAddress?.trim().toLowerCase() ?? '';
+  const shortRecipientAddress = recipientWalletAddress ? shortAddress(recipientWalletAddress, 4) : '';
 
-  const { data: recipientIdentity } = useQuery({
+  const { data: recipientIdentityProfile } = useQuery({
     queryKey: identityQueryKey(normalizedRecipientAddress || 'pending-recipient'),
     queryFn: () => fetchIdentityProfile(normalizedRecipientAddress),
     enabled: Boolean(normalizedRecipientAddress),
     staleTime: 30 * 60 * 1000,
   });
-  const recipientBaseName = recipientIdentity?.name?.trim();
+  const recipientBaseName = recipientIdentityProfile?.name?.trim();
 
   const waitForTransaction = useCallback(
     async (hash: `0x${string}`, pendingLabel: string) => {
@@ -151,14 +166,14 @@ export function SendFileCard() {
     publicKey: string;
     type: 'vault' | 'passkey' | 'seed';
   } | null>({
-    queryKey: ['recipient-key', recipientAddress],
-    enabled: Boolean(recipientAddress),
+    queryKey: ['recipient-key', recipientValue],
+    enabled: Boolean(recipientValue),
     retry: false,
     staleTime: 60_000,
     queryFn: async () => {
-      if (!recipientAddress) return null;
+      if (!recipientValue) return null;
       const response = await fetch(
-        `/api/send/getReceiverPublicKey?address=${encodeURIComponent(recipientAddress)}`,
+        `/api/send/getReceiverPublicKey?identity=${encodeURIComponent(recipientValue)}`,
         { method: 'GET' }
       );
       const payload = await response.json().catch(() => null);
@@ -187,7 +202,9 @@ export function SendFileCard() {
     error: quoteError,
   } = useQuery<QuoteData>({
     queryKey: ['quote-payment', chainId, MANAGER_CONTRACT_ADDRESS, tierInfo?.id],
-    enabled: Boolean(publicClient && MANAGER_CONTRACT_ADDRESS && tierInfo && isOnSupportedChain),
+    enabled: Boolean(
+      isWalletLogin && publicClient && MANAGER_CONTRACT_ADDRESS && tierInfo && isOnSupportedChain
+    ),
     refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!publicClient || !MANAGER_CONTRACT_ADDRESS || !tierInfo) {
@@ -242,26 +259,28 @@ export function SendFileCard() {
   });
 
   useEffect(() => {
-    if (!isOnSupportedChain) return;
+    if (!isWalletLogin || !isOnSupportedChain) return;
     if (quoteError) {
       const message = (quoteError as Error)?.message?.trim().length
         ? (quoteError as Error).message
         : 'Failed to fetch payment quote.';
       toast.error(message, { toastId: 'payment-quote-error' });
     }
-  }, [isOnSupportedChain, quoteError]);
+  }, [isWalletLogin, isOnSupportedChain, quoteError]);
 
   const {
     data: walletBalances,
     isFetching: balancesLoading,
     refetch: refetchWalletBalances,
   } = useQuery({
-    queryKey: ['wallet-balances', chainId, MANAGER_CONTRACT_ADDRESS, address],
-    enabled: Boolean(publicClient && address && MANAGER_CONTRACT_ADDRESS && isOnSupportedChain),
+    queryKey: ['wallet-balances', chainId, MANAGER_CONTRACT_ADDRESS, walletAddress],
+    enabled: Boolean(
+      isWalletLogin && publicClient && walletAddress && MANAGER_CONTRACT_ADDRESS && isOnSupportedChain
+    ),
     refetchOnWindowFocus: false,
     staleTime: 15_000,
     queryFn: async () => {
-      if (!publicClient || !address) {
+      if (!publicClient || !walletAddress) {
         throw new Error('Missing dependencies for wallet balances.');
       }
 
@@ -270,15 +289,15 @@ export function SendFileCard() {
           address: R1_CONTRACT_ADDRESS,
           abi: Erc20Abi,
           functionName: 'balanceOf',
-          args: [address],
+          args: [walletAddress],
         }) as Promise<bigint>,
         publicClient.readContract({
           address: USDC_CONTRACT_ADDRESS,
           abi: Erc20Abi,
           functionName: 'balanceOf',
-          args: [address],
+          args: [walletAddress],
         }) as Promise<bigint>,
-        publicClient.getBalance({ address }),
+        publicClient.getBalance({ address: walletAddress }),
       ]);
 
       return {
@@ -295,14 +314,14 @@ export function SendFileCard() {
     error: freeAllowanceError,
     refetch: refetchFreeAllowance,
   } = useQuery<FreeSendAllowance | null>({
-    queryKey: ['free-allowance', address],
-    enabled: Boolean(address),
+    queryKey: ['free-allowance', identityValue],
+    enabled: Boolean(hasIdentity),
     refetchOnWindowFocus: false,
     staleTime: 60_000,
     queryFn: async () => {
-      if (!address) return null;
+      if (!identityValue) return null;
       const response = await fetch(
-        `/api/send/freeAllowance?address=${encodeURIComponent(address)}`
+        `/api/send/freeAllowance?identity=${encodeURIComponent(identityValue)}`
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.success || !payload.allowance) {
@@ -326,15 +345,15 @@ export function SendFileCard() {
 
   const isMicroTierSelected = tierInfo?.id === FREE_MICRO_TIER_ID;
   const freeRemaining = freeAllowance?.remaining ?? 0;
-  const freeLimit = freeAllowance?.limit ?? 0;
+  const freeLimit = freeAllowance?.limit ?? FREE_MICRO_SENDS_PER_MONTH;
   const freeSendEligible = Boolean(isMicroTierSelected && freeRemaining > 0);
-  const useFreeSend = freeSendEligible;
+  const useFreeSend = isEmailLogin ? Boolean(isMicroTierSelected) : freeSendEligible;
 
-  const quoteDataForDisplay = isOnSupportedChain ? quoteData : null;
-  const walletBalancesForDisplay = isOnSupportedChain ? walletBalances : null;
+  const quoteDataForDisplay = isWalletLogin && isOnSupportedChain ? quoteData : null;
+  const walletBalancesForDisplay = isWalletLogin && isOnSupportedChain ? walletBalances : null;
 
   useEffect(() => {
-    if (!isOnSupportedChain) return;
+    if (!isWalletLogin || !isOnSupportedChain) return;
     if (
       paymentAsset === 'ETH' &&
       quoteData &&
@@ -342,7 +361,7 @@ export function SendFileCard() {
     ) {
       setPaymentAsset('R1');
     }
-  }, [isOnSupportedChain, paymentAsset, quoteData]);
+  }, [isWalletLogin, isOnSupportedChain, paymentAsset, quoteData]);
 
   const usdcDisplay = useMemo(() => {
     if (!quoteDataForDisplay) return null;
@@ -391,13 +410,21 @@ export function SendFileCard() {
   }, [quoteDataForDisplay]);
 
   const disabled = useMemo(() => {
-    if (!isConnected) return true;
-    if (!recipientAddress) return true;
+    if (!hasIdentity) return true;
+    if (!recipientValue) return true;
     if (recipientResolutionLoading) return true;
     if (!file) return true;
     if (sending) return true;
     if (!tierInfo) return true;
     if (sizeExceedsLimit) return true;
+    if (isEmailLogin) {
+      if (!isMicroTierSelected) return true;
+      if (freeAllowanceLoading) return true;
+      return !freeSendEligible;
+    }
+
+    if (!isWalletLogin) return true;
+    if (!isConnected) return true;
     if (!isOnSupportedChain) return true;
     if (!MANAGER_CONTRACT_ADDRESS) return true;
     if (useFreeSend && freeSendEligible) {
@@ -422,22 +449,27 @@ export function SendFileCard() {
 
     return false;
   }, [
-    isConnected,
-    recipientAddress,
+    hasIdentity,
+    recipientValue,
     recipientResolutionLoading,
     file,
     sending,
     tierInfo,
     sizeExceedsLimit,
+    isEmailLogin,
+    isMicroTierSelected,
+    freeAllowanceLoading,
+    freeSendEligible,
+    isWalletLogin,
+    isConnected,
     isOnSupportedChain,
+    MANAGER_CONTRACT_ADDRESS,
     quoteLoading,
     quoteData,
     balancesLoading,
     walletBalances,
     paymentAsset,
     useFreeSend,
-    freeSendEligible,
-    freeAllowanceLoading,
   ]);
 
   const insufficientMessage = useMemo(() => {
@@ -489,11 +521,12 @@ export function SendFileCard() {
   }, [paymentAsset, quoteDataForDisplay, walletBalancesForDisplay, useFreeSend, freeSendEligible]);
 
   const summaryItems = useMemo(() => {
-    if (useFreeSend && freeSendEligible) {
-      const helper =
-        freeAllowanceLoading || !freeAllowance
-          ? 'Monthly free credits apply to micro-sends.'
-          : `${freeRemaining} out of ${freeLimit} free micro-sends left this month.`;
+    if (useFreeSend) {
+      const helper = freeAllowanceLoading
+        ? 'Checking your monthly free credits…'
+        : freeSendEligible
+          ? `${freeRemaining} out of ${freeLimit} free micro-sends left this month.`
+          : 'No free micro-sends left this month.';
       return [
         {
           label: 'Payment',
@@ -506,7 +539,7 @@ export function SendFileCard() {
         },
       ];
     }
-    if (!quoteDataForDisplay) return [];
+    if (!isWalletLogin || !quoteDataForDisplay) return [];
     const items: Array<{ label: string; value: string; helper?: string }> = [
       {
         label: 'USD equivalent',
@@ -548,10 +581,10 @@ export function SendFileCard() {
     useFreeSend,
     freeSendEligible,
     freeAllowanceLoading,
-    freeAllowance,
     freeRemaining,
     freeLimit,
     tierInfo,
+    isWalletLogin,
     paymentAsset,
     quoteDataForDisplay,
     usdcDisplay,
@@ -606,42 +639,50 @@ export function SendFileCard() {
   }, [ethDisplay, ethMaxDisplay, quoteDataForDisplay, r1Display, r1MaxDisplay, usdcDisplay]);
 
   const onSend = useCallback(async () => {
-    if (!address || !file || !recipientAddress) return;
+    if (!identityValue || !file || !recipientValue) return;
     const selectedFile = file;
-    const targetAddress = recipientAddress;
+    const targetIdentity = recipientValue;
+    const initiatorIdentity = identityValue;
     const originalFilename = selectedFile.name;
     const originalMimeType =
       selectedFile.type && selectedFile.type.trim().length > 0
         ? selectedFile.type
         : 'application/octet-stream';
     const originalSize = selectedFile.size;
-    const usingFreeSend = useFreeSend && freeSendEligible;
+    const usingFreeSend = useFreeSend && (isWalletLogin ? freeSendEligible : true);
     setSending(true);
     setStatus(usingFreeSend ? 'Reserving free send…' : 'Preparing payment…');
     try {
-      if (!MANAGER_CONTRACT_ADDRESS) {
-        throw new Error('Manager contract address is not configured.');
-      }
       if (!tierInfo) {
         throw new Error('Selected file exceeds the 5 GB limit we support today.');
-      }
-      if (!publicClient) {
-        throw new Error('Unable to connect to the network client.');
-      }
-      if (!chainId) {
-        throw new Error('Wallet chain not detected.');
-      }
-      if (!isOnSupportedChain) {
-        throw new Error(`Please switch to ${REQUIRED_CHAIN_NAME} before sending.`);
       }
       if (usingFreeSend && freeAllowanceLoading) {
         throw new Error('Checking free micro-send status. Please try again in a moment.');
       }
+      if (isEmailLogin && !freeSendEligible) {
+        throw new Error('No free micro-sends remaining this month.');
+      }
 
-      const currentQuote = usingFreeSend
-        ? quoteData
-        : (quoteData ?? (await refetchQuote().then((res) => res.data ?? null)));
-      if (!usingFreeSend && !currentQuote) {
+      if (isWalletLogin) {
+        if (!MANAGER_CONTRACT_ADDRESS) {
+          throw new Error('Manager contract address is not configured.');
+        }
+        if (!publicClient) {
+          throw new Error('Unable to connect to the network client.');
+        }
+        if (!chainId) {
+          throw new Error('Wallet chain not detected.');
+        }
+        if (!isOnSupportedChain) {
+          throw new Error(`Please switch to ${REQUIRED_CHAIN_NAME} before sending.`);
+        }
+      }
+
+      const currentQuote =
+        usingFreeSend || !isWalletLogin
+          ? quoteData
+          : (quoteData ?? (await refetchQuote().then((res) => res.data ?? null)));
+      if (!usingFreeSend && isWalletLogin && !currentQuote) {
         throw new Error('Could not fetch payment quote.');
       }
 
@@ -650,9 +691,6 @@ export function SendFileCard() {
       const usdcAmount = currentQuote?.usdcAmount;
 
       setStatus('Resolving recipient key…');
-      if (!recipientAddress) {
-        throw new Error('Recipient address is not valid.');
-      }
       let receiverKeyRecord = recipientKeyData ?? null;
       if (!receiverKeyRecord) {
         const refreshed = await refetchRecipientKey({ throwOnError: true });
@@ -669,7 +707,7 @@ export function SendFileCard() {
       const { encryptedFile, metadata: encryptionMetadata } = await encryptFileForRecipient({
         file: selectedFile,
         recipientPublicKey: receiverPublicKey,
-        recipientAddress,
+        recipientAddress: targetIdentity,
         note: hasNote ? note : undefined,
       });
       encryptionMetadata.keySource = receiverKeySource;
@@ -679,125 +717,132 @@ export function SendFileCard() {
 
       if (usingFreeSend) {
         const nonce = Math.random().toString(16).slice(2, 10);
-        paymentTxHash = `${FREE_PAYMENT_REFERENCE_PREFIX}${address}:${Date.now()}:${nonce}`;
+        paymentTxHash = `${FREE_PAYMENT_REFERENCE_PREFIX}${initiatorIdentity}:${Date.now()}:${nonce}`;
         setStatus('Applying free micro-send…');
-      } else if (paymentAsset === 'R1') {
-        if (!maxR1Amount || !minR1Amount) {
-          throw new Error('Missing quote for R1 payment.');
+      } else if (isWalletLogin) {
+        if (!publicClient || !walletAddress) {
+          throw new Error('Wallet is not connected.');
         }
-        setStatus('Checking R1 balance…');
-        const r1Balance = (await publicClient.readContract({
-          address: R1_CONTRACT_ADDRESS,
-          abi: Erc20Abi,
-          functionName: 'balanceOf',
-          args: [address],
-        })) as bigint;
-        if (r1Balance < maxR1Amount) {
-          throw new Error('Not enough R1 to cover the burn and buffer.');
-        }
-
-        setStatus('Checking R1 allowance…');
-        const allowance = (await publicClient.readContract({
-          address: R1_CONTRACT_ADDRESS,
-          abi: Erc20Abi,
-          functionName: 'allowance',
-          args: [address, MANAGER_CONTRACT_ADDRESS],
-        })) as bigint;
-
-        if (allowance < maxR1Amount) {
-          setStatus('Approving R1 spend…');
-          const approveHash = await writeContractAsync({
+        if (paymentAsset === 'R1') {
+          if (!maxR1Amount || !minR1Amount) {
+            throw new Error('Missing quote for R1 payment.');
+          }
+          setStatus('Checking R1 balance…');
+          const r1Balance = (await publicClient.readContract({
             address: R1_CONTRACT_ADDRESS,
             abi: Erc20Abi,
-            functionName: 'approve',
-            args: [MANAGER_CONTRACT_ADDRESS, maxR1Amount],
+            functionName: 'balanceOf',
+            args: [walletAddress],
+          })) as bigint;
+          if (r1Balance < maxR1Amount) {
+            throw new Error('Not enough R1 to cover the burn and buffer.');
+          }
+
+          setStatus('Checking R1 allowance…');
+          const allowance = (await publicClient.readContract({
+            address: R1_CONTRACT_ADDRESS,
+            abi: Erc20Abi,
+            functionName: 'allowance',
+            args: [walletAddress, MANAGER_CONTRACT_ADDRESS],
+          })) as bigint;
+
+          if (allowance < maxR1Amount) {
+            setStatus('Approving R1 spend…');
+            const approveHash = await writeContractAsync({
+              address: R1_CONTRACT_ADDRESS,
+              abi: Erc20Abi,
+              functionName: 'approve',
+              args: [MANAGER_CONTRACT_ADDRESS, maxR1Amount],
+            });
+            await waitForTransaction(approveHash, 'Confirming R1 approval on-chain…');
+          }
+
+          setStatus('Paying with R1…');
+          const transferHash = await writeContractAsync({
+            address: MANAGER_CONTRACT_ADDRESS,
+            abi: Manager3sendAbi,
+            functionName: 'transferPayment',
+            args: [tierInfo.id, maxR1Amount],
           });
-          await waitForTransaction(approveHash, 'Confirming R1 approval on-chain…');
-        }
-
-        setStatus('Paying with R1…');
-        const transferHash = await writeContractAsync({
-          address: MANAGER_CONTRACT_ADDRESS,
-          abi: Manager3sendAbi,
-          functionName: 'transferPayment',
-          args: [tierInfo.id, maxR1Amount],
-        });
-        await waitForTransaction(transferHash, 'Waiting for R1 burn confirmation…');
-        paymentTxHash = transferHash;
-      } else if (paymentAsset === 'USDC') {
-        if (!usdcAmount || !minR1Amount) {
-          throw new Error('Missing quote for USDC payment.');
-        }
-        setStatus('Checking USDC balance…');
-        const usdcBalance = (await publicClient.readContract({
-          address: USDC_CONTRACT_ADDRESS,
-          abi: Erc20Abi,
-          functionName: 'balanceOf',
-          args: [address],
-        })) as bigint;
-        if (usdcBalance < usdcAmount) {
-          throw new Error('Not enough USDC to cover the payment.');
-        }
-
-        setStatus('Checking USDC allowance…');
-        const usdcAllowance = (await publicClient.readContract({
-          address: USDC_CONTRACT_ADDRESS,
-          abi: Erc20Abi,
-          functionName: 'allowance',
-          args: [address, MANAGER_CONTRACT_ADDRESS],
-        })) as bigint;
-
-        if (usdcAllowance < usdcAmount) {
-          setStatus('Approving USDC spend…');
-          const approveHash = await writeContractAsync({
+          await waitForTransaction(transferHash, 'Waiting for R1 burn confirmation…');
+          paymentTxHash = transferHash;
+        } else if (paymentAsset === 'USDC') {
+          if (!usdcAmount || !minR1Amount) {
+            throw new Error('Missing quote for USDC payment.');
+          }
+          setStatus('Checking USDC balance…');
+          const usdcBalance = (await publicClient.readContract({
             address: USDC_CONTRACT_ADDRESS,
             abi: Erc20Abi,
-            functionName: 'approve',
-            args: [MANAGER_CONTRACT_ADDRESS, usdcAmount],
+            functionName: 'balanceOf',
+            args: [walletAddress],
+          })) as bigint;
+          if (usdcBalance < usdcAmount) {
+            throw new Error('Not enough USDC to cover the payment.');
+          }
+
+          setStatus('Checking USDC allowance…');
+          const usdcAllowance = (await publicClient.readContract({
+            address: USDC_CONTRACT_ADDRESS,
+            abi: Erc20Abi,
+            functionName: 'allowance',
+            args: [walletAddress, MANAGER_CONTRACT_ADDRESS],
+          })) as bigint;
+
+          if (usdcAllowance < usdcAmount) {
+            setStatus('Approving USDC spend…');
+            const approveHash = await writeContractAsync({
+              address: USDC_CONTRACT_ADDRESS,
+              abi: Erc20Abi,
+              functionName: 'approve',
+              args: [MANAGER_CONTRACT_ADDRESS, usdcAmount],
+            });
+            await waitForTransaction(approveHash, 'Confirming USDC approval on-chain…');
+          }
+
+          setStatus('Paying with USDC…');
+          const transferHash = await writeContractAsync({
+            address: MANAGER_CONTRACT_ADDRESS,
+            abi: Manager3sendAbi,
+            functionName: 'transferPaymentWithUSDC',
+            args: [tierInfo.id, minR1Amount],
           });
-          await waitForTransaction(approveHash, 'Confirming USDC approval on-chain…');
-        }
+          await waitForTransaction(transferHash, 'Waiting for USDC swap confirmation…');
+          paymentTxHash = transferHash;
+        } else {
+          if (!currentQuote) {
+            throw new Error('Missing quote for ETH payment.');
+          }
+          if (
+            !currentQuote.wethAmount ||
+            !currentQuote.maxWethWithSlippage ||
+            currentQuote.wethDecimals == null
+          ) {
+            throw new Error('Unable to quote ETH payment right now.');
+          }
+          if (!minR1Amount) {
+            throw new Error('Missing quote for ETH payment.');
+          }
 
-        setStatus('Paying with USDC…');
-        const transferHash = await writeContractAsync({
-          address: MANAGER_CONTRACT_ADDRESS,
-          abi: Manager3sendAbi,
-          functionName: 'transferPaymentWithUSDC',
-          args: [tierInfo.id, minR1Amount],
-        });
-        await waitForTransaction(transferHash, 'Waiting for USDC swap confirmation…');
-        paymentTxHash = transferHash;
+          setStatus('Checking ETH balance…');
+          const ethBalance = await publicClient.getBalance({ address: walletAddress });
+          if (ethBalance < currentQuote.maxWethWithSlippage) {
+            throw new Error('Not enough ETH to cover the swap and buffer.');
+          }
+
+          setStatus('Paying with ETH…');
+          const transferHash = await writeContractAsync({
+            address: MANAGER_CONTRACT_ADDRESS,
+            abi: Manager3sendAbi,
+            functionName: 'transferPaymentWithETH',
+            args: [tierInfo.id, minR1Amount],
+            value: currentQuote.maxWethWithSlippage,
+          });
+          await waitForTransaction(transferHash, 'Waiting for ETH swap confirmation…');
+          paymentTxHash = transferHash;
+        }
       } else {
-        if (!currentQuote) {
-          throw new Error('Missing quote for ETH payment.');
-        }
-        if (
-          !currentQuote.wethAmount ||
-          !currentQuote.maxWethWithSlippage ||
-          currentQuote.wethDecimals == null
-        ) {
-          throw new Error('Unable to quote ETH payment right now.');
-        }
-        if (!minR1Amount) {
-          throw new Error('Missing quote for ETH payment.');
-        }
-
-        setStatus('Checking ETH balance…');
-        const ethBalance = await publicClient.getBalance({ address });
-        if (ethBalance < currentQuote.maxWethWithSlippage) {
-          throw new Error('Not enough ETH to cover the swap and buffer.');
-        }
-
-        setStatus('Paying with ETH…');
-        const transferHash = await writeContractAsync({
-          address: MANAGER_CONTRACT_ADDRESS,
-          abi: Manager3sendAbi,
-          functionName: 'transferPaymentWithETH',
-          args: [tierInfo.id, minR1Amount],
-          value: currentQuote.maxWethWithSlippage,
-        });
-        await waitForTransaction(transferHash, 'Waiting for ETH swap confirmation…');
-        paymentTxHash = transferHash;
+        throw new Error('Email logins can only use free micro-sends.');
       }
 
       if (!paymentTxHash) {
@@ -805,16 +850,17 @@ export function SendFileCard() {
       }
 
       const startedAt = Date.now();
-      setStatus('Signing upload…');
+      setStatus(isWalletLogin ? 'Signing upload…' : 'Preparing upload…');
       const plaintextBytes =
         typeof encryptionMetadata.plaintextLength === 'number' &&
         Number.isFinite(encryptionMetadata.plaintextLength)
           ? encryptionMetadata.plaintextLength
           : originalSize;
+      const effectiveChainId = isWalletLogin ? chainId : 0;
       const handshakeMsg = buildSendHandshakeMessage({
-        initiator: address,
-        recipient: recipientAddress,
-        chainId,
+        initiator: initiatorIdentity,
+        recipient: targetIdentity,
+        chainId: effectiveChainId,
         paymentTxHash,
         sentAt: startedAt,
         tierId: tierInfo.id,
@@ -823,18 +869,26 @@ export function SendFileCard() {
         originalFilename,
         encryption: encryptionMetadata,
       });
-      const signature = await signMessageAsync({ message: handshakeMsg });
+      let signature: string | undefined;
+      if (isWalletLogin) {
+        if (!signMessageAsync) {
+          throw new Error('Wallet signer not available.');
+        }
+        signature = await signMessageAsync({ message: handshakeMsg });
+      }
 
       setStatus('Uploading encrypted file…');
       const formData = new FormData();
       formData.append('file', encryptedFile);
-      formData.append('initiator', address);
-      formData.append('recipient', recipientAddress);
+      formData.append('initiator', initiatorIdentity);
+      formData.append('recipient', targetIdentity);
       formData.append('handshakeMessage', handshakeMsg);
-      formData.append('signature', signature);
+      if (signature) {
+        formData.append('signature', signature);
+      }
       formData.append('sentAt', String(startedAt));
       formData.append('paymentTxHash', paymentTxHash);
-      formData.append('chainId', String(chainId));
+      formData.append('chainId', String(effectiveChainId));
       formData.append('tierId', String(tierInfo.id));
       formData.append('paymentAsset', paymentAssetUsed ?? paymentAsset);
       formData.append('paymentType', usingFreeSend ? 'FREE' : 'PAID');
@@ -856,8 +910,10 @@ export function SendFileCard() {
       setRecipientInput('');
       setNote('');
       setStatus(null);
-      await refetchQuote();
-      await refetchWalletBalances();
+      if (isWalletLogin) {
+        await refetchQuote();
+        await refetchWalletBalances();
+      }
       await refetchFreeAllowance();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ratio1:upload-completed'));
@@ -867,9 +923,9 @@ export function SendFileCard() {
       }
       const recipientDisplay =
         normalizedRecipientInput ||
-        (targetAddress && targetAddress.length > 10
-          ? `${targetAddress.slice(0, 6)}…${targetAddress.slice(-4)}`
-          : targetAddress) ||
+        (targetIdentity && targetIdentity.length > 10
+          ? `${targetIdentity.slice(0, 6)}…${targetIdentity.slice(-4)}`
+          : targetIdentity) ||
         'recipient';
       const fileLabel = originalFilename || 'your file';
       const fileDisplay =
@@ -889,13 +945,13 @@ export function SendFileCard() {
       setSending(false);
     }
   }, [
-    address,
+    identityValue,
+    recipientValue,
     chainId,
     file,
     note,
     publicClient,
     quoteData,
-    recipientAddress,
     recipientKeyData,
     normalizedRecipientInput,
     refetchQuote,
@@ -911,6 +967,9 @@ export function SendFileCard() {
     paymentAsset,
     waitForTransaction,
     writeContractAsync,
+    isWalletLogin,
+    isEmailLogin,
+    walletAddress,
   ]);
 
   const statusLabel = status ?? 'Processing…';
@@ -921,25 +980,31 @@ export function SendFileCard() {
       <span className="spinner" aria-hidden="true" style={{ width: 16, height: 16 }} />
       <span>{statusLabel}</span>
     </span>
+  ) : isEmailLogin ? (
+    isMicroTierSelected ? (
+      'Send free micro-send'
+    ) : (
+      'Free micro-sends only'
+    )
   ) : useFreeSend && freeSendEligible ? (
     'Send free micro-send'
   ) : (
     `Send with ${paymentAsset}`
   );
 
-  const copyRecipientAddress = useCallback(async () => {
-    if (!recipientAddress) return;
+  const copyRecipientIdentity = useCallback(async () => {
+    if (!recipientValue) return;
     try {
       if (typeof navigator === 'undefined' || !navigator.clipboard) {
         throw new Error('Clipboard unavailable');
       }
-      await navigator.clipboard.writeText(recipientAddress);
-      toast.success('Recipient address copied.');
+      await navigator.clipboard.writeText(recipientValue);
+      toast.success('Recipient copied.');
     } catch (err) {
-      console.error('[send] copy recipient address failed', err);
-      toast.error('Unable to copy recipient address.');
+      console.error('[send] copy recipient identity failed', err);
+      toast.error('Unable to copy recipient.');
     }
-  }, [recipientAddress]);
+  }, [recipientValue]);
 
   const copyRecipientBasename = useCallback(async () => {
     if (!recipientBaseName) return;
@@ -960,28 +1025,32 @@ export function SendFileCard() {
       <div>
         <div style={{ fontWeight: 700, fontSize: 18 }}>Send a file</div>
         <div className="muted" style={{ fontSize: 12 }}>
-          Pay in R1, ETH, or USDC - or use your 3 free micro-sends (≤50 MB) each month. Encrypt and
-          send securely through the Ratio1 Edge Nodes network; all tokens are converted to R1 and
-          burned.
+          {isEmailLogin
+            ? 'Email logins use free micro-sends (≤50 MB) each month. Encrypt and send securely through the Ratio1 Edge Nodes network.'
+            : 'Pay in R1, ETH, or USDC - or use your 3 free micro-sends (≤50 MB) each month. Encrypt and send securely through the Ratio1 Edge Nodes network; all tokens are converted to R1 and burned.'}
         </div>
       </div>
 
       <label className="col">
         <span className="muted mono" style={{ fontSize: 12 }}>
-          Recipient address or basename
+          Recipient email or wallet address
         </span>
         <input
           className="input"
-          placeholder="0x… or yourname.base.eth"
+          placeholder="email@domain.com or 0x… / yourname.base.eth"
           value={recipientInput}
           onChange={(e) => setRecipientInput(e.target.value.trim())}
           autoComplete="off"
           data-1p-ignore
         />
-        {!normalizedRecipientInput ? null : recipientAddress ? (
+        {!normalizedRecipientInput ? null : recipientValue ? (
           <div className="col" style={{ gap: 4 }}>
             <span className="muted" style={{ fontSize: 12 }}>
-              {recipientResolvedFromName ? 'Basename resolved to address' : 'Address looks valid'}
+              {recipientEmail
+                ? 'Email looks valid'
+                : recipientResolvedFromName
+                  ? 'Basename resolved to address'
+                  : 'Address looks valid'}
             </span>
             <div
               className="card col"
@@ -1027,9 +1096,9 @@ export function SendFileCard() {
                 >
                   <button
                     type="button"
-                    onClick={copyRecipientAddress}
-                    aria-label="Copy recipient address"
-                    title="Copy recipient address"
+                    onClick={copyRecipientIdentity}
+                    aria-label="Copy recipient"
+                    title="Copy recipient"
                     style={{
                       background: 'transparent',
                       border: 'none',
@@ -1043,7 +1112,7 @@ export function SendFileCard() {
                     }}
                   >
                     <span className="mono" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.4 }}>
-                      {shortRecipientAddress}
+                      {recipientEmail ?? shortRecipientAddress}
                     </span>
                   </button>
                 </div>
@@ -1087,7 +1156,9 @@ export function SendFileCard() {
               : 'Could not resolve this name to an address.'}
           </span>
         ) : (
-          <span style={{ color: '#f87171', fontSize: 12 }}>Enter a valid address or basename</span>
+          <span style={{ color: '#f87171', fontSize: 12 }}>
+            Enter a valid email or wallet address
+          </span>
         )}
       </label>
 
@@ -1195,7 +1266,7 @@ export function SendFileCard() {
                     <span className="muted" style={{ fontSize: 12 }}>
                       {freeAllowanceLoading
                         ? 'Checking your monthly credits…'
-                        : `You have ${freeRemaining} out of ${freeLimit || FREE_MICRO_SENDS_PER_MONTH} free micro-sends left this month.`}
+                        : `You have ${freeRemaining} out of ${freeLimit} free micro-sends left this month.`}
                     </span>
                   </div>
                 </div>
@@ -1206,18 +1277,60 @@ export function SendFileCard() {
                 )}
                 {!freeSendEligible && !freeAllowanceLoading && (
                   <span className="muted" style={{ fontSize: 12 }}>
-                    All monthly free micro-sends are used. Pay normally to continue.
+                    {isEmailLogin
+                      ? 'All monthly free micro-sends are used. Credits reset at the start of next month.'
+                      : 'All monthly free micro-sends are used. Paid transfers apply from here.'}
                   </span>
                 )}
               </div>
             )}
-            {quoteLoading && !useFreeSend && (
+            {isEmailLogin && !isMicroTierSelected && file && !sizeExceedsLimit && (
+              <div
+                className="col"
+                style={{
+                  gap: 6,
+                  padding: 12,
+                  borderRadius: 12,
+                  background: '#fff7ed',
+                  border: '1px solid rgba(251, 146, 60, 0.4)',
+                  color: '#9a3412',
+                  fontSize: 12,
+                }}
+              >
+                Email logins are limited to free micro-sends (≤50 MB). Reduce the file size to
+                continue.
+              </div>
+            )}
+            {!isEmailLogin && quoteLoading && !useFreeSend && (
               <div className="muted" style={{ fontSize: 12 }}>
                 Fetching payment quote…
               </div>
             )}
             <div className="col" style={{ gap: 12 }}>
-              {!useFreeSend ? (
+              {isEmailLogin ? (
+                useFreeSend ? (
+                  <div
+                    className="col"
+                    style={{
+                      gap: 6,
+                      padding: 12,
+                      borderRadius: 12,
+                      background: '#f8fafc',
+                      border: '1px solid rgba(148, 163, 184, 0.4)',
+                      boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>No payment required</span>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {freeAllowanceLoading
+                        ? 'Checking your free micro-sends…'
+                        : freeSendEligible
+                          ? 'This transfer uses one of your monthly free micro-sends.'
+                          : 'No free micro-sends left this month.'}
+                    </span>
+                  </div>
+                ) : null
+              ) : !useFreeSend ? (
                 !quoteLoading &&
                 !quoteError &&
                 quoteData && (
@@ -1307,7 +1420,11 @@ export function SendFileCard() {
                 >
                   <span style={{ fontWeight: 600, fontSize: 13 }}>No payment required</span>
                   <span className="muted" style={{ fontSize: 12 }}>
-                    This transfer uses one of your monthly free micro-sends.
+                    {freeAllowanceLoading
+                      ? 'Checking your free micro-sends…'
+                      : freeSendEligible
+                        ? 'This transfer uses one of your monthly free micro-sends.'
+                        : 'No free micro-sends left this month.'}
                   </span>
                 </div>
               )}
@@ -1387,12 +1504,12 @@ export function SendFileCard() {
         />
       </label>
 
-      {!isConnected && (
+      {isWalletLogin && !isConnected && (
         <div className="muted" style={{ fontSize: 12 }}>
           Connect your wallet to continue.
         </div>
       )}
-      {wrongNetwork && (
+      {isWalletLogin && wrongNetwork && (
         <div style={{ fontSize: 12, color: '#dc2626' }}>
           Switch your wallet network to {REQUIRED_CHAIN_NAME} to send files.
         </div>

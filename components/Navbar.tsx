@@ -32,7 +32,7 @@ function NavItem({ href, label }: { href: string; label: string }) {
 export function Navbar() {
   const { isLoggedIn, canUseWallet } = useAuthStatus();
   const { address } = useAccount();
-  const normalizedAddress = address?.trim().toLowerCase() ?? '';
+  const normalizedAddress = canUseWallet ? address?.trim().toLowerCase() ?? '' : '';
   const { data: identityProfile } = useQuery({
     queryKey: identityQueryKey(normalizedAddress),
     queryFn: () => fetchIdentityProfile(normalizedAddress),
@@ -88,7 +88,7 @@ export function Navbar() {
             </div>
           </SignedIn>
           <MinimalConnect />
-          {canUseWallet && (
+          {isLoggedIn && (
             <Link
               href="/profile"
               aria-label="Open profile"

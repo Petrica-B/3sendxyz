@@ -106,8 +106,8 @@ export default function WelcomeModal() {
           Welcome to <span style={{ color: 'var(--accent)' }}>3send</span>
         </div>
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.6 }}>
-          Say goodbye to file-sharing privacy concerns. Send encrypted files wallet-to-wallet on
-          Base via Ratio1. You keep the keys and control your data.
+          Say goodbye to file-sharing privacy concerns. Send encrypted files with email or a wallet
+          on Base via Ratio1. You keep the keys and control your data.
         </div>
 
         <div className="welcomeSteps" aria-label="How it works">
@@ -117,9 +117,9 @@ export default function WelcomeModal() {
               1
             </span>
             <Image className="welcomeStepIcon" src="/Connect.svg" alt="" width={40} height={40} />
-            <div style={{ fontWeight: 700, fontSize: 13 }}>Connect your wallet.</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>Log in with email or a wallet.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              Start instantly - no accounts or setup required.
+              Start instantly with email or bring an existing wallet.
             </div>
           </div>
           {/* Step 2 */}
@@ -129,7 +129,7 @@ export default function WelcomeModal() {
             </span>
             <Image className="welcomeStepIcon" src="/Upload.svg" alt="" width={40} height={40} />
             <div style={{ fontWeight: 700, fontSize: 13 }}>
-              Select files and a recipient address.
+              Select files and a recipient email or wallet.
             </div>
             <div className="muted" style={{ fontSize: 12 }}>
               Choose what to send and who receives it.
@@ -156,7 +156,7 @@ export default function WelcomeModal() {
             <Image className="welcomeStepIcon" src="/Unlock.svg" alt="" width={40} height={40} />
             <div style={{ fontWeight: 700, fontSize: 13 }}>Recipient decrypts in their inbox.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              The recipient unlocks the file privately with their wallet.
+              The recipient unlocks the file privately with their account.
             </div>
           </div>
         </div>

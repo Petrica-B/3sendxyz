@@ -1,4 +1,6 @@
 import { REGISTERED_KEYS_CSTORE_HKEY } from '@/lib/constants';
+import { getClerkIdentityKey } from '@/lib/clerkIdentity';
+import { parseIdentityKey } from '@/lib/identityKey';
 import { buildRegisteredKeyMessage } from '@/lib/keyAccess';
 import type {
   RegisteredKeyRecord,
@@ -14,6 +16,7 @@ export const runtime = 'nodejs';
 
 type RegisterBody = {
   address?: string;
+  identity?: string;
   signature?: string;
   message?: string;
   type?: string;
@@ -57,6 +60,7 @@ export async function POST(request: Request) {
 
   const {
     address,
+    identity,
     signature,
     message,
     type,
@@ -71,29 +75,46 @@ export async function POST(request: Request) {
     fingerprint,
     derivationPath,
   } = body ?? {};
-  if (!address || typeof address !== 'string' || address.trim().length === 0) {
-    return NextResponse.json({ success: false, error: 'Missing address' }, { status: 400 });
-  }
-  if (
-    !signature ||
-    typeof signature !== 'string' ||
-    signature.trim().length === 0 ||
-    !isHex(signature)
-  ) {
-    return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 });
-  }
-  if (!message || typeof message !== 'string' || message.trim().length === 0) {
-    return NextResponse.json({ success: false, error: 'Missing message' }, { status: 400 });
+  const rawIdentity = typeof identity === 'string' && identity.trim().length > 0 ? identity : address;
+  const parsedIdentity = rawIdentity ? parseIdentityKey(rawIdentity) : null;
+  const clerkIdentity = await getClerkIdentityKey();
+  const walletIdentity = parsedIdentity?.kind === 'wallet' ? parsedIdentity : null;
+  const emailIdentity = parsedIdentity?.kind === 'email' ? parsedIdentity : null;
+
+  if (walletIdentity) {
+    if (
+      !signature ||
+      typeof signature !== 'string' ||
+      signature.trim().length === 0 ||
+      !isHex(signature)
+    ) {
+      return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 });
+    }
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      return NextResponse.json({ success: false, error: 'Missing message' }, { status: 400 });
+    }
+  } else if (clerkIdentity) {
+    if (emailIdentity && emailIdentity.value !== clerkIdentity.value) {
+      return NextResponse.json({ success: false, error: 'Identity mismatch' }, { status: 403 });
+    }
+  } else {
+    return NextResponse.json({ success: false, error: 'Missing identity' }, { status: 400 });
   }
 
   const normalizedType = typeof type === 'string' ? type.toLowerCase().trim() : '';
   const keyType: 'passkey' | 'seed' = normalizedType === 'seed' ? 'seed' : 'passkey';
 
-  let normalized: string;
-  try {
-    normalized = getAddress(address);
-  } catch {
-    return NextResponse.json({ success: false, error: 'Invalid address' }, { status: 400 });
+  const resolvedIdentity = walletIdentity ?? emailIdentity ?? clerkIdentity;
+  if (!resolvedIdentity) {
+    return NextResponse.json({ success: false, error: 'Missing identity' }, { status: 400 });
+  }
+  let normalizedAddress: string | null = null;
+  if (resolvedIdentity.kind === 'wallet') {
+    try {
+      normalizedAddress = getAddress(resolvedIdentity.value);
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid address' }, { status: 400 });
+    }
   }
 
   const labelValue = sanitizeLabel(label);
@@ -242,42 +263,44 @@ export async function POST(request: Request) {
     );
   }
 
-  const expectedMessage = buildRegisteredKeyMessage(normalized, keyPublicBase64);
-  if (message !== expectedMessage) {
-    return NextResponse.json({ success: false, error: 'Unexpected message' }, { status: 400 });
-  }
+  if (normalizedAddress) {
+    const expectedMessage = buildRegisteredKeyMessage(normalizedAddress, keyPublicBase64);
+    if (message !== expectedMessage) {
+      return NextResponse.json({ success: false, error: 'Unexpected message' }, { status: 400 });
+    }
 
-  try {
-    const recovered = await recoverMessageAddress({
-      message,
-      signature: signature as `0x${string}`,
-    });
-    if (getAddress(recovered) !== normalized) {
+    try {
+      const recovered = await recoverMessageAddress({
+        message: message as string,
+        signature: signature as `0x${string}`,
+      });
+      if (getAddress(recovered) !== normalizedAddress) {
+        return NextResponse.json(
+          { success: false, error: 'Signature does not match address' },
+          { status: 401 }
+        );
+      }
+    } catch (error) {
+      console.warn('[passkeys] Failed to recover address from signature', error);
       return NextResponse.json(
-        { success: false, error: 'Signature does not match address' },
-        { status: 401 }
+        { success: false, error: 'Failed to validate signature' },
+        { status: 400 }
       );
     }
-  } catch (error) {
-    console.warn('[passkeys] Failed to recover address from signature', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to validate signature' },
-      { status: 400 }
-    );
   }
 
   try {
     const ratio1 = createEdgeSdk();
-    const key = normalized.toLowerCase();
     await ratio1.cstore.hset({
       hkey: REGISTERED_KEYS_CSTORE_HKEY,
-      key,
+      key: resolvedIdentity.storageKey,
       value: JSON.stringify(record),
     });
 
     return NextResponse.json({
       success: true,
-      address: normalized,
+      identity: resolvedIdentity.value,
+      identityKey: resolvedIdentity.storageKey,
       record,
     });
   } catch (error) {

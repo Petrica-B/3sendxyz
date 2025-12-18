@@ -8,21 +8,21 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
+  title: '3send.xyz - Encrypted File Transfer',
   description:
-    'Send encrypted files wallet‑to‑wallet on Base via Ratio1. End‑to‑end encryption, no accounts, pay with R1, ETH, or USDC.',
+    'Send encrypted files with email or a wallet on Base via Ratio1. End‑to‑end encryption, fast delivery, and optional on-chain payments.',
   openGraph: {
-    title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
+    title: '3send.xyz - Encrypted File Transfer',
     description:
-      'Send encrypted files wallet‑to‑wallet on Base via Ratio1. End‑to‑end encryption, no accounts, pay with R1, ETH, or USDC.',
+      'Send encrypted files with email or a wallet on Base via Ratio1. End‑to‑end encryption, fast delivery, and optional on-chain payments.',
     images: [{ url: '/Home.png', width: 1200, height: 630, alt: '3send', type: 'image/png' }],
     siteName: '3send.xyz',
   },
   twitter: {
     card: 'summary_large_image',
-    title: '3send.xyz - Wallet‑to‑Wallet Encrypted File Transfer',
+    title: '3send.xyz - Encrypted File Transfer',
     description:
-      'Send encrypted files wallet‑to‑wallet on Base via Ratio1. End‑to‑end encryption, no accounts, pay with R1, ETH, or USDC.',
+      'Send encrypted files with email or a wallet on Base via Ratio1. End‑to‑end encryption, fast delivery, and optional on-chain payments.',
     images: [{ url: 'https://3send.xyz/Home.png', alt: '3send' }],
   },
 };
@@ -34,7 +34,7 @@ export default async function Home() {
       <WelcomeModal />
       <section className="hero">
         <div className="headline">
-          Send files wallet-to-wallet
+          Send files securely
           <span> </span>
           <span className="gradientText">on Base</span>
           <span> via </span>
@@ -61,9 +61,9 @@ export default async function Home() {
               1
             </span>
             <Image className="welcomeStepIcon" src="/Connect.svg" alt="" width={40} height={40} />
-            <div style={{ fontWeight: 700, fontSize: 13 }}>Connect your wallet.</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>Log in with email or a wallet.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              Start instantly - no accounts or setup required.
+              Start instantly with email or bring an existing wallet.
             </div>
           </div>
           {/* Step 2 */}
@@ -73,7 +73,7 @@ export default async function Home() {
             </span>
             <Image className="welcomeStepIcon" src="/Upload.svg" alt="" width={40} height={40} />
             <div style={{ fontWeight: 700, fontSize: 13 }}>
-              Select files and a recipient address.
+              Select files and a recipient email or wallet.
             </div>
             <div className="muted" style={{ fontSize: 12 }}>
               Choose what to send and who receives it.
@@ -100,7 +100,7 @@ export default async function Home() {
             <Image className="welcomeStepIcon" src="/Unlock.svg" alt="" width={40} height={40} />
             <div style={{ fontWeight: 700, fontSize: 13 }}>Recipient decrypts in their inbox.</div>
             <div className="muted" style={{ fontSize: 12 }}>
-              The recipient unlocks the file privately with their wallet.
+              The recipient unlocks the file privately with their account.
             </div>
           </div>
         </div>

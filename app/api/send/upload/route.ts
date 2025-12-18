@@ -5,6 +5,7 @@ import {
   USED_PAYMENT_TXS_CSTORE_HKEY,
   resolveTierBySize,
 } from '@/lib/constants';
+import { getClerkIdentityKey } from '@/lib/clerkIdentity';
 import { consumeFreeSend, isFreePaymentReference, isMicroTier } from '@/lib/freeSends';
 import {
   buildSendHandshakeMessage,
@@ -15,6 +16,7 @@ import { Manager3sendAbi } from '@/lib/SmartContracts';
 import { PLATFORM_STATS_CACHE_TAG, updateStatsAfterUpload } from '@/lib/stats';
 import { createStepTimers } from '@/lib/timers';
 import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
+import { parseIdentityKey } from '@/lib/identityKey';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
@@ -22,7 +24,6 @@ import {
   createPublicClient,
   decodeEventLog,
   http,
-  isAddress,
   isErc6492Signature,
   verifyMessage,
 } from 'viem';
@@ -77,22 +78,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing recipient' }, { status: 400 });
     }
 
-    const recipientAddress = recipient.trim();
-    if (!isAddress(recipientAddress)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid recipient address' },
-        { status: 400 }
-      );
-    }
-
     if (typeof initiator !== 'string' || initiator.trim().length === 0) {
       return NextResponse.json({ success: false, error: 'Missing initiator' }, { status: 400 });
     }
 
-    const initiatorAddress = initiator.trim();
-    if (!isAddress(initiatorAddress)) {
+    const recipientIdentity = parseIdentityKey(recipient);
+    if (!recipientIdentity) {
       return NextResponse.json(
-        { success: false, error: 'Invalid initiator address' },
+        { success: false, error: 'Invalid recipient identity' },
+        { status: 400 }
+      );
+    }
+
+    const initiatorIdentity = parseIdentityKey(initiator);
+    if (!initiatorIdentity) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid initiator identity' },
         { status: 400 }
       );
     }
@@ -104,19 +105,36 @@ export async function POST(request: Request) {
       );
     }
 
-    if (typeof signatureRaw !== 'string' || signatureRaw.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Missing signature' }, { status: 400 });
+    const isEmailInitiator = initiatorIdentity.kind === 'email';
+    const isWalletInitiator = initiatorIdentity.kind === 'wallet';
+
+    if (isEmailInitiator) {
+      const clerkIdentity = await getClerkIdentityKey();
+      if (!clerkIdentity || clerkIdentity.value !== initiatorIdentity.value) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized initiator identity' },
+          { status: 403 }
+        );
+      }
     }
 
-    if (!signatureRaw.trim().startsWith('0x')) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid signature format' },
-        { status: 400 }
-      );
+    if (isWalletInitiator) {
+      if (typeof signatureRaw !== 'string' || signatureRaw.trim().length === 0) {
+        return NextResponse.json({ success: false, error: 'Missing signature' }, { status: 400 });
+      }
+      if (!signatureRaw.trim().startsWith('0x')) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid signature format' },
+          { status: 400 }
+        );
+      }
     }
 
     if (typeof paymentTxHashRaw !== 'string' || paymentTxHashRaw.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Missing paymentTxHash' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Missing payment reference' },
+        { status: 400 }
+      );
     }
     const paymentTxHashProvided = paymentTxHashRaw.trim().toLowerCase();
 
@@ -127,11 +145,14 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const signature = signatureRaw.trim() as `0x${string}`;
+    const signature = signatureRaw?.toString().trim() as `0x${string}`;
     const paymentTxHash = paymentTxHashProvided;
 
-    const chainId = typeof chainIdRaw === 'string' ? Number(chainIdRaw) : Number(chainIdRaw ?? NaN);
-    if (!Number.isInteger(chainId) || chainId <= 0) {
+    const chainIdCandidate =
+      typeof chainIdRaw === 'string' ? Number(chainIdRaw) : Number(chainIdRaw ?? NaN);
+    const chainId =
+      Number.isInteger(chainIdCandidate) && chainIdCandidate > 0 ? chainIdCandidate : 0;
+    if (isWalletInitiator && chainId <= 0) {
       return NextResponse.json({ success: false, error: 'Missing chainId' }, { status: 400 });
     }
 
@@ -226,8 +247,13 @@ export async function POST(request: Request) {
         ? originalMimeTypeRaw
         : undefined;
 
-    const recipientKey = recipientAddress.toLowerCase();
-    const initiatorAddr = initiatorAddress.toLowerCase();
+    const recipientValue = recipientIdentity.value;
+    const initiatorValue = initiatorIdentity.value;
+    const recipientStorageKey = recipientIdentity.storageKey;
+    const initiatorStorageKey = initiatorIdentity.storageKey;
+    const recipientSecret = recipientValue.toLowerCase();
+    const initiatorSecret = initiatorValue.toLowerCase();
+    const initiatorWalletAddress = isWalletInitiator ? initiatorValue : null;
 
     const preliminarySentAt =
       typeof sentAtRaw === 'string'
@@ -251,13 +277,13 @@ export async function POST(request: Request) {
       );
     }
 
-    if (parsedHandshake.sender !== initiatorAddr) {
+    if (parsedHandshake.sender !== initiatorSecret) {
       return NextResponse.json(
         { success: false, error: 'Handshake sender mismatch' },
         { status: 400 }
       );
     }
-    if (parsedHandshake.recipient !== recipientKey) {
+    if (parsedHandshake.recipient !== recipientSecret) {
       return NextResponse.json(
         { success: false, error: 'Handshake recipient mismatch' },
         { status: 400 }
@@ -311,8 +337,8 @@ export async function POST(request: Request) {
     sentTimestamp = parsedHandshake.sentAtMs;
 
     const expectedHandshakeMessage = buildSendHandshakeMessage({
-      initiator: initiatorAddr,
-      recipient: recipientKey,
+      initiator: initiatorSecret,
+      recipient: recipientSecret,
       chainId,
       paymentTxHash,
       sentAt: sentTimestamp,
@@ -340,6 +366,13 @@ export async function POST(request: Request) {
         : undefined;
     const isFreePayment = isFreePaymentReference(paymentTxHash);
 
+    if (isEmailInitiator && !isFreePayment) {
+      return NextResponse.json(
+        { success: false, error: 'Email logins can only use free micro-sends.' },
+        { status: 400 }
+      );
+    }
+
     if (!isFreePayment && normalizedPaymentType === 'FREE') {
       return NextResponse.json(
         { success: false, error: 'Payment type mismatch for paid transfer' },
@@ -361,49 +394,55 @@ export async function POST(request: Request) {
       );
     }
 
-    if (isFreePayment) {
+    if (isFreePayment || isEmailInitiator) {
       paymentAsset = 'FREE';
     }
 
-    const rpcDetails = getRpcUrl(chainId);
-    if (!rpcDetails) {
-      return NextResponse.json({ success: false, error: 'Unsupported chain' }, { status: 400 });
-    }
-
-    const { chain, rpcUrl } = rpcDetails;
-    const client = createPublicClient({ chain, transport: http(rpcUrl) });
-
     endInitialVerification();
+    let client: ReturnType<typeof createPublicClient> | null = null;
 
-    const endSignatureVerification = timers.start('signatureVerification');
-    let signatureVerified = false;
-    try {
-      signatureVerified = await client.verifyMessage({
-        address: initiatorAddress as `0x${string}`,
-        message: handshakeMessage,
-        signature,
-      });
-    } catch (err) {
-      console.warn('[upload] Failed smart wallet verification, falling back to EOA', err);
-      signatureVerified = await verifyMessage({
-        address: initiatorAddress as `0x${string}`,
-        message: handshakeMessage,
-        signature,
-      });
-    }
-    endSignatureVerification();
+    if (isWalletInitiator) {
+      const rpcDetails = getRpcUrl(chainId);
+      if (!rpcDetails) {
+        return NextResponse.json({ success: false, error: 'Unsupported chain' }, { status: 400 });
+      }
 
-    if (!signatureVerified) {
-      return NextResponse.json(
-        { success: false, error: 'Handshake signature mismatch' },
-        { status: 400 }
-      );
+      const { chain, rpcUrl } = rpcDetails;
+      client = createPublicClient({ chain, transport: http(rpcUrl) });
+
+      const endSignatureVerification = timers.start('signatureVerification');
+      let signatureVerified = false;
+      try {
+        signatureVerified = await client.verifyMessage({
+          address: initiatorWalletAddress as `0x${string}`,
+          message: handshakeMessage,
+          signature,
+        });
+      } catch (err) {
+        console.warn('[upload] Failed smart wallet verification, falling back to EOA', err);
+        signatureVerified = await verifyMessage({
+          address: initiatorWalletAddress as `0x${string}`,
+          message: handshakeMessage,
+          signature,
+        });
+      }
+      endSignatureVerification();
+
+      if (!signatureVerified) {
+        return NextResponse.json(
+          { success: false, error: 'Handshake signature mismatch' },
+          { status: 400 }
+        );
+      }
     }
 
     let eventUsdcAmount = 0n;
     let eventR1Amount = 0n;
 
     if (!isFreePayment) {
+      if (!client) {
+        throw new Error('Missing blockchain client for paid transfer');
+      }
       const endPaymentOnchainCheck = timers.start('paymentOnchainCheck');
       let receipt;
       try {
@@ -421,7 +460,7 @@ export async function POST(request: Request) {
         typedSignature.length > 132 || isErc6492Signature(typedSignature);
       if (!maybeSmartWalletSignature) {
         const receiptInitiator = receipt.from?.toLowerCase();
-        if (!receiptInitiator || receiptInitiator !== initiatorAddr) {
+        if (!receiptInitiator || receiptInitiator !== initiatorSecret) {
           throw new Error('Payment transaction initiator does not match sender');
         }
       }
@@ -450,7 +489,7 @@ export async function POST(request: Request) {
       }
 
       const logSender = String(paymentLog.args.sender ?? '').toLowerCase();
-      if (logSender !== initiatorAddr) {
+      if (logSender !== initiatorSecret) {
         throw new Error('Payment sender does not match initiator');
       }
 
@@ -483,7 +522,7 @@ export async function POST(request: Request) {
     if (isFreePayment) {
       try {
         const endFreeSendReservation = timers.start('freeSendReservation');
-        const { timings } = await consumeFreeSend(initiatorAddr, sentTimestamp, ratio1);
+        const { timings } = await consumeFreeSend(initiatorStorageKey, sentTimestamp, ratio1);
         endFreeSendReservation();
         timers.timings = { ...timers.timings, ...timings };
       } catch (err) {
@@ -500,7 +539,7 @@ export async function POST(request: Request) {
     formDataRequest.append('contentType', file.type);
     const uploadResult = await ratio1.r1fs.addFile({
       formData: formDataRequest,
-      secret: recipientKey,
+      secret: recipientSecret,
     });
     console.log('[upload] Completed R1FS upload');
     endR1fsUpload();
@@ -520,8 +559,8 @@ export async function POST(request: Request) {
     const record: StoredUploadRecord = {
       cid,
       filename: originalFilename ?? file.name,
-      recipient: recipientKey,
-      initiator: initiatorAddr,
+      recipient: recipientValue,
+      initiator: initiatorValue,
       note: hasEncryptedNote ? undefined : noteValue,
       txHash: paymentTxHash,
       filesize: effectiveFileSize,
@@ -541,7 +580,7 @@ export async function POST(request: Request) {
     const recordJson = JSON.stringify(record);
     const endCstoreWriteReceived = timers.start('cstoreWriteReceived');
     await ratio1.cstore.hset({
-      hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${recipientKey}`,
+      hkey: `${RECEIVED_FILES_CSTORE_HKEY}_${recipientStorageKey}`,
       key: paymentTxHash,
       value: recordJson,
     });
@@ -549,7 +588,7 @@ export async function POST(request: Request) {
 
     const endCstoreWriteSent = timers.start('cstoreWriteSent');
     await ratio1.cstore.hset({
-      hkey: `${SENT_FILES_CSTORE_HKEY}_${initiatorAddr}`,
+      hkey: `${SENT_FILES_CSTORE_HKEY}_${initiatorStorageKey}`,
       key: paymentTxHash,
       value: recordJson,
     });
@@ -567,8 +606,8 @@ export async function POST(request: Request) {
     try {
       const { timings } = await updateStatsAfterUpload({
         ratio1,
-        sender: initiatorAddr,
-        recipient: recipientKey,
+        sender: initiatorValue,
+        recipient: recipientValue,
         filesize: effectiveFileSize,
         r1Burn: eventR1Amount,
       });
@@ -583,8 +622,8 @@ export async function POST(request: Request) {
     const cleanupIndexEntry: FileCleanupIndexEntry = {
       txHash: paymentTxHash,
       cid,
-      recipient: recipientKey,
-      initiator: initiatorAddr,
+      recipient: recipientValue,
+      initiator: initiatorValue,
       sentAt: sentTimestamp,
     };
     const endCleanupIndexWrite = timers.start('cleanupIndexWrite');
@@ -597,7 +636,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      recordKey: recipientKey,
+      recordKey: recipientStorageKey,
       record,
       timings: timers.timings,
     });

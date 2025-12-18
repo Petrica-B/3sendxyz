@@ -691,7 +691,7 @@ function SetupModal(props: SetupModalProps) {
         primaryButtonLabel = 'Deriving encryption key…';
         break;
       case 'sign-wallet':
-        primaryButtonLabel = 'Approve wallet signature…';
+        primaryButtonLabel = 'Confirm account access…';
         break;
       case 'register-server':
         primaryButtonLabel = 'Saving passkey…';

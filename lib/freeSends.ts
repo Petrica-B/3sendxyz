@@ -4,11 +4,10 @@ import {
   FREE_PAYMENT_REFERENCE_PREFIX,
   FREE_SENDS_CSTORE_HKEY,
 } from '@/lib/constants';
+import { parseIdentityKey } from '@/lib/identityKey';
 import type { FreeSendAllowance } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { createStepTimers } from './timers';
-
-const ADDRESS_KEY_PREFIX = 'addr:';
 
 type EdgeSdk = ReturnType<typeof createEdgeSdk>;
 
@@ -37,8 +36,12 @@ function toSafeInteger(value: unknown): number {
   return Math.max(0, Math.floor(num));
 }
 
-function makeAddressKey(address: string): string {
-  return `${ADDRESS_KEY_PREFIX}${address.toLowerCase()}`;
+function makeIdentityKey(identity: string): string {
+  const parsed = parseIdentityKey(identity);
+  if (!parsed) {
+    throw new Error('Invalid identity for free sends');
+  }
+  return parsed.storageKey;
 }
 
 function parseUsage(raw: string | null, currentMonth: string): FreeSendUsageRecord {
@@ -63,12 +66,12 @@ function parseUsage(raw: string | null, currentMonth: string): FreeSendUsageReco
 }
 
 async function readUsage(
-  address: string,
+  identity: string,
   now: number,
   ratio1?: EdgeSdk
 ): Promise<FreeSendUsageRecord> {
   const client = ratio1 ?? createEdgeSdk();
-  const key = makeAddressKey(address);
+  const key = makeIdentityKey(identity);
   let raw: string | null = null;
   try {
     raw = await client.cstore.hget({
@@ -83,11 +86,11 @@ async function readUsage(
 }
 
 export async function getFreeSendAllowance(
-  address: string,
+  identity: string,
   now: number = Date.now(),
   ratio1?: EdgeSdk
 ): Promise<FreeSendAllowance> {
-  const usage = await readUsage(address, now, ratio1);
+  const usage = await readUsage(identity, now, ratio1);
   const monthKey = toMonthKey(now);
   const used = usage.month === monthKey ? usage.used : 0;
   const limit = FREE_MICRO_SENDS_PER_MONTH;
@@ -102,7 +105,7 @@ export async function getFreeSendAllowance(
 }
 
 export async function consumeFreeSend(
-  address: string,
+  identity: string,
   now: number = Date.now(),
   ratio1?: EdgeSdk
 ): Promise<FreeSendAllowance & { timings: Record<string, number> }> {
@@ -110,7 +113,7 @@ export async function consumeFreeSend(
   const client = ratio1 ?? createEdgeSdk();
   const monthKey = toMonthKey(now);
   const endReadUsage = timers.start('consumeFreeSendReadUsage');
-  const usage = await readUsage(address, now, client);
+  const usage = await readUsage(identity, now, client);
   endReadUsage();
   const used = usage.month === monthKey ? usage.used : 0;
   if (used >= FREE_MICRO_SENDS_PER_MONTH) {
@@ -124,7 +127,7 @@ export async function consumeFreeSend(
   const endCstoreWrite = timers.start('consumeFreeSendCstoreWrite');
   await client.cstore.hset({
     hkey: FREE_SENDS_CSTORE_HKEY,
-    key: makeAddressKey(address),
+    key: makeIdentityKey(identity),
     value: JSON.stringify(nextUsage),
   });
   endCstoreWrite();

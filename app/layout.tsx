@@ -10,7 +10,7 @@ import './globals.css';
 
 const baseMetadata: Metadata = {
   title: '3send.xyz — P2P File Transfer',
-  description: 'P2P file transfer dapp using Ratio1 with Base wallet connect.',
+  description: 'P2P file transfer dapp using Ratio1 with email or wallet login.',
   icons: {
     icon: [
       { url: '/favicon.ico' },

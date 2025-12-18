@@ -13,9 +13,9 @@ import { toast } from 'react-toastify';
 import { useAccount } from 'wagmi';
 
 export default function HomeCta() {
-  const { authMethod, canUseWallet } = useAuthStatus();
+  const { authMethod, canUseWallet, isLoggedIn, identityValue } = useAuthStatus();
   const { address } = useAccount();
-  const normalizedAddress = address?.trim().toLowerCase() ?? '';
+  const normalizedAddress = canUseWallet ? address?.trim().toLowerCase() ?? '' : '';
   const { data: identityProfile } = useQuery({
     queryKey: identityQueryKey(normalizedAddress),
     queryFn: () => fetchIdentityProfile(normalizedAddress),
@@ -31,10 +31,10 @@ export default function HomeCta() {
   );
   const [freeAllowanceError, setFreeAllowanceError] = useState<string | null>(null);
   const walletActive = canUseWallet;
-  const sentLoading = walletActive && Boolean(address) && sentCount === null;
-  const inboxLoading = walletActive && Boolean(address) && inboxCount === null;
-  const freeAllowanceLoading =
-    walletActive && Boolean(address) && freeAllowance === null && !freeAllowanceError;
+  const hasIdentity = Boolean(identityValue);
+  const sentLoading = isLoggedIn && hasIdentity && sentCount === null;
+  const inboxLoading = isLoggedIn && hasIdentity && inboxCount === null;
+  const freeAllowanceLoading = isLoggedIn && hasIdentity && freeAllowance === null && !freeAllowanceError;
   const baseName = identityProfile?.name?.trim();
 
   const copyAddress = useCallback(async () => {
@@ -65,6 +65,20 @@ export default function HomeCta() {
     }
   }, [baseName]);
 
+  const copyIdentity = useCallback(async () => {
+    if (!identityValue) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(identityValue);
+      toast.success('Identity copied.');
+    } catch (err) {
+      console.error('[home] copy identity failed', err);
+      toast.error('Unable to copy identity.');
+    }
+  }, [identityValue]);
+
   useEffect(() => {
     let aborted = false;
     const toSafeCount = (value: unknown): number | null => {
@@ -74,7 +88,7 @@ export default function HomeCta() {
     };
 
     async function fetchCounts() {
-      if (!walletActive || !address) {
+      if (!isLoggedIn || !identityValue) {
         setSentCount(null);
         setInboxCount(null);
         setFreeAllowance(null);
@@ -82,9 +96,9 @@ export default function HomeCta() {
         return;
       }
       try {
-        const qsSent = new URLSearchParams({ initiator: address });
-        const qsInbox = new URLSearchParams({ recipient: address });
-        const allowanceUrl = `/api/send/freeAllowance?address=${encodeURIComponent(address)}`;
+        const qsSent = new URLSearchParams({ initiator: identityValue });
+        const qsInbox = new URLSearchParams({ recipient: identityValue });
+        const allowanceUrl = `/api/send/freeAllowance?identity=${encodeURIComponent(identityValue)}`;
         const [resSent, resInbox, resFreeAllowance] = await Promise.all([
           fetch(`/api/sent?${qsSent.toString()}`),
           fetch(`/api/inbox?${qsInbox.toString()}`),
@@ -151,9 +165,9 @@ export default function HomeCta() {
       window.removeEventListener('ratio1:upload-completed', onCompleted);
       window.removeEventListener('focus', onFocus);
     };
-  }, [walletActive, address]);
+  }, [isLoggedIn, identityValue]);
 
-  if (walletActive) {
+  if (isLoggedIn && identityValue) {
     return (
       <div
         className="card"
@@ -176,7 +190,7 @@ export default function HomeCta() {
             }}
           >
             <span>Hello</span>
-            {address ? (
+            {walletActive && address ? (
               <button
                 type="button"
                 onClick={hasBaseName ? copyBasename : copyAddress}
@@ -187,19 +201,42 @@ export default function HomeCta() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 8,
-                flexWrap: 'wrap',
-                background: 'transparent',
-                border: 'none',
-                padding: 0,
+                  flexWrap: 'wrap',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
                   cursor: 'pointer',
                   fontSize: 'inherit',
                 }}
               >
                 <IdentityBadge address={address} size={4} basicStyle={true} />
               </button>
-            ) : null}
+            ) : (
+              <button
+                type="button"
+                onClick={copyIdentity}
+                aria-label="Copy identity"
+                title="Copy identity"
+                style={{
+                  color: 'var(--accent)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontSize: 'inherit',
+                }}
+              >
+                <span className="mono" style={{ fontSize: 12, color: 'var(--accent)' }}>
+                  {identityValue}
+                </span>
+              </button>
+            )}
           </div>
-          {hasBaseName && address ? (
+          {walletActive && hasBaseName && address ? (
             <div
               className="row"
               style={{ gap: 8, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}
@@ -295,28 +332,6 @@ export default function HomeCta() {
               )}
             </span>
           </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (authMethod === 'clerk') {
-    return (
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <div style={{ fontWeight: 700 }}>Email login active</div>
-          <div className="muted" style={{ fontSize: 12 }}>
-            To use a wallet instead, sign out of email login first.
-          </div>
         </div>
       </div>
     );

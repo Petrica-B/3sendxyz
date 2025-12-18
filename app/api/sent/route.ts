@@ -1,4 +1,5 @@
 import { SENT_FILES_CSTORE_HKEY } from '@/lib/constants';
+import { parseIdentityKey } from '@/lib/identityKey';
 import type { StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
@@ -27,33 +28,37 @@ function parseRecord(raw: string): StoredUploadRecord | null {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const initiator = url.searchParams.get('initiator');
+  const initiator = url.searchParams.get('initiator') ?? url.searchParams.get('identity');
 
   if (!initiator) {
-    return NextResponse.json({ success: false, error: 'Missing initiator' }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Missing identity' }, { status: 400 });
+  }
+  const identity = parseIdentityKey(initiator);
+  if (!identity) {
+    return NextResponse.json({ success: false, error: 'Invalid identity' }, { status: 400 });
   }
 
   try {
     const ratio1 = createEdgeSdk();
-    const initiatorLc = initiator.toLowerCase();
-    const hkey = `${SENT_FILES_CSTORE_HKEY}_${initiatorLc}`;
-    let allEntries: Record<string, string> = {};
-    try {
-      allEntries = await ratio1.cstore.hgetall({
-        hkey,
-      });
-    } catch (err) {
-      console.warn('[sent] hgetall empty or failed', err);
-      allEntries = {};
+    const keysToCheck = [identity.storageKey, ...identity.legacyKeys];
+    const mergedEntries: Record<string, string> = {};
+    for (const key of keysToCheck) {
+      const hkey = `${SENT_FILES_CSTORE_HKEY}_${key}`;
+      try {
+        const entries = await ratio1.cstore.hgetall({ hkey });
+        Object.assign(mergedEntries, entries ?? {});
+      } catch (err) {
+        console.warn('[sent] hgetall empty or failed', err);
+      }
     }
 
     const parsedRecords: StoredUploadRecord[] = [];
-    for (const raw of Object.values(allEntries)) {
+    for (const raw of Object.values(mergedEntries)) {
       const record = typeof raw === 'string' ? parseRecord(raw) : null;
       if (record) parsedRecords.push(record);
     }
 
-    const filtered = parsedRecords.filter((record) => record.initiator === initiatorLc);
+    const filtered = parsedRecords.filter((record) => record.initiator === identity.value);
     filtered.sort((a, b) => b.sentAt - a.sentAt);
 
     return NextResponse.json({ success: true, records: filtered });

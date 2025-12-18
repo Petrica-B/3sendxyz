@@ -2,39 +2,47 @@
 
 import { shortAddress } from '@/lib/format';
 import { fetchIdentityProfile, identityQueryKey } from '@/lib/identity';
+import { parseIdentityKey } from '@/lib/identityKey';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { toast } from 'react-toastify';
 
 type WalletIdentityCardProps = {
-  address?: string;
+  identity?: string;
   label: string;
 };
 
-export function WalletIdentityCard({ address, label }: WalletIdentityCardProps) {
-  const normalized = useMemo(() => address?.trim().toLowerCase() ?? '', [address]);
-  const enabled = normalized.length > 0;
+export function WalletIdentityCard({ identity, label }: WalletIdentityCardProps) {
+  const parsed = useMemo(() => (identity ? parseIdentityKey(identity) : null), [identity]);
+  const normalized = parsed?.kind === 'wallet' ? parsed.value : '';
+  const emailValue = parsed?.kind === 'email' ? parsed.value : '';
+  const enabled = Boolean(parsed?.value);
 
   const { data } = useQuery({
     queryKey: identityQueryKey(normalized || 'pending-identity'),
     queryFn: () => fetchIdentityProfile(normalized),
-    enabled,
+    enabled: Boolean(normalized),
     staleTime: 30 * 60 * 1000,
   });
 
   const baseName = data?.name?.trim();
   const short = normalized ? shortAddress(normalized, 4) : '';
 
-  const copyValue = useCallback(async (value: string, type: 'address' | 'basename') => {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      toast.success(`${type === 'address' ? 'Address' : 'Basename'} copied.`);
-    } catch (err) {
-      console.error('[wallet-identity-card] copy failed', err);
-      toast.error('Unable to copy to clipboard.');
-    }
-  }, []);
+  const copyValue = useCallback(
+    async (value: string, type: 'address' | 'basename' | 'email') => {
+      if (!value) return;
+      try {
+        await navigator.clipboard.writeText(value);
+        const labelText =
+          type === 'email' ? 'Email' : type === 'address' ? 'Address' : 'Basename';
+        toast.success(`${labelText} copied.`);
+      } catch (err) {
+        console.error('[wallet-identity-card] copy failed', err);
+        toast.error('Unable to copy to clipboard.');
+      }
+    },
+    []
+  );
 
   if (!enabled) return null;
 
@@ -78,9 +86,9 @@ export function WalletIdentityCard({ address, label }: WalletIdentityCardProps) 
         >
           <button
             type="button"
-            onClick={() => copyValue(normalized, 'address')}
-            aria-label={`Copy ${label} address`}
-            title={`Copy ${label} address`}
+            onClick={() => copyValue(parsed?.value ?? '', parsed?.kind === 'email' ? 'email' : 'address')}
+            aria-label={`Copy ${label} ${parsed?.kind === 'email' ? 'email' : 'address'}`}
+            title={`Copy ${label} ${parsed?.kind === 'email' ? 'email' : 'address'}`}
             style={{
               background: 'transparent',
               border: 'none',
@@ -94,7 +102,7 @@ export function WalletIdentityCard({ address, label }: WalletIdentityCardProps) 
             }}
           >
             <span className="mono" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.4 }}>
-              {short}
+              {emailValue || short}
             </span>
           </button>
         </div>

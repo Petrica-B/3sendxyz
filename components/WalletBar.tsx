@@ -7,7 +7,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
 
 export function WalletBar() {
-  const { authMethod, canUseWallet } = useAuthStatus();
+  const { canUseWallet, isLoggedIn } = useAuthStatus();
   const { chain } = useAccount();
   const walletActive = canUseWallet;
   const wrongNetwork = Boolean(chain?.id && chain.id !== REQUIRED_CHAIN_ID);
@@ -15,11 +15,7 @@ export function WalletBar() {
     ? wrongNetwork
       ? `Wrong network${chain?.name ? `: ${chain.name}` : ''}. Switch to ${REQUIRED_CHAIN_NAME}.`
       : `Connected${chain ? ` on ${chain.name}` : ''}`
-    : authMethod === 'clerk'
-      ? 'Wallet locked while email login is active.'
-      : authMethod === 'mixed'
-        ? 'Multiple logins active. Disconnect one to continue.'
-        : 'Not connected';
+    : 'Not connected';
   return (
     <div
       className="card"
@@ -33,13 +29,9 @@ export function WalletBar() {
       </div>
       {walletActive ? (
         <ConnectButton showBalance={false} />
-      ) : authMethod === 'clerk' ? (
+      ) : isLoggedIn ? (
         <span className="muted" style={{ fontSize: 12 }}>
-          Email login active
-        </span>
-      ) : authMethod === 'mixed' ? (
-        <span className="muted" style={{ fontSize: 12 }}>
-          Multiple logins active
+          Wallet disconnected
         </span>
       ) : (
         <LoginButton />

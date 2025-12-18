@@ -1,4 +1,5 @@
 import { RECEIVED_FILES_CSTORE_HKEY } from '@/lib/constants';
+import { parseIdentityKey } from '@/lib/identityKey';
 import type { StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
@@ -27,27 +28,33 @@ function parseRecord(raw: string): StoredUploadRecord | null {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const recipient = url.searchParams.get('recipient');
+  const recipient = url.searchParams.get('recipient') ?? url.searchParams.get('identity');
 
   if (!recipient) {
-    return NextResponse.json({ success: false, error: 'Missing recipient' }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Missing identity' }, { status: 400 });
+  }
+  const identity = parseIdentityKey(recipient);
+  if (!identity) {
+    return NextResponse.json({ success: false, error: 'Invalid identity' }, { status: 400 });
   }
 
   try {
     const ratio1 = createEdgeSdk();
-    const recipientLc = recipient.toLowerCase();
-    const hkey = `${RECEIVED_FILES_CSTORE_HKEY}_${recipientLc}`;
-    let allEntries: Record<string, string> = {};
+    const keysToCheck = [identity.storageKey, ...identity.legacyKeys];
+    const mergedEntries: Record<string, string> = {};
 
-    try {
-      allEntries = await ratio1.cstore.hgetall({ hkey });
-    } catch (err) {
-      console.warn('[inbox] hgetall empty or failed', err);
-      allEntries = {};
+    for (const key of keysToCheck) {
+      const hkey = `${RECEIVED_FILES_CSTORE_HKEY}_${key}`;
+      try {
+        const entries = await ratio1.cstore.hgetall({ hkey });
+        Object.assign(mergedEntries, entries ?? {});
+      } catch (err) {
+        console.warn('[inbox] hgetall empty or failed', err);
+      }
     }
 
     const parsedRecords: StoredUploadRecord[] = [];
-    for (const raw of Object.values(allEntries)) {
+    for (const raw of Object.values(mergedEntries)) {
       const record = typeof raw === 'string' ? parseRecord(raw) : null;
       if (record) parsedRecords.push(record);
     }

@@ -1,3 +1,4 @@
+import { parseIdentityKey } from '@/lib/identityKey';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
 
@@ -20,9 +21,13 @@ export async function POST(request: Request) {
     if (!recipient || typeof recipient !== 'string') {
       return NextResponse.json({ success: false, error: 'Missing recipient' }, { status: 400 });
     }
+    const identity = parseIdentityKey(recipient);
+    if (!identity) {
+      return NextResponse.json({ success: false, error: 'Invalid recipient identity' }, { status: 400 });
+    }
 
     const ratio1 = createEdgeSdk();
-    const recipientKey = recipient.toLowerCase();
+    const recipientKey = identity.value;
 
     const downloadResult = await ratio1.r1fs.getFileBase64({
       cid,

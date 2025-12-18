@@ -1,43 +1,46 @@
 import { REGISTERED_KEYS_CSTORE_HKEY } from '@/lib/constants';
+import { getClerkIdentityKey } from '@/lib/clerkIdentity';
+import { parseIdentityKey } from '@/lib/identityKey';
 import { parseRegisteredKeyRecord } from '@/lib/passkey';
 import type { RegisteredKeyRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { NextResponse } from 'next/server';
-import { getAddress } from 'viem';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const address = url.searchParams.get('address');
-  if (!address || typeof address !== 'string' || address.trim().length === 0) {
-    return NextResponse.json({ success: false, error: 'Missing address' }, { status: 400 });
-  }
+  const rawIdentity = url.searchParams.get('identity') ?? url.searchParams.get('address');
+  const identity =
+    rawIdentity && rawIdentity.trim().length > 0 ? parseIdentityKey(rawIdentity) : null;
+  const clerkIdentity = identity ? null : await getClerkIdentityKey();
+  const resolvedIdentity = identity ?? clerkIdentity;
 
-  let normalized: string;
-  try {
-    normalized = getAddress(address);
-  } catch {
-    return NextResponse.json({ success: false, error: 'Invalid address' }, { status: 400 });
+  if (!resolvedIdentity) {
+    return NextResponse.json({ success: false, error: 'Missing identity' }, { status: 400 });
   }
 
   try {
     const ratio1 = createEdgeSdk();
-  	const key = normalized.toLowerCase();
+    const keysToCheck = [resolvedIdentity.storageKey, ...resolvedIdentity.legacyKeys];
     let record: RegisteredKeyRecord | null = null;
-    try {
-      const value = await ratio1.cstore.hget({
-        hkey: REGISTERED_KEYS_CSTORE_HKEY,
-        key,
-      });
-      record = parseRegisteredKeyRecord(value);
-    } catch (error) {
-      console.warn('[keys] hget failed', error);
+    for (const key of keysToCheck) {
+      try {
+        const value = await ratio1.cstore.hget({
+          hkey: REGISTERED_KEYS_CSTORE_HKEY,
+          key,
+        });
+        record = parseRegisteredKeyRecord(value);
+        if (record) break;
+      } catch (error) {
+        console.warn('[keys] hget failed', error);
+      }
     }
 
     return NextResponse.json({
       success: true,
-      address: normalized,
+      identity: resolvedIdentity.value,
+      identityKey: resolvedIdentity.storageKey,
       record,
       hasKey: Boolean(record),
       keyType: record?.type ?? null,

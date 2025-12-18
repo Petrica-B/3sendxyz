@@ -5,9 +5,9 @@ import { useAuthStatus } from '@/lib/useAuthStatus';
 import Link from 'next/link';
 
 export default function PricingCta() {
-  const { authMethod, canUseWallet } = useAuthStatus();
+  const { isLoggedIn, identityValue, authMethod } = useAuthStatus();
 
-  if (canUseWallet) {
+  if (isLoggedIn && identityValue) {
     return (
       <div
         className="card"
@@ -28,29 +28,7 @@ export default function PricingCta() {
     );
   }
 
-  if (authMethod === 'clerk') {
-    return (
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <div style={{ fontWeight: 700 }}>Email login active</div>
-          <div className="muted" style={{ fontSize: 12 }}>
-            To use a wallet instead, sign out of email login first.
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (authMethod === 'mixed') {
+  if (isLoggedIn && !identityValue && authMethod === 'mixed') {
     return (
       <div
         className="card"
@@ -65,7 +43,7 @@ export default function PricingCta() {
         <div>
           <div style={{ fontWeight: 700 }}>Multiple logins active</div>
           <div className="muted" style={{ fontSize: 12 }}>
-            Disconnect one login method to continue.
+            Sign out of one login method to continue.
           </div>
         </div>
       </div>

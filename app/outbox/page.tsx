@@ -11,15 +11,13 @@ import { LoginButton } from '@/components/LoginButton';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { formatUnits } from 'viem';
-import { useAccount } from 'wagmi';
 
 type SentItem = StoredUploadRecord & { id: string };
 
 const makeRecordId = (record: StoredUploadRecord) => `${record.txHash}:${record.recipient}`;
 
 export default function OutboxPage() {
-  const { authMethod, canUseWallet, isLoggedIn } = useAuthStatus();
-  const { address } = useAccount();
+  const { authMethod, isLoggedIn, identityValue } = useAuthStatus();
   const [records, setRecords] = useState<SentItem[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
@@ -28,7 +26,7 @@ export default function OutboxPage() {
   const pageSize = 10;
 
   const fetchSent = useCallback(async () => {
-    if (!canUseWallet || !address) {
+    if (!isLoggedIn || !identityValue) {
       setRecords([]);
       setExpanded({});
       return;
@@ -36,7 +34,7 @@ export default function OutboxPage() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ initiator: address });
+      const params = new URLSearchParams({ initiator: identityValue });
       const res = await fetch(`/api/sent?${params.toString()}`);
       const payload = await res.json().catch(() => null);
       if (!res.ok || !payload?.success) {
@@ -57,7 +55,7 @@ export default function OutboxPage() {
     } finally {
       setLoading(false);
     }
-  }, [canUseWallet, address]);
+  }, [isLoggedIn, identityValue]);
 
   useEffect(() => {
     fetchSent();
@@ -85,23 +83,26 @@ export default function OutboxPage() {
     setPage(1);
   }, [records]);
 
-  if (!canUseWallet) {
+  if (!isLoggedIn) {
     return (
       <main className="col" style={{ gap: 16 }}>
         <div className="hero">
           <div className="headline">Outbox</div>
-          <div className="subhead">
-            {authMethod === 'clerk'
-              ? 'Email login is active. Sign out to connect a wallet.'
-              : authMethod === 'mixed'
-                ? 'Multiple logins active. Disconnect one to continue.'
-                : 'Log in to see sent files.'}
+          <div className="subhead">Log in to see sent files.</div>
+          <div style={{ marginTop: 12 }}>
+            <LoginButton />
           </div>
-          {!isLoggedIn && (
-            <div style={{ marginTop: 12 }}>
-              <LoginButton />
-            </div>
-          )}
+        </div>
+      </main>
+    );
+  }
+
+  if (!identityValue && authMethod === 'mixed') {
+    return (
+      <main className="col" style={{ gap: 16 }}>
+        <div className="hero">
+          <div className="headline">Outbox</div>
+          <div className="subhead">Multiple logins active. Sign out of one to continue.</div>
         </div>
       </main>
     );
@@ -111,7 +112,7 @@ export default function OutboxPage() {
     <main className="col" style={{ gap: 24 }}>
       <div className="hero">
         <div className="headline">Outbox</div>
-        <div className="subhead">Files sent from your wallet.</div>
+        <div className="subhead">Files you sent.</div>
       </div>
 
       <section className="col" style={{ gap: 12 }}>
@@ -152,7 +153,7 @@ export default function OutboxPage() {
                     {expanded[item.id] && (
                       <div className="details mono" style={{ fontSize: 12 }}>
                         <div className="col" style={{ gap: 6 }}>
-                          <WalletIdentityCard label="To" address={item.recipient} />
+                          <WalletIdentityCard label="To" identity={item.recipient} />
                         </div>
                         <div style={{ marginTop: 10 }}>
                           tx:{' '}

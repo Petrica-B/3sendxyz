@@ -1,3 +1,4 @@
+import { jsonWithServer } from '@/lib/api';
 import {
   FILE_CLEANUP_INDEX_CSTORE_HKEY,
   RECEIVED_FILES_CSTORE_HKEY,
@@ -16,8 +17,9 @@ import { PLATFORM_STATS_CACHE_TAG, updateStatsAfterUpload } from '@/lib/stats';
 import { createStepTimers } from '@/lib/timers';
 import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
+import Busboy from 'busboy';
 import { revalidateTag } from 'next/cache';
-import { jsonWithServer } from '@/lib/api';
+import { PassThrough, Readable } from 'node:stream';
 import {
   createPublicClient,
   decodeEventLog,
@@ -44,95 +46,191 @@ function getRpcUrl(chainId: number): { chain: Chain; rpcUrl: string } | null {
   return { chain, rpcUrl };
 }
 
+type MultipartFile = {
+  stream: NodeJS.ReadableStream;
+  filename: string;
+  mimeType: string;
+};
+
+type ParsedMultipart = {
+  fields: Record<string, string>;
+  file: MultipartFile;
+  finished: Promise<void>;
+};
+
+async function parseMultipartRequest(request: Request): Promise<ParsedMultipart> {
+  const contentType = request.headers.get('content-type') ?? '';
+  if (!contentType.toLowerCase().includes('multipart/form-data')) {
+    throw new Error('Expected multipart/form-data');
+  }
+
+  const body = request.body;
+  if (!body) {
+    throw new Error('Missing request body');
+  }
+
+  const fields: Record<string, string> = {};
+  let fileFound = false;
+  let resolveFile: (file: MultipartFile) => void = () => {};
+  let rejectFile: (error: Error) => void = () => {};
+  let resolveFinished: () => void = () => {};
+  let rejectFinished: (error: Error) => void = () => {};
+
+  const filePromise = new Promise<MultipartFile>((resolve, reject) => {
+    resolveFile = resolve;
+    rejectFile = reject;
+  });
+
+  const finished = new Promise<void>((resolve, reject) => {
+    resolveFinished = resolve;
+    rejectFinished = reject;
+  });
+
+  const busboy = Busboy({ headers: Object.fromEntries(request.headers) });
+
+  busboy.on('field', (name, value) => {
+    if (typeof value === 'string') {
+      fields[name] = value;
+    }
+  });
+
+  busboy.on('file', (name, stream, info) => {
+    if (name !== 'file') {
+      stream.resume();
+      return;
+    }
+    if (fileFound) {
+      stream.resume();
+      return;
+    }
+    fileFound = true;
+    stream.pause();
+    resolveFile({
+      stream,
+      filename: info?.filename || 'file',
+      mimeType: info?.mimeType || 'application/octet-stream',
+    });
+  });
+
+  busboy.on('error', (error) => {
+    rejectFile(error as Error);
+    rejectFinished(error as Error);
+  });
+
+  busboy.on('finish', () => {
+    if (!fileFound) {
+      const error = new Error('Missing file');
+      rejectFile(error);
+      rejectFinished(error);
+      return;
+    }
+    resolveFinished();
+  });
+
+  const nodeStream = Readable.fromWeb(body as any);
+  nodeStream.on('error', (error) => {
+    rejectFile(error);
+    rejectFinished(error);
+  });
+  nodeStream.pipe(busboy);
+
+  const file = await filePromise;
+  return { fields, file, finished };
+}
+
+async function drainFileStream(
+  stream: NodeJS.ReadableStream,
+  finished: Promise<void>
+): Promise<void> {
+  stream.on('error', () => {});
+  stream.resume();
+  stream.on('data', () => {});
+  try {
+    await finished;
+  } catch {}
+}
+
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
+  const timers = createStepTimers();
+  const endInitialVerification = timers.start('initialVerification');
+  let parsedMultipart: ParsedMultipart | null = null;
+  let uploadStarted = false;
+
   try {
-    const timers = createStepTimers();
-    const endInitialVerification = timers.start('initialVerification');
+    parsedMultipart = await parseMultipartRequest(request);
+    const { fields, file, finished } = parsedMultipart;
+    const recipient = fields.recipient;
+    const initiator = fields.initiator;
+    const note = fields.note;
+    const handshakeMessageRaw = fields.handshakeMessage;
+    const signatureRaw = fields.signature;
+    const sentAtRaw = fields.sentAt;
+    const paymentTxHashRaw = fields.paymentTxHash;
+    const paymentAssetRaw = fields.paymentAsset;
+    const paymentTypeRaw = fields.paymentType;
+    const chainIdRaw = fields.chainId;
+    const tierIdRaw = fields.tierId;
+    const originalSizeRaw = fields.originalSize;
+    const originalFilenameRaw = fields.originalFilename;
+    const originalMimeTypeRaw = fields.originalMimeType;
+    const encryptionRaw = fields.encryption;
 
-    const formData = await request.formData();
-    const file = formData.get('file');
-    const recipient = formData.get('recipient');
-    const initiator = formData.get('initiator');
-    const note = formData.get('note');
-    const handshakeMessageRaw = formData.get('handshakeMessage');
-    const signatureRaw = formData.get('signature');
-    const sentAtRaw = formData.get('sentAt');
-    const paymentTxHashRaw = formData.get('paymentTxHash');
-    const paymentAssetRaw = formData.get('paymentAsset');
-    const paymentTypeRaw = formData.get('paymentType');
-    const chainIdRaw = formData.get('chainId');
-    const tierIdRaw = formData.get('tierId');
-    const originalSizeRaw = formData.get('originalSize');
-    const originalFilenameRaw = formData.get('originalFilename');
-    const originalMimeTypeRaw = formData.get('originalMimeType');
-    const encryptionRaw = formData.get('encryption');
-
-    if (!(file instanceof File)) {
-      return jsonWithServer({ success: false, error: 'Missing file' }, { status: 400 });
-    }
+    const fail = (message: string, status = 400) => {
+      if (!uploadStarted) {
+        file.stream.on('error', () => {});
+        file.stream.on('data', () => {});
+        file.stream.resume();
+      }
+      return jsonWithServer({ success: false, error: message }, { status });
+    };
 
     if (typeof recipient !== 'string' || recipient.trim().length === 0) {
-      return jsonWithServer({ success: false, error: 'Missing recipient' }, { status: 400 });
+      return fail('Missing recipient', 400);
     }
 
     const recipientAddress = recipient.trim();
     if (!isAddress(recipientAddress)) {
-      return jsonWithServer(
-        { success: false, error: 'Invalid recipient address' },
-        { status: 400 }
-      );
+      return fail('Invalid recipient address', 400);
     }
 
     if (typeof initiator !== 'string' || initiator.trim().length === 0) {
-      return jsonWithServer({ success: false, error: 'Missing initiator' }, { status: 400 });
+      return fail('Missing initiator', 400);
     }
 
     const initiatorAddress = initiator.trim();
     if (!isAddress(initiatorAddress)) {
-      return jsonWithServer(
-        { success: false, error: 'Invalid initiator address' },
-        { status: 400 }
-      );
+      return fail('Invalid initiator address', 400);
     }
 
     if (typeof handshakeMessageRaw !== 'string' || handshakeMessageRaw.trim().length === 0) {
-      return jsonWithServer(
-        { success: false, error: 'Missing handshakeMessage' },
-        { status: 400 }
-      );
+      return fail('Missing handshakeMessage', 400);
     }
 
     if (typeof signatureRaw !== 'string' || signatureRaw.trim().length === 0) {
-      return jsonWithServer({ success: false, error: 'Missing signature' }, { status: 400 });
+      return fail('Missing signature', 400);
     }
 
     if (!signatureRaw.trim().startsWith('0x')) {
-      return jsonWithServer(
-        { success: false, error: 'Invalid signature format' },
-        { status: 400 }
-      );
+      return fail('Invalid signature format', 400);
     }
 
     if (typeof paymentTxHashRaw !== 'string' || paymentTxHashRaw.trim().length === 0) {
-      return jsonWithServer({ success: false, error: 'Missing paymentTxHash' }, { status: 400 });
+      return fail('Missing paymentTxHash', 400);
     }
     const paymentTxHashProvided = paymentTxHashRaw.trim().toLowerCase();
 
     const handshakeMessage = handshakeMessageRaw.replace(/\r\n/g, '\n').trim();
     if (handshakeMessage.length === 0) {
-      return jsonWithServer(
-        { success: false, error: 'Missing handshakeMessage' },
-        { status: 400 }
-      );
+      return fail('Missing handshakeMessage', 400);
     }
     const signature = signatureRaw.trim() as `0x${string}`;
     const paymentTxHash = paymentTxHashProvided;
 
     const chainId = typeof chainIdRaw === 'string' ? Number(chainIdRaw) : Number(chainIdRaw ?? NaN);
     if (!Number.isInteger(chainId) || chainId <= 0) {
-      return jsonWithServer({ success: false, error: 'Missing chainId' }, { status: 400 });
+      return fail('Missing chainId', 400);
     }
 
     let parsedOriginalSize: number | null = null;
@@ -147,20 +245,6 @@ export async function POST(request: Request) {
       originalSizeRaw > 0
     ) {
       parsedOriginalSize = Math.floor(originalSizeRaw);
-    }
-
-    const effectiveFileSize = parsedOriginalSize ?? file.size;
-
-    const expectedTier = resolveTierBySize(effectiveFileSize);
-    if (!expectedTier) {
-      return jsonWithServer(
-        { success: false, error: 'File exceeds maximum allowed size' },
-        { status: 400 }
-      );
-    }
-
-    if (typeof tierIdRaw === 'string' && Number(tierIdRaw) !== expectedTier.id) {
-      return jsonWithServer({ success: false, error: 'Tier mismatch' }, { status: 400 });
     }
 
     let encryptionMetadata: EncryptionMetadata | undefined;
@@ -181,40 +265,45 @@ export async function POST(request: Request) {
         }
         encryptionMetadata = parsed;
       } catch {
-        return jsonWithServer(
-          { success: false, error: 'Invalid encryption metadata' },
-          { status: 400 }
-        );
+        return fail('Invalid encryption metadata', 400);
       }
     }
 
     if (!encryptionMetadata) {
-      return jsonWithServer(
-        { success: false, error: 'Missing encryption metadata' },
-        { status: 400 }
-      );
+      return fail('Missing encryption metadata', 400);
     }
 
-    if (
+    const metadataPlaintextLength =
       Number.isFinite(encryptionMetadata.plaintextLength) &&
-      (encryptionMetadata.plaintextLength as number) > 0 &&
-      Math.floor(encryptionMetadata.plaintextLength as number) !== effectiveFileSize
-    ) {
-      return jsonWithServer(
-        { success: false, error: 'Plaintext size mismatch' },
-        { status: 400 }
-      );
+      (encryptionMetadata.plaintextLength as number) > 0
+        ? Math.floor(encryptionMetadata.plaintextLength as number)
+        : undefined;
+    const metadataCiphertextLength =
+      Number.isFinite(encryptionMetadata.ciphertextLength) &&
+      (encryptionMetadata.ciphertextLength as number) > 0
+        ? Math.floor(encryptionMetadata.ciphertextLength as number)
+        : undefined;
+
+    const effectiveFileSize = parsedOriginalSize ?? metadataPlaintextLength;
+    if (!effectiveFileSize || !Number.isFinite(effectiveFileSize) || effectiveFileSize <= 0) {
+      return fail('Missing original size', 400);
+    }
+
+    const expectedTier = resolveTierBySize(effectiveFileSize);
+    if (!expectedTier) {
+      return fail('File exceeds maximum allowed size', 400);
+    }
+
+    if (typeof tierIdRaw === 'string' && Number(tierIdRaw) !== expectedTier.id) {
+      return fail('Tier mismatch', 400);
     }
 
     if (
-      Number.isFinite(encryptionMetadata.ciphertextLength) &&
-      (encryptionMetadata.ciphertextLength as number) > 0 &&
-      Math.floor(encryptionMetadata.ciphertextLength as number) !== file.size
+      Number.isFinite(metadataPlaintextLength) &&
+      (metadataPlaintextLength as number) > 0 &&
+      Math.floor(metadataPlaintextLength as number) !== effectiveFileSize
     ) {
-      return jsonWithServer(
-        { success: false, error: 'Ciphertext size mismatch' },
-        { status: 400 }
-      );
+      return fail('Plaintext size mismatch', 400);
     }
 
     const originalFilename =
@@ -245,68 +334,54 @@ export async function POST(request: Request) {
       parsedHandshake = parseSendHandshakeMessage(handshakeMessage);
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'invalid format';
-      return jsonWithServer(
-        { success: false, error: `Invalid handshake message: ${detail}` },
-        { status: 400 }
-      );
+      return fail(`Invalid handshake message: ${detail}`, 400);
+    }
+
+    if (
+      typeof metadataCiphertextLength === 'number' &&
+      metadataCiphertextLength > 0 &&
+      parsedHandshake.ciphertextBytes !== metadataCiphertextLength
+    ) {
+      return fail('Handshake ciphertext size mismatch', 400);
+    }
+
+    const expectedCiphertextBytes =
+      typeof metadataCiphertextLength === 'number' && metadataCiphertextLength > 0
+        ? metadataCiphertextLength
+        : parsedHandshake.ciphertextBytes;
+    if (!Number.isFinite(expectedCiphertextBytes) || expectedCiphertextBytes <= 0) {
+      return fail('Missing ciphertext size', 400);
     }
 
     if (parsedHandshake.sender !== initiatorAddr) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake sender mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake sender mismatch', 400);
     }
     if (parsedHandshake.recipient !== recipientKey) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake recipient mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake recipient mismatch', 400);
     }
     if (parsedHandshake.chainId !== chainId) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake chain mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake chain mismatch', 400);
     }
     if (parsedHandshake.paymentTxHash !== paymentTxHash) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake payment hash mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake payment hash mismatch', 400);
     }
     if (parsedHandshake.tierId !== expectedTier.id) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake tier mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake tier mismatch', 400);
     }
     if (parsedHandshake.plaintextBytes !== effectiveFileSize) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake plaintext size mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake plaintext size mismatch', 400);
     }
-    if (parsedHandshake.ciphertextBytes !== file.size) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake ciphertext size mismatch' },
-        { status: 400 }
-      );
+    if (parsedHandshake.ciphertextBytes !== expectedCiphertextBytes) {
+      return fail('Handshake ciphertext size mismatch', 400);
     }
 
     const expectedMetadataDigest = computeEncryptionMetadataDigest(encryptionMetadata);
     if (parsedHandshake.metadataDigest !== expectedMetadataDigest) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake metadata mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake metadata mismatch', 400);
     }
 
     if (parsedHandshake.sentAtMs !== sentTimestampCandidate) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake timestamp mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake timestamp mismatch', 400);
     }
     sentTimestamp = parsedHandshake.sentAtMs;
 
@@ -318,16 +393,13 @@ export async function POST(request: Request) {
       sentAt: sentTimestamp,
       tierId: expectedTier.id,
       plaintextBytes: effectiveFileSize,
-      ciphertextBytes: file.size,
-      originalFilename: originalFilename ?? file.name,
+      ciphertextBytes: expectedCiphertextBytes,
+      originalFilename: originalFilename ?? file.filename,
       encryption: encryptionMetadata,
     });
 
     if (expectedHandshakeMessage !== handshakeMessage) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake message mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake message mismatch', 400);
     }
 
     const normalizedPaymentType =
@@ -341,24 +413,15 @@ export async function POST(request: Request) {
     const isFreePayment = isFreePaymentReference(paymentTxHash);
 
     if (!isFreePayment && normalizedPaymentType === 'FREE') {
-      return jsonWithServer(
-        { success: false, error: 'Payment type mismatch for paid transfer' },
-        { status: 400 }
-      );
+      return fail('Payment type mismatch for paid transfer', 400);
     }
 
     if (isFreePayment && !isMicroTier(expectedTier.id)) {
-      return jsonWithServer(
-        { success: false, error: 'Free micro-sends only apply to the smallest tier' },
-        { status: 400 }
-      );
+      return fail('Free micro-sends only apply to the smallest tier', 400);
     }
 
     if (!isFreePayment && !paymentTxHash.startsWith('0x')) {
-      return jsonWithServer(
-        { success: false, error: 'Invalid paymentTxHash for paid transfer' },
-        { status: 400 }
-      );
+      return fail('Invalid paymentTxHash for paid transfer', 400);
     }
 
     if (isFreePayment) {
@@ -367,7 +430,7 @@ export async function POST(request: Request) {
 
     const rpcDetails = getRpcUrl(chainId);
     if (!rpcDetails) {
-      return jsonWithServer({ success: false, error: 'Unsupported chain' }, { status: 400 });
+      return fail('Unsupported chain', 400);
     }
 
     const { chain, rpcUrl } = rpcDetails;
@@ -394,10 +457,7 @@ export async function POST(request: Request) {
     endSignatureVerification();
 
     if (!signatureVerified) {
-      return jsonWithServer(
-        { success: false, error: 'Handshake signature mismatch' },
-        { status: 400 }
-      );
+      return fail('Handshake signature mismatch', 400);
     }
 
     let eventUsdcAmount = 0n;
@@ -472,10 +532,7 @@ export async function POST(request: Request) {
       endPaymentReuseCheck();
 
       if (existingPaymentUsage) {
-        return jsonWithServer(
-          { success: false, error: 'Payment reference already used for upload' },
-          { status: 400 }
-        );
+        return fail('Payment reference already used for upload', 400);
       }
     } catch (err) {
       console.error('[upload] Failed to check payment hash reuse', err);
@@ -491,26 +548,53 @@ export async function POST(request: Request) {
       } catch (err) {
         const message =
           err instanceof Error && err.message ? err.message : 'Unable to reserve free transfer.';
-        return jsonWithServer({ success: false, error: message }, { status: 400 });
+        return fail(message, 400);
       }
     }
     console.log(`[upload] Starting R1FS upload preparation at ${Date.now()}`);
-    const formDataRequest = new FormData();
-    formDataRequest.append('file', file);
-    formDataRequest.append('filename', file.name);
-    formDataRequest.append('contentType', file.type);
+    const uploadFilename = file.filename || originalFilename || 'file';
+    const uploadContentType = file.mimeType || 'application/octet-stream';
+    const passThrough = new PassThrough();
+    let ciphertextBytes = 0;
+    passThrough.on('data', (chunk) => {
+      ciphertextBytes += chunk.length;
+    });
+    file.stream.on('error', (error) => {
+      passThrough.destroy(error);
+    });
     console.log(`[upload] Completed R1FS upload preparation at ${Date.now()}`);
     const endR1fsUpload = timers.start('r1fsUpload');
     console.log(`[upload] Starting R1FS upload at ${Date.now()}`);
-    const uploadResult = await ratio1.r1fs.addFile({
-      formData: formDataRequest,
+    uploadStarted = true;
+    const uploadPromise = ratio1.r1fs.addFile({
+      file: passThrough,
+      filename: uploadFilename,
+      contentType: uploadContentType,
       secret: recipientKey,
     });
+    file.stream.pipe(passThrough);
+    file.stream.resume();
+    let uploadResult;
+    try {
+      uploadResult = await uploadPromise;
+    } catch (err) {
+      passThrough.destroy(err as Error);
+      throw err;
+    }
     console.log(`[upload] Completed R1FS upload at ${Date.now()}`);
     endR1fsUpload();
+    await finished;
     const cid = uploadResult.cid;
     if (!cid) {
       throw new Error('Failed to store file in R1FS: ' + JSON.stringify(uploadResult));
+    }
+    if (ciphertextBytes !== expectedCiphertextBytes) {
+      try {
+        await ratio1.r1fs.deleteFile({ cid });
+      } catch (err) {
+        console.error('[upload] Failed to delete mismatched ciphertext', err);
+      }
+      throw new Error('Ciphertext size mismatch');
     }
 
     const hasEncryptedNote =
@@ -523,7 +607,7 @@ export async function POST(request: Request) {
 
     const record: StoredUploadRecord = {
       cid,
-      filename: originalFilename ?? file.name,
+      filename: originalFilename ?? uploadFilename,
       recipient: recipientKey,
       initiator: initiatorAddr,
       note: hasEncryptedNote ? undefined : noteValue,
@@ -535,10 +619,10 @@ export async function POST(request: Request) {
       r1Amount: eventR1Amount.toString(),
       paymentType: isFreePayment ? 'free' : 'paid',
       paymentAsset,
-      originalFilename: originalFilename ?? file.name,
+      originalFilename: originalFilename ?? uploadFilename,
       originalMimeType,
       originalFilesize: parsedOriginalSize ?? undefined,
-      encryptedFilesize: file.size,
+      encryptedFilesize: ciphertextBytes,
       encryption: encryptionMetadata,
     };
 
@@ -612,6 +696,9 @@ export async function POST(request: Request) {
       timings: timers.timings,
     });
   } catch (error) {
+    if (parsedMultipart && !uploadStarted) {
+      await drainFileStream(parsedMultipart.file.stream, parsedMultipart.finished);
+    }
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[upload] Failed to process upload', error);
     const lower = message.toLowerCase();

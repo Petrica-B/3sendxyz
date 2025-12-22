@@ -827,7 +827,6 @@ export function SendFileCard() {
 
       setStatus('Uploading encrypted file…');
       const formData = new FormData();
-      formData.append('file', encryptedFile);
       formData.append('initiator', address);
       formData.append('recipient', recipientAddress);
       formData.append('handshakeMessage', handshakeMsg);
@@ -842,6 +841,7 @@ export function SendFileCard() {
       formData.append('originalMimeType', originalMimeType);
       formData.append('originalSize', String(originalSize));
       formData.append('encryption', JSON.stringify(encryptionMetadata));
+      formData.append('file', encryptedFile);
 
       const response = await fetch('/api/send/upload', {
         method: 'POST',

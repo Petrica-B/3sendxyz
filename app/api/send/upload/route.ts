@@ -628,6 +628,7 @@ export async function POST(request: Request) {
 
     const recordJson = JSON.stringify(record);
 
+    const endCstoreWrites = timers.start('cstoreWrites');
     await Promise.all([
       async () => {
         const endCstoreWriteReceived = timers.start('cstoreWriteReceived');
@@ -663,6 +664,7 @@ export async function POST(request: Request) {
         endCstoreWritePaymentUsed();
       },
     ]);
+    endCstoreWrites();
 
     const endStatsUpdate = timers.start('statsUpdate'); //TODO add more detailed timers inside
     try {

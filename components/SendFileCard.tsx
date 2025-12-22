@@ -73,6 +73,7 @@ export function SendFileCard() {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [paymentAsset, setPaymentAsset] = useState<PaymentAsset>('R1');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -605,6 +606,55 @@ export function SendFileCard() {
     return map;
   }, [ethDisplay, ethMaxDisplay, quoteDataForDisplay, r1Display, r1MaxDisplay, usdcDisplay]);
 
+  const uploadEncryptedFile = useCallback(
+    async (formData: FormData) => {
+      return await new Promise<unknown>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/send/upload');
+        xhr.responseType = 'json';
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return;
+          const percent = Math.max(
+            0,
+            Math.min(100, Math.round((event.loaded / event.total) * 100))
+          );
+          setUploadProgress(percent);
+        };
+        xhr.onload = () => {
+          const response =
+            xhr.response ??
+            (() => {
+              try {
+                return JSON.parse(xhr.responseText);
+              } catch {
+                return null;
+              }
+            })();
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(response);
+            return;
+          }
+          const message =
+            response &&
+            typeof response === 'object' &&
+            'error' in response &&
+            typeof (response as { error?: unknown }).error === 'string'
+              ? (response as { error?: string }).error
+              : '';
+          reject(new Error(message || `Upload failed with status ${xhr.status}.`));
+        };
+        xhr.onerror = () => {
+          reject(new Error('Upload failed due to a network error.'));
+        };
+        xhr.onabort = () => {
+          reject(new Error('Upload was cancelled.'));
+        };
+        xhr.send(formData);
+      });
+    },
+    [setUploadProgress]
+  );
+
   const onSend = useCallback(async () => {
     if (!address || !file || !recipientAddress) return;
     const selectedFile = file;
@@ -618,6 +668,7 @@ export function SendFileCard() {
     const usingFreeSend = useFreeSend && freeSendEligible;
     setSending(true);
     setStatus(usingFreeSend ? 'Reserving free send…' : 'Preparing payment…');
+    setUploadProgress(null);
     try {
       if (!MANAGER_CONTRACT_ADDRESS) {
         throw new Error('Manager contract address is not configured.');
@@ -826,6 +877,7 @@ export function SendFileCard() {
       const signature = await signMessageAsync({ message: handshakeMsg });
 
       setStatus('Uploading encrypted file…');
+      setUploadProgress(0);
       const formData = new FormData();
       formData.append('initiator', address);
       formData.append('recipient', recipientAddress);
@@ -843,13 +895,13 @@ export function SendFileCard() {
       formData.append('encryption', JSON.stringify(encryptionMetadata));
       formData.append('file', encryptedFile);
 
-      const response = await fetch('/api/send/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || `Upload failed with status ${response.status}.`);
+      const uploadResult = await uploadEncryptedFile(formData);
+      const payload =
+        uploadResult && typeof uploadResult === 'object'
+          ? (uploadResult as { success?: boolean; error?: string })
+          : null;
+      if (!payload?.success) {
+        throw new Error(payload?.error || 'Upload failed.');
       }
 
       setFile(null);
@@ -887,6 +939,7 @@ export function SendFileCard() {
       setStatus(null);
     } finally {
       setSending(false);
+      setUploadProgress(null);
     }
   }, [
     address,
@@ -911,6 +964,7 @@ export function SendFileCard() {
     paymentAsset,
     waitForTransaction,
     writeContractAsync,
+    uploadEncryptedFile,
   ]);
 
   const statusLabel = status ?? 'Processing…';
@@ -1398,7 +1452,7 @@ export function SendFileCard() {
         </div>
       )}
       {file && (
-        <div className="col" style={{ alignItems: 'flex-end', gap: 6 }}>
+        <div className="col" style={{ alignItems: 'stretch', gap: 10 }}>
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <button
               className="button"
@@ -1410,6 +1464,37 @@ export function SendFileCard() {
               {buttonContent}
             </button>
           </div>
+          {uploadProgress !== null && (
+            <div className="col" style={{ gap: 6 }}>
+              <div className="row" style={{ justifyContent: 'space-between', fontSize: 12 }}>
+                <span className="muted">Uploading…</span>
+                <span className="muted mono">{uploadProgress}%</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label="Upload progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={uploadProgress}
+                style={{
+                  width: '100%',
+                  height: 6,
+                  borderRadius: 999,
+                  background: 'rgba(148, 163, 184, 0.35)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    width: `${uploadProgress}%`,
+                    height: '100%',
+                    background: 'var(--accent)',
+                    transition: 'width 150ms ease',
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

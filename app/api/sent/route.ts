@@ -1,7 +1,7 @@
 import { SENT_FILES_CSTORE_HKEY } from '@/lib/constants';
 import type { StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { NextResponse } from 'next/server';
+import { jsonWithServer } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   const initiator = url.searchParams.get('initiator');
 
   if (!initiator) {
-    return NextResponse.json({ success: false, error: 'Missing initiator' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Missing initiator' }, { status: 400 });
   }
 
   try {
@@ -56,10 +56,10 @@ export async function GET(request: Request) {
     const filtered = parsedRecords.filter((record) => record.initiator === initiatorLc);
     filtered.sort((a, b) => b.sentAt - a.sentAt);
 
-    return NextResponse.json({ success: true, records: filtered });
+    return jsonWithServer({ success: true, records: filtered });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[sent] Failed to list sent files', error);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return jsonWithServer({ success: false, error: message }, { status: 500 });
   }
 }

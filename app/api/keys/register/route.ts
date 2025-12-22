@@ -6,7 +6,7 @@ import type {
   RegisteredSeedRecord,
 } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { NextResponse } from 'next/server';
+import { jsonWithServer } from '@/lib/api';
 import { Buffer } from 'node:buffer';
 import { getAddress, isHex, recoverMessageAddress } from 'viem';
 
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as RegisterBody;
   } catch {
-    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 
   const {
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     derivationPath,
   } = body ?? {};
   if (!address || typeof address !== 'string' || address.trim().length === 0) {
-    return NextResponse.json({ success: false, error: 'Missing address' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Missing address' }, { status: 400 });
   }
   if (
     !signature ||
@@ -80,10 +80,10 @@ export async function POST(request: Request) {
     signature.trim().length === 0 ||
     !isHex(signature)
   ) {
-    return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Invalid signature' }, { status: 400 });
   }
   if (!message || typeof message !== 'string' || message.trim().length === 0) {
-    return NextResponse.json({ success: false, error: 'Missing message' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Missing message' }, { status: 400 });
   }
 
   const normalizedType = typeof type === 'string' ? type.toLowerCase().trim() : '';
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   try {
     normalized = getAddress(address);
   } catch {
-    return NextResponse.json({ success: false, error: 'Invalid address' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Invalid address' }, { status: 400 });
   }
 
   const labelValue = sanitizeLabel(label);
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
 
   if (keyType === 'passkey') {
     if (!credentialId || typeof credentialId !== 'string' || credentialId.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Missing credentialId' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing credentialId' }, { status: 400 });
     }
     const keyPublicCandidate =
       typeof passkeyPublicKey === 'string' && passkeyPublicKey.trim().length > 0
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
             : null;
 
     if (!keyPublicCandidate) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Missing passkey public key' },
         { status: 400 }
       );
@@ -123,23 +123,23 @@ export async function POST(request: Request) {
     const normalizedKey = keyPublicCandidate.trim();
 
     if (!prfSalt || typeof prfSalt !== 'string' || prfSalt.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Missing prfSalt' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing prfSalt' }, { status: 400 });
     }
 
     if (!isBase64(credentialId)) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'credentialId must be base64 encoded' },
         { status: 400 }
       );
     }
     if (!isBase64(normalizedKey)) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'passkey public key must be base64 encoded' },
         { status: 400 }
       );
     }
     if (!isBase64(prfSalt)) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'prfSalt must be base64 encoded' },
         { status: 400 }
       );
@@ -153,20 +153,20 @@ export async function POST(request: Request) {
       publicKeyBuf = Buffer.from(normalizedKey, 'base64');
       prfSaltBuf = Buffer.from(prfSalt, 'base64');
     } catch {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Failed to decode credential payload' },
         { status: 400 }
       );
     }
 
     if (credentialIdBuf.length === 0) {
-      return NextResponse.json({ success: false, error: 'credentialId is empty' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'credentialId is empty' }, { status: 400 });
     }
     if (publicKeyBuf.length === 0) {
-      return NextResponse.json({ success: false, error: 'publicKey is empty' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'publicKey is empty' }, { status: 400 });
     }
     if (prfSaltBuf.length === 0) {
-      return NextResponse.json({ success: false, error: 'prfSalt is empty' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'prfSalt is empty' }, { status: 400 });
     }
 
     keyPublicBase64 = normalizedKey;
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
             : null;
 
     if (!keyPublicCandidate) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Missing seed public key' },
         { status: 400 }
       );
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
     const normalizedKey = keyPublicCandidate.trim();
 
     if (!isBase64(normalizedKey)) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'seed public key must be base64 encoded' },
         { status: 400 }
       );
@@ -212,14 +212,14 @@ export async function POST(request: Request) {
     try {
       publicKeyBuf = Buffer.from(normalizedKey, 'base64');
     } catch {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Failed to decode seed public key' },
         { status: 400 }
       );
     }
 
     if (publicKeyBuf.length === 0) {
-      return NextResponse.json({ success: false, error: 'publicKey is empty' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'publicKey is empty' }, { status: 400 });
     }
 
     keyPublicBase64 = normalizedKey;
@@ -236,7 +236,7 @@ export async function POST(request: Request) {
   }
 
   if (!keyPublicBase64) {
-    return NextResponse.json(
+    return jsonWithServer(
       { success: false, error: 'Missing public key' },
       { status: 400 }
     );
@@ -244,7 +244,7 @@ export async function POST(request: Request) {
 
   const expectedMessage = buildRegisteredKeyMessage(normalized, keyPublicBase64);
   if (message !== expectedMessage) {
-    return NextResponse.json({ success: false, error: 'Unexpected message' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Unexpected message' }, { status: 400 });
   }
 
   try {
@@ -253,14 +253,14 @@ export async function POST(request: Request) {
       signature: signature as `0x${string}`,
     });
     if (getAddress(recovered) !== normalized) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Signature does not match address' },
         { status: 401 }
       );
     }
   } catch (error) {
     console.warn('[passkeys] Failed to recover address from signature', error);
-    return NextResponse.json(
+    return jsonWithServer(
       { success: false, error: 'Failed to validate signature' },
       { status: 400 }
     );
@@ -275,7 +275,7 @@ export async function POST(request: Request) {
       value: JSON.stringify(record),
     });
 
-    return NextResponse.json({
+    return jsonWithServer({
       success: true,
       address: normalized,
       record,
@@ -283,6 +283,6 @@ export async function POST(request: Request) {
   } catch (error) {
     const messageText = error instanceof Error ? error.message : 'Unknown error';
     console.error('[keys] Failed to store record', error);
-    return NextResponse.json({ success: false, error: messageText }, { status: 500 });
+    return jsonWithServer({ success: false, error: messageText }, { status: 500 });
   }
 }

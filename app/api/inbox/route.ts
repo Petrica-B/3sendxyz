@@ -1,7 +1,7 @@
 import { RECEIVED_FILES_CSTORE_HKEY } from '@/lib/constants';
 import type { StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { NextResponse } from 'next/server';
+import { jsonWithServer } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   const recipient = url.searchParams.get('recipient');
 
   if (!recipient) {
-    return NextResponse.json({ success: false, error: 'Missing recipient' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Missing recipient' }, { status: 400 });
   }
 
   try {
@@ -54,10 +54,10 @@ export async function GET(request: Request) {
 
     parsedRecords.sort((a, b) => b.sentAt - a.sentAt);
 
-    return NextResponse.json({ success: true, records: parsedRecords });
+    return jsonWithServer({ success: true, records: parsedRecords });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[inbox] Failed to list inbox files', error);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return jsonWithServer({ success: false, error: message }, { status: 500 });
   }
 }

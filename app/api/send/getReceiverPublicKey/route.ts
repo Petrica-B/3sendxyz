@@ -3,7 +3,7 @@ import { parseRegisteredKeyRecord } from '@/lib/passkey';
 import type { RegisteredKeyRecord, VaultKeyRecord } from '@/lib/types';
 import { createVaultRecord, getVaultPrivateKeySecret, parseVaultRecord } from '@/lib/vault';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { NextResponse } from 'next/server';
+import { jsonWithServer } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const address = url.searchParams.get('address');
 
   if (!address || typeof address !== 'string' || address.trim().length === 0) {
-    return NextResponse.json({ success: false, error: 'Missing address' }, { status: 400 });
+    return jsonWithServer({ success: false, error: 'Missing address' }, { status: 400 });
   }
 
   try {
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     }
 
     if (registeredKey?.publicKey) {
-      return NextResponse.json({
+      return jsonWithServer({
         success: true,
         type: registeredKey.type,
         publicKey: registeredKey.publicKey,
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json({
+    return jsonWithServer({
       success: true,
       type: 'vault',
       publicKey: record.publicKey,
@@ -68,6 +68,6 @@ export async function GET(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[vault] Failed to resolve receiver public key', error);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return jsonWithServer({ success: false, error: message }, { status: 500 });
   }
 }

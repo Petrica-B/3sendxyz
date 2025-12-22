@@ -1,6 +1,6 @@
 import { fetchAddressStats, fetchPlatformStats } from '@/lib/stats';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { NextResponse } from 'next/server';
+import { jsonWithServer } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       address ? fetchAddressStats(address, ratio1) : Promise.resolve(null),
     ]);
 
-    return NextResponse.json({
+    return jsonWithServer({
       success: true,
       totals,
       address: addressStats,
@@ -23,6 +23,6 @@ export async function GET(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[stats] Failed to read stats', error);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return jsonWithServer({ success: false, error: message }, { status: 500 });
   }
 }

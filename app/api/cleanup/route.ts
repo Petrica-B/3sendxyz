@@ -1,5 +1,5 @@
 import { runFileCleanup } from '@/lib/cleanup';
-import { NextResponse } from 'next/server';
+import { jsonWithServer } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -18,12 +18,12 @@ function isAuthorized(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    return jsonWithServer({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const result = await runFileCleanup();
-    return NextResponse.json({
+    return jsonWithServer({
       success: true,
       processed: result.processed,
       deleted: result.deleted,
@@ -31,6 +31,6 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[cleanup] API-triggered run failed', error);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return jsonWithServer({ success: false, error: message }, { status: 500 });
   }
 }

@@ -17,7 +17,7 @@ import { createStepTimers } from '@/lib/timers';
 import type { EncryptionMetadata, FileCleanupIndexEntry, StoredUploadRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
 import { revalidateTag } from 'next/cache';
-import { NextResponse } from 'next/server';
+import { jsonWithServer } from '@/lib/api';
 import {
   createPublicClient,
   decodeEventLog,
@@ -70,59 +70,59 @@ export async function POST(request: Request) {
     const encryptionRaw = formData.get('encryption');
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ success: false, error: 'Missing file' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing file' }, { status: 400 });
     }
 
     if (typeof recipient !== 'string' || recipient.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Missing recipient' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing recipient' }, { status: 400 });
     }
 
     const recipientAddress = recipient.trim();
     if (!isAddress(recipientAddress)) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Invalid recipient address' },
         { status: 400 }
       );
     }
 
     if (typeof initiator !== 'string' || initiator.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Missing initiator' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing initiator' }, { status: 400 });
     }
 
     const initiatorAddress = initiator.trim();
     if (!isAddress(initiatorAddress)) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Invalid initiator address' },
         { status: 400 }
       );
     }
 
     if (typeof handshakeMessageRaw !== 'string' || handshakeMessageRaw.trim().length === 0) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Missing handshakeMessage' },
         { status: 400 }
       );
     }
 
     if (typeof signatureRaw !== 'string' || signatureRaw.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Missing signature' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing signature' }, { status: 400 });
     }
 
     if (!signatureRaw.trim().startsWith('0x')) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Invalid signature format' },
         { status: 400 }
       );
     }
 
     if (typeof paymentTxHashRaw !== 'string' || paymentTxHashRaw.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Missing paymentTxHash' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing paymentTxHash' }, { status: 400 });
     }
     const paymentTxHashProvided = paymentTxHashRaw.trim().toLowerCase();
 
     const handshakeMessage = handshakeMessageRaw.replace(/\r\n/g, '\n').trim();
     if (handshakeMessage.length === 0) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Missing handshakeMessage' },
         { status: 400 }
       );
@@ -132,7 +132,7 @@ export async function POST(request: Request) {
 
     const chainId = typeof chainIdRaw === 'string' ? Number(chainIdRaw) : Number(chainIdRaw ?? NaN);
     if (!Number.isInteger(chainId) || chainId <= 0) {
-      return NextResponse.json({ success: false, error: 'Missing chainId' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing chainId' }, { status: 400 });
     }
 
     let parsedOriginalSize: number | null = null;
@@ -153,14 +153,14 @@ export async function POST(request: Request) {
 
     const expectedTier = resolveTierBySize(effectiveFileSize);
     if (!expectedTier) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'File exceeds maximum allowed size' },
         { status: 400 }
       );
     }
 
     if (typeof tierIdRaw === 'string' && Number(tierIdRaw) !== expectedTier.id) {
-      return NextResponse.json({ success: false, error: 'Tier mismatch' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Tier mismatch' }, { status: 400 });
     }
 
     let encryptionMetadata: EncryptionMetadata | undefined;
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
         }
         encryptionMetadata = parsed;
       } catch {
-        return NextResponse.json(
+        return jsonWithServer(
           { success: false, error: 'Invalid encryption metadata' },
           { status: 400 }
         );
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
     }
 
     if (!encryptionMetadata) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Missing encryption metadata' },
         { status: 400 }
       );
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
       (encryptionMetadata.plaintextLength as number) > 0 &&
       Math.floor(encryptionMetadata.plaintextLength as number) !== effectiveFileSize
     ) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Plaintext size mismatch' },
         { status: 400 }
       );
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
       (encryptionMetadata.ciphertextLength as number) > 0 &&
       Math.floor(encryptionMetadata.ciphertextLength as number) !== file.size
     ) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Ciphertext size mismatch' },
         { status: 400 }
       );
@@ -245,50 +245,50 @@ export async function POST(request: Request) {
       parsedHandshake = parseSendHandshakeMessage(handshakeMessage);
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'invalid format';
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: `Invalid handshake message: ${detail}` },
         { status: 400 }
       );
     }
 
     if (parsedHandshake.sender !== initiatorAddr) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake sender mismatch' },
         { status: 400 }
       );
     }
     if (parsedHandshake.recipient !== recipientKey) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake recipient mismatch' },
         { status: 400 }
       );
     }
     if (parsedHandshake.chainId !== chainId) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake chain mismatch' },
         { status: 400 }
       );
     }
     if (parsedHandshake.paymentTxHash !== paymentTxHash) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake payment hash mismatch' },
         { status: 400 }
       );
     }
     if (parsedHandshake.tierId !== expectedTier.id) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake tier mismatch' },
         { status: 400 }
       );
     }
     if (parsedHandshake.plaintextBytes !== effectiveFileSize) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake plaintext size mismatch' },
         { status: 400 }
       );
     }
     if (parsedHandshake.ciphertextBytes !== file.size) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake ciphertext size mismatch' },
         { status: 400 }
       );
@@ -296,14 +296,14 @@ export async function POST(request: Request) {
 
     const expectedMetadataDigest = computeEncryptionMetadataDigest(encryptionMetadata);
     if (parsedHandshake.metadataDigest !== expectedMetadataDigest) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake metadata mismatch' },
         { status: 400 }
       );
     }
 
     if (parsedHandshake.sentAtMs !== sentTimestampCandidate) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake timestamp mismatch' },
         { status: 400 }
       );
@@ -324,7 +324,7 @@ export async function POST(request: Request) {
     });
 
     if (expectedHandshakeMessage !== handshakeMessage) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake message mismatch' },
         { status: 400 }
       );
@@ -341,21 +341,21 @@ export async function POST(request: Request) {
     const isFreePayment = isFreePaymentReference(paymentTxHash);
 
     if (!isFreePayment && normalizedPaymentType === 'FREE') {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Payment type mismatch for paid transfer' },
         { status: 400 }
       );
     }
 
     if (isFreePayment && !isMicroTier(expectedTier.id)) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Free micro-sends only apply to the smallest tier' },
         { status: 400 }
       );
     }
 
     if (!isFreePayment && !paymentTxHash.startsWith('0x')) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Invalid paymentTxHash for paid transfer' },
         { status: 400 }
       );
@@ -367,7 +367,7 @@ export async function POST(request: Request) {
 
     const rpcDetails = getRpcUrl(chainId);
     if (!rpcDetails) {
-      return NextResponse.json({ success: false, error: 'Unsupported chain' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Unsupported chain' }, { status: 400 });
     }
 
     const { chain, rpcUrl } = rpcDetails;
@@ -394,7 +394,7 @@ export async function POST(request: Request) {
     endSignatureVerification();
 
     if (!signatureVerified) {
-      return NextResponse.json(
+      return jsonWithServer(
         { success: false, error: 'Handshake signature mismatch' },
         { status: 400 }
       );
@@ -472,7 +472,7 @@ export async function POST(request: Request) {
       endPaymentReuseCheck();
 
       if (existingPaymentUsage) {
-        return NextResponse.json(
+        return jsonWithServer(
           { success: false, error: 'Payment reference already used for upload' },
           { status: 400 }
         );
@@ -491,7 +491,7 @@ export async function POST(request: Request) {
       } catch (err) {
         const message =
           err instanceof Error && err.message ? err.message : 'Unable to reserve free transfer.';
-        return NextResponse.json({ success: false, error: message }, { status: 400 });
+        return jsonWithServer({ success: false, error: message }, { status: 400 });
       }
     }
     console.log(`[upload] Starting R1FS upload preparation at ${Date.now()}`);
@@ -605,7 +605,7 @@ export async function POST(request: Request) {
     });
     endCleanupIndexWrite();
 
-    return NextResponse.json({
+    return jsonWithServer({
       success: true,
       recordKey: recipientKey,
       record,
@@ -617,6 +617,6 @@ export async function POST(request: Request) {
     const lower = message.toLowerCase();
     const clientErrors = ['missing', 'mismatch', 'not found', 'exceeds', 'unsupported'];
     const status = clientErrors.some((fragment) => lower.includes(fragment)) ? 400 : 500;
-    return NextResponse.json({ success: false, error: message }, { status });
+    return jsonWithServer({ success: false, error: message }, { status });
   }
 }

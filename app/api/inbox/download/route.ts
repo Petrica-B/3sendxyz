@@ -1,5 +1,5 @@
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { NextResponse } from 'next/server';
+import { jsonWithServer } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -15,10 +15,10 @@ export async function POST(request: Request) {
     const { cid, recipient, filename } = body ?? {};
 
     if (!cid || typeof cid !== 'string') {
-      return NextResponse.json({ success: false, error: 'Missing cid' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing cid' }, { status: 400 });
     }
     if (!recipient || typeof recipient !== 'string') {
-      return NextResponse.json({ success: false, error: 'Missing recipient' }, { status: 400 });
+      return jsonWithServer({ success: false, error: 'Missing recipient' }, { status: 400 });
     }
 
     const ratio1 = createEdgeSdk();
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       throw new Error('Missing file data from R1FS');
     }
 
-    return NextResponse.json({
+    return jsonWithServer({
       success: true,
       file: {
         base64: fileBase64,
@@ -46,6 +46,6 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[inbox-download] Failed to download file', error);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return jsonWithServer({ success: false, error: message }, { status: 500 });
   }
 }

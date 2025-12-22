@@ -1,6 +1,5 @@
 import { jsonWithServer } from '@/lib/api';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
@@ -25,20 +24,23 @@ export async function POST(request: Request) {
     const ratio1 = createEdgeSdk();
     const recipientKey = recipient.toLowerCase();
 
-    const downloadResult = await ratio1.r1fs.getFile({
+    const downloadResult = await ratio1.r1fs.getFileBase64({
       cid,
       secret: recipientKey,
     });
 
-    if (!downloadResult) {
+    const fileBase64 = downloadResult?.file_base64_str;
+    const fileName = downloadResult?.filename ?? filename ?? `${cid}.bin`;
+
+    if (!fileBase64) {
       throw new Error('Missing file data from R1FS');
     }
 
-    return new NextResponse(downloadResult.file_data, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${downloadResult.filename || 'file'}"`,
+    return jsonWithServer({
+      success: true,
+      file: {
+        base64: fileBase64,
+        filename: fileName,
       },
     });
   } catch (error) {

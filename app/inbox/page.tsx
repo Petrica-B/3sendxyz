@@ -313,34 +313,23 @@ export default function InboxPage() {
             filename: item.filename,
           }),
         });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.success || !payload?.file?.base64) {
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
           throw new Error(payload?.error || 'Download failed');
         }
-        const rawBase64 = payload.file.base64;
-        const fileName =
-          (payload.file.filename && typeof payload.file.filename === 'string'
-            ? payload.file.filename
-            : null) ??
-          item.originalFilename ??
-          item.filename;
+
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const headerFilenameMatch = contentDisposition?.match(/filename="([^"]+)"/i);
+        const headerFilename = headerFilenameMatch?.[1];
+        const fileName = headerFilename ?? item.originalFilename ?? item.filename ?? 'file';
 
         const { encryption, originalMimeType } = item;
         if (encryption) {
-          let base64Data: string | null = null;
-          if (typeof rawBase64 === 'string') {
-            if (rawBase64.startsWith('data:')) {
-              const commaIndex = rawBase64.indexOf(',');
-              base64Data = commaIndex >= 0 ? rawBase64.slice(commaIndex + 1) : null;
-            } else {
-              base64Data = rawBase64;
-            }
-          }
-          if (!base64Data) {
+          const buffer = await response.arrayBuffer();
+          if (!buffer || buffer.byteLength === 0) {
             throw new Error('Encrypted payload missing data');
           }
-
-          const ciphertext = decodeBase64(base64Data);
+          const ciphertext = new Uint8Array(buffer);
           const { privateKey, source } = await resolveRecipientPrivateKey(item);
           try {
             const plaintext = await decryptFileFromEnvelope({
@@ -372,16 +361,15 @@ export default function InboxPage() {
             }
           }
         } else {
-          const downloadUrl =
-            typeof rawBase64 === 'string' && rawBase64.startsWith('data:')
-              ? rawBase64
-              : `data:application/octet-stream;base64,${rawBase64 ?? ''}`;
+          const blob = await response.blob();
+          const downloadUrl = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = downloadUrl;
           a.download = fileName;
           document.body.appendChild(a);
           a.click();
           a.remove();
+          URL.revokeObjectURL(downloadUrl);
         }
         const displayNameRaw = fileName ?? 'your file';
         const displayName =

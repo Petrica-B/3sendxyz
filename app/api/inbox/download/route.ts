@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       secret: recipientKey,
     });
 
-    if (!downloadResult.meta?.filename) {
+    if (!downloadResult) {
       throw new Error('Missing file data from R1FS');
     }
 

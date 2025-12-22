@@ -1,3 +1,4 @@
+import { jsonWithServer } from '@/lib/api';
 import { VAULT_CSTORE_HKEY } from '@/lib/constants';
 import type { VaultKeyRecord } from '@/lib/types';
 import {
@@ -8,7 +9,6 @@ import {
 } from '@/lib/vault';
 import { buildVaultAccessMessage } from '@/lib/vaultAccess';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { jsonWithServer } from '@/lib/api';
 import { getAddress, isHex, recoverMessageAddress } from 'viem';
 
 export const runtime = 'nodejs';
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     let record: VaultKeyRecord | null = null;
 
     try {
-      const existingValue = await ratio1.cstore.hget({
+      const existingValue = await ratio1.cstore.hget<string>({
         hkey: VAULT_CSTORE_HKEY,
         key: addressKey,
       });

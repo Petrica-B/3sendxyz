@@ -1,9 +1,9 @@
+import { jsonWithServer } from '@/lib/api';
 import { REGISTERED_KEYS_CSTORE_HKEY, VAULT_CSTORE_HKEY } from '@/lib/constants';
 import { parseRegisteredKeyRecord } from '@/lib/passkey';
 import type { RegisteredKeyRecord, VaultKeyRecord } from '@/lib/types';
 import { createVaultRecord, getVaultPrivateKeySecret, parseVaultRecord } from '@/lib/vault';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { jsonWithServer } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
     let registeredKey: RegisteredKeyRecord | null = null;
     try {
-      const storedValue = await ratio1.cstore.hget({
+      const storedValue = await ratio1.cstore.hget<string>({
         hkey: REGISTERED_KEYS_CSTORE_HKEY,
         key: addressKey,
       });
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     let record: VaultKeyRecord | null = null;
 
     try {
-      const existingValue = await ratio1.cstore.hget({
+      const existingValue = await ratio1.cstore.hget<string>({
         hkey: VAULT_CSTORE_HKEY,
         key: addressKey,
       });

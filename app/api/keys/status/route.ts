@@ -1,8 +1,8 @@
+import { jsonWithServer } from '@/lib/api';
 import { REGISTERED_KEYS_CSTORE_HKEY } from '@/lib/constants';
 import { parseRegisteredKeyRecord } from '@/lib/passkey';
 import type { RegisteredKeyRecord } from '@/lib/types';
 import createEdgeSdk from '@ratio1/edge-sdk-ts';
-import { jsonWithServer } from '@/lib/api';
 import { getAddress } from 'viem';
 
 export const runtime = 'nodejs';
@@ -23,10 +23,10 @@ export async function GET(request: Request) {
 
   try {
     const ratio1 = createEdgeSdk();
-  	const key = normalized.toLowerCase();
+    const key = normalized.toLowerCase();
     let record: RegisteredKeyRecord | null = null;
     try {
-      const value = await ratio1.cstore.hget({
+      const value = await ratio1.cstore.hget<string>({
         hkey: REGISTERED_KEYS_CSTORE_HKEY,
         key,
       });
